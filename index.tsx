@@ -1,9 +1,8 @@
-/**
- * @format
- */
+import { registerRootComponent } from 'expo';
 
-import { AppRegistry } from 'react-native';
 import App from './App';
 
-// 'main' est le nom par défaut pour l'entrée de l'application dans Expo et React Native CLI
-AppRegistry.registerComponent('main', () => App);
+// registerRootComponent garantit que l'environnement est correctement configuré 
+// que ce soit pour Expo Go ou pour une build native de production.
+// Cela remplace AppRegistry.registerComponent de manière plus robuste pour Expo.
+registerRootComponent(App);

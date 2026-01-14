@@ -1,28 +1,27 @@
 {
-  "name": "levelup-life",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "deepflow",
+  "version": "1.0.0",
+  "main": "index.tsx",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
   },
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "lucide-react": "^0.562.0",
-    "@supabase/supabase-js": "2.39.3",
-    "@react-native-async-storage/async-storage": "^2.2.0",
+    "expo": "~52.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.3",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@supabase/supabase-js": "^2.39.0",
     "lucide-react-native": "^0.562.0",
-    "react-native": "^0.83.1",
-    "react-native-url-polyfill": "^3.0.0",
-    "react-native-svg": "^15.15.1"
+    "react-native-svg": "15.8.0",
+    "react-native-url-polyfill": "^2.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  }
+    "@babel/core": "^7.20.0",
+    "@types/react": "~18.3.12",
+    "typescript": "^5.3.3"
+  },
+  "private": true
 }

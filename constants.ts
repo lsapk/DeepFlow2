@@ -1,6 +1,6 @@
 import { Habit, Quest, Task, UserProfile, PlayerProfile } from "./types";
 
-export const APP_NAME = "LevelUp Life";
+export const APP_NAME = "DeepFlow";
 
 // Mock Data for UI demonstration
 export const MOCK_USER: UserProfile = {

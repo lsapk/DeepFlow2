@@ -58,7 +58,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout }) => {
             </TouchableOpacity>
         </View>
 
-        <Text style={styles.versionText}>LevelUp Life v1.0.0</Text>
+        <Text style={styles.versionText}>DeepFlow v1.0.0</Text>
       </ScrollView>
     </View>
   );
