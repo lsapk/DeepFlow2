@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>LevelUp Life</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Mobile-specific optimiztions */
+      body {
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: none;
+      }
+      /* Hide scrollbar for clean UI */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "@react-native-async-storage/async-storage": "https://esm.sh/@react-native-async-storage/async-storage@^2.2.0",
+    "lucide-react-native": "https://esm.sh/lucide-react-native@^0.562.0",
+    "react-native": "https://esm.sh/react-native@^0.83.1",
+    "react-native-url-polyfill/": "https://esm.sh/react-native-url-polyfill@^3.0.0/",
+    "react-native-svg": "https://esm.sh/react-native-svg@^15.15.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-50 text-slate-900 select-none">
+    <div id="root"></div>
+  </body>
+</html>
