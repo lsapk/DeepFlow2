@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { Home, CheckCircle2, Zap, Trophy, User } from 'lucide-react-native';
+import { Home, CheckCircle2, Zap, Trophy, User, BookOpen } from 'lucide-react-native';
 import { ViewState } from '../types';
 
 interface BottomNavProps {
@@ -14,6 +14,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
     { view: ViewState.TASKS, icon: CheckCircle2, label: 'Tasks' },
     { view: ViewState.FOCUS, icon: Zap, label: 'Focus' },
     { view: ViewState.HABITS, icon: Trophy, label: 'Habits' },
+    { view: ViewState.JOURNAL, icon: BookOpen, label: 'Journal' },
     { view: ViewState.PROFILE, icon: User, label: 'Profile' },
   ];
 
@@ -30,7 +31,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
             activeOpacity={0.5}
           >
             <Icon 
-                size={26} 
+                size={24} 
                 color={isActive ? '#007AFF' : '#999999'} 
                 strokeWidth={isActive ? 2.5 : 2}
             />
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.95)', // Glass effect simulation
     borderTopWidth: 0.5,
     borderTopColor: '#C6C6C8', // iOS separator color
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 28 : 8, // Safe area manual
     justifyContent: 'space-between',
@@ -67,7 +68,7 @@ const styles = StyleSheet.create({
     height: 50,
   },
   label: {
-    fontSize: 10,
+    fontSize: 9,
     marginTop: 4,
     fontWeight: '500',
   },

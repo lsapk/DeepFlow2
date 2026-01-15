@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
 import Focus from './pages/Focus';
+import Journal from './pages/Journal';
 import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabase';
@@ -25,11 +26,16 @@ const App: React.FC = () => {
   const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Initial Auth Check
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchData(session.user.id);
-      else setLoading(false);
+      if (session) {
+        fetchData(session.user.id);
+        setupRealtimeSubscription(session.user.id);
+      } else {
+        setLoading(false);
+      }
     });
 
     const {
@@ -38,6 +44,7 @@ const App: React.FC = () => {
       setSession(session);
       if (session) {
         fetchData(session.user.id);
+        setupRealtimeSubscription(session.user.id);
       } else {
         setUser(null);
         setPlayer(null);
@@ -47,6 +54,47 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Realtime Subscription Logic
+  const setupRealtimeSubscription = (userId: string) => {
+    const channel = supabase.channel('db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` },
+        () => fetchTasks(userId)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` },
+        () => fetchHabits(userId)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` },
+        () => fetchPlayer(userId)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  // Fetch helpers used by both initial load and realtime
+  const fetchTasks = async (userId: string) => {
+    const { data } = await supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    if (data) setTasks(data);
+  };
+
+  const fetchHabits = async (userId: string) => {
+    const { data } = await supabase.from('habits').select('*').eq('user_id', userId);
+    if (data) setHabits(data);
+  };
+
+  const fetchPlayer = async (userId: string) => {
+    const { data } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
+    if (data) setPlayer(data);
+  };
 
   const fetchData = async (userId: string) => {
     setLoading(true);
@@ -68,34 +116,11 @@ const App: React.FC = () => {
           });
       }
 
-      // 2. Player
-      const { data: playerData } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
+      await fetchPlayer(userId);
+      await fetchTasks(userId);
+      await fetchHabits(userId);
 
-      if (playerData) {
-        setPlayer(playerData);
-      } else {
-        const defaultPlayer = {
-            user_id: userId,
-            experience_points: 0,
-            level: 1,
-            avatar_type: 'novice',
-            credits: 0,
-            total_quests_completed: 0
-        };
-        const { data: newPlayer } = await supabase.from('player_profiles').insert(defaultPlayer).select().single();
-        if (newPlayer) setPlayer(newPlayer);
-        else setPlayer(defaultPlayer as any);
-      }
-
-      // 3. Tasks
-      const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-      if (tasksData) setTasks(tasksData);
-
-      // 4. Habits
-      const { data: habitsData } = await supabase.from('habits').select('*').eq('user_id', userId);
-      if (habitsData) setHabits(habitsData);
-
-      // 5. Quests
+      // 5. Quests (Global usually, or filter by user if specific)
       const { data: questsData } = await supabase.from('quests').select('*');
       if (questsData) setQuests(questsData);
 
@@ -111,23 +136,28 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
   };
 
+  // Actions
   const toggleTask = async (id: string) => {
+    // Optimistic Update
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     const newStatus = !task.completed;
+    
+    // UI update immediately
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: newStatus } : t));
+
+    // DB Update
     const { error } = await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
+    
+    // Gamification Logic (Server side trigger usually better, but here's client side logic)
     if (!error && newStatus && player) {
         const xpGain = 50;
         const newXp = player.experience_points + xpGain;
         const newLevel = Math.floor(newXp / 1000) + 1;
-        const { data: updatedPlayer } = await supabase
+        await supabase
             .from('player_profiles')
             .update({ experience_points: newXp, level: newLevel, credits: player.credits + 5 })
-            .eq('id', player.id)
-            .select()
-            .single();
-        if (updatedPlayer) setPlayer(updatedPlayer);
+            .eq('id', player.id);
     }
   };
 
@@ -140,11 +170,11 @@ const App: React.FC = () => {
           completed: false,
           created_at: new Date().toISOString()
       };
-      const { data } = await supabase.from('tasks').insert(newTaskPayload).select().single();
-      if (data) setTasks(prev => [data, ...prev]);
+      await supabase.from('tasks').insert(newTaskPayload);
   };
 
   const deleteTask = async (id: string) => {
+      // Optimistic
       setTasks(prev => prev.filter(t => t.id !== id));
       await supabase.from('tasks').delete().eq('id', id);
   }
@@ -152,18 +182,20 @@ const App: React.FC = () => {
   const incrementHabit = async (id: string) => {
       const habit = habits.find(h => h.id === id);
       if (!habit || !player) return;
+      
       const newStreak = habit.streak + 1;
       const now = new Date().toISOString();
+      
+      // UI update handled by realtime or optimistic
       setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: now } : h));
+
       await supabase.from('habits').update({ streak: newStreak, last_completed_at: now }).eq('id', id);
+      
       const xpGain = 30;
-      const { data: updatedPlayer } = await supabase
+      await supabase
         .from('player_profiles')
         .update({ experience_points: player.experience_points + xpGain })
-        .eq('id', player.id)
-        .select()
-        .single();
-      if (updatedPlayer) setPlayer(updatedPlayer);
+        .eq('id', player.id);
   };
 
   const renderView = () => {
@@ -185,7 +217,9 @@ const App: React.FC = () => {
       case ViewState.HABITS:
         return <Habits habits={habits} incrementHabit={incrementHabit} />;
       case ViewState.FOCUS:
-        return <Focus />;
+        return <Focus onExit={() => setCurrentView(ViewState.DASHBOARD)} />;
+      case ViewState.JOURNAL:
+        return <Journal userId={user.id} />;
       case ViewState.PROFILE:
         return <Profile user={user} player={player} logout={handleLogout} />;
       default:
@@ -196,16 +230,14 @@ const App: React.FC = () => {
   // Apple Design: Light mode defaults (except Focus mode which is OLED black)
   const isFocusMode = currentView === ViewState.FOCUS;
   const backgroundColor = isFocusMode ? '#000000' : '#F2F2F7';
-  
-  // Status Bar Style
   const statusBarStyle = isFocusMode ? "light-content" : "dark-content";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: backgroundColor }}>
       <StatusBar 
         barStyle={statusBarStyle} 
-        backgroundColor={backgroundColor} // Android Only: Matches app background
-        translucent={false} // Keeping opaque for standard safe-area behavior implies better consistency here without extra deps
+        backgroundColor={backgroundColor} 
+        translucent={false} 
       />
       <View style={{ flex: 1, backgroundColor: backgroundColor }}>
         {renderView()}

@@ -59,11 +59,20 @@ export interface FocusSession {
   session_type: string;
 }
 
+export interface JournalEntry {
+  id: string;
+  user_id: string;
+  content: string;
+  mood: 'happy' | 'neutral' | 'sad' | 'energetic' | 'tired';
+  created_at: string;
+}
+
 export enum ViewState {
   AUTH = 'AUTH',
   DASHBOARD = 'DASHBOARD',
   TASKS = 'TASKS',
   HABITS = 'HABITS',
   FOCUS = 'FOCUS',
+  JOURNAL = 'JOURNAL',
   PROFILE = 'PROFILE'
 }

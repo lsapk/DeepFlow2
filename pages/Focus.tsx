@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Play, Pause, RotateCcw, X } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
@@ -10,7 +10,11 @@ const STROKE_WIDTH = 20; // Thicker, Apple Watch style
 const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const Focus: React.FC = () => {
+interface FocusProps {
+    onExit: () => void;
+}
+
+const Focus: React.FC<FocusProps> = ({ onExit }) => {
   const [isActive, setIsActive] = useState(false);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [sessionType, setSessionType] = useState<'FOCUS' | 'BREAK'>('FOCUS');
@@ -67,7 +71,11 @@ const Focus: React.FC = () => {
   return (
     <View style={styles.container}>
         <View style={styles.header}>
-             <Text style={styles.headerTitle}>Focus</Text>
+             <TouchableOpacity onPress={onExit} style={styles.exitButton}>
+                <X size={24} color="white" />
+             </TouchableOpacity>
+             <Text style={styles.headerTitle}>Focus Mode</Text>
+             <View style={{width: 40}} /> 
         </View>
 
         <View style={styles.content}>
@@ -144,11 +152,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000', // Deep black OLED friendly
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'android' ? 40 : 20,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 40,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    height: 44,
+  },
+  exitButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1C1C1E',
+    borderRadius: 20,
   },
   headerTitle: {
       color: 'white',
