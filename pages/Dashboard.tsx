@@ -1,80 +1,125 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { PlayerProfile, UserProfile, Quest } from '../types';
-import GamificationHeader from '../components/GamificationHeader';
-import { ChevronRight, Target, Zap } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { PlayerProfile, UserProfile, Quest, Task, Habit } from '../types';
+import { CheckCircle2, Zap, Trophy, BookOpen, Flag, BrainCircuit } from 'lucide-react-native';
+import ProgressRing from '../components/ProgressRing';
 
 interface DashboardProps {
   user: UserProfile;
   player: PlayerProfile;
   quests: Quest[];
+  tasks: Task[];
+  habits: Habit[];
   setView: (view: any) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, quests, setView }) => {
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48) / 2; // 2 columns with padding
+
+const Dashboard: React.FC<DashboardProps> = ({ user, player, quests, tasks, habits, setView }) => {
+  
+  // Calculate Stats
+  const completedTasksToday = tasks.filter(t => t.completed).length; // Simplified for demo (should check date)
+  const completedHabitsToday = habits.filter(h => {
+       return h.last_completed_at && new Date(h.last_completed_at).toDateString() === new Date().toDateString();
+  }).length;
+  
+  // Mock focus minutes (needs backend support later)
+  const focusMinutes = 0; 
+
+  const totalHabits = habits.length || 1; // avoid div by 0
+  const habitProgress = completedHabitsToday / totalHabits;
+  
+  const totalTasks = tasks.length || 1;
+  const taskProgress = completedTasksToday / totalTasks;
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <GamificationHeader user={user} player={player} />
-
-        {/* Quests Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Active Quests</Text>
-            <TouchableOpacity>
-                <Text style={styles.linkText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.listContainer}>
-            {quests.slice(0, 3).map((quest, index) => (
-                <View key={quest.id}>
-                    <View style={styles.questItem}>
-                        <View style={styles.questContent}>
-                            <Text style={styles.questTitle} numberOfLines={1}>{quest.title}</Text>
-                            <View style={styles.questMeta}>
-                                <Text style={styles.questReward}>{quest.reward_xp} XP</Text>
-                                <Text style={styles.questSep}>•</Text>
-                                <Text style={[styles.questProgress, { color: quest.current_progress >= quest.target_value ? '#34C759' : '#8E8E93' }]}>
-                                    {Math.round((quest.current_progress / quest.target_value) * 100)}%
-                                </Text>
-                            </View>
-                        </View>
-                        <ChevronRight size={20} color="#C7C7CC" />
-                    </View>
-                    {index < quests.slice(0, 3).length - 1 && <View style={styles.separator} />}
-                </View>
-            ))}
-          </View>
+        
+        <View style={styles.header}>
+            <Text style={styles.largeTitle}>Accueil</Text>
         </View>
 
-        {/* Actions Grid */}
-        <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.grid}>
-                <TouchableOpacity 
-                    onPress={() => setView('FOCUS')}
-                    style={styles.gridItem}
-                    activeOpacity={0.7}
-                >
-                    <View style={[styles.iconContainer, { backgroundColor: '#5856D6' }]}>
-                        <Zap size={24} color="white" fill="white" />
-                    </View>
-                    <Text style={styles.gridLabel}>Focus Mode</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                    onPress={() => setView('TASKS')}
-                    style={styles.gridItem}
-                    activeOpacity={0.7}
-                >
-                    <View style={[styles.iconContainer, { backgroundColor: '#007AFF' }]}>
-                        <Target size={24} color="white" />
-                    </View>
-                    <Text style={styles.gridLabel}>Add Task</Text>
-                </TouchableOpacity>
+        {/* Daily Report Section */}
+        <View style={styles.reportContainer}>
+            <Text style={styles.sectionTitle}>Rapport Quotidien</Text>
+            <View style={styles.ringsRow}>
+                <ProgressRing 
+                    size={100} 
+                    strokeWidth={8} 
+                    progress={0} 
+                    color="#5856D6" 
+                    label="Focus" 
+                    value={`${focusMinutes}m`} 
+                />
+                <ProgressRing 
+                    size={100} 
+                    strokeWidth={8} 
+                    progress={taskProgress} 
+                    color="#8E8E93" // Grey as per screenshot for Tasks (or Blue)
+                    label="Tâches" 
+                    value={completedTasksToday} 
+                />
+                <ProgressRing 
+                    size={100} 
+                    strokeWidth={8} 
+                    progress={habitProgress} 
+                    color="#34C759" 
+                    label="Habitudes" 
+                    value={completedHabitsToday} 
+                />
             </View>
         </View>
+
+        {/* Features Grid */}
+        <View style={styles.gridContainer}>
+            
+            <TouchableOpacity style={styles.card} onPress={() => setView('TASKS')}>
+                <View style={styles.cardContent}>
+                    <CheckCircle2 size={32} color="#007AFF" style={styles.cardIcon} />
+                    <Text style={styles.cardTitle}>Tâches</Text>
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.card} onPress={() => setView('HABITS')}>
+                <View style={styles.cardContent}>
+                    <Trophy size={32} color="#34C759" style={styles.cardIcon} />
+                    <Text style={styles.cardTitle}>Habitudes</Text>
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.card} onPress={() => setView('GOALS')}>
+                <View style={styles.cardContent}>
+                    <Flag size={32} color="#FF9500" style={styles.cardIcon} />
+                    <Text style={styles.cardTitle}>Objectifs</Text>
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.card} onPress={() => setView('JOURNAL')}>
+                <View style={styles.cardContent}>
+                    <BookOpen size={32} color="#FF3B30" style={styles.cardIcon} />
+                    <Text style={styles.cardTitle}>Journal</Text>
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.card} onPress={() => setView('FOCUS')}>
+                <View style={styles.cardContent}>
+                    <Zap size={32} color="#5856D6" style={styles.cardIcon} />
+                    <Text style={styles.cardTitle}>Focus</Text>
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.card} onPress={() => setView('JOURNAL')}> 
+                {/* Reusing Journal for Reflection/Reflexion as per screenshot, or make separate view */}
+                <View style={styles.cardContent}>
+                    <BrainCircuit size={32} color="#E0255E" style={styles.cardIcon} />
+                    <Text style={styles.cardTitle}>Réflexion</Text>
+                </View>
+            </TouchableOpacity>
+
+        </View>
+
       </ScrollView>
     </View>
   );
@@ -83,109 +128,66 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, quests, setView }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7', // iOS Grouped Background
+    backgroundColor: '#F2F2F7', 
   },
   scrollContent: {
     paddingBottom: 100,
+    paddingTop: 20,
   },
-  sectionContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
+  header: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 8,
-    paddingHorizontal: 4,
+  largeTitle: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#000',
+  },
+  reportContainer: {
+      paddingHorizontal: 20,
+      marginBottom: 30,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 8,
-    paddingHorizontal: 4,
+      fontSize: 20,
+      fontWeight: '600',
+      marginBottom: 16,
+      color: '#000',
   },
-  linkText: {
-    fontSize: 15,
-    color: '#007AFF',
+  ringsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
   },
-  listContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    overflow: 'hidden',
+  gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 16,
+      gap: 16,
   },
-  questItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: 'white',
+  card: {
+      width: CARD_WIDTH,
+      height: CARD_WIDTH * 0.85, // Slightly rectangular
+      backgroundColor: 'white',
+      borderRadius: 24, // High border radius like screenshot
+      padding: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+      justifyContent: 'flex-start',
   },
-  separator: {
-    height: 0.5,
-    backgroundColor: '#C6C6C8',
-    marginLeft: 16,
+  cardContent: {
+      flex: 1,
+      justifyContent: 'space-between',
   },
-  questContent: {
-    flex: 1,
-    marginRight: 16,
+  cardIcon: {
+      marginBottom: 10,
   },
-  questTitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  questMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  questReward: {
-    fontSize: 13,
-    color: '#FF9500',
-    fontWeight: '600',
-  },
-  questSep: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginHorizontal: 4,
-  },
-  questProgress: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  grid: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  gridItem: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 110,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  gridLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000000',
-  },
+  cardTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: '#000',
+  }
 });
 
 export default Dashboard;

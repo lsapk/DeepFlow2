@@ -19,6 +19,16 @@ export interface PlayerProfile {
   total_quests_completed: number;
 }
 
+export interface Subtask {
+  id: string;
+  parent_task_id: string;
+  user_id: string;
+  title: string;
+  completed: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   user_id: string;
@@ -27,18 +37,53 @@ export interface Task {
   completed: boolean;
   due_date: string | null;
   priority: 'low' | 'medium' | 'high';
+  sort_order: number;
   created_at: string;
+  // UI Helper properties
+  subtasks?: Subtask[]; 
+  isExpanded?: boolean;
+}
+
+export interface SubObjective {
+  id: string;
+  parent_goal_id: string;
+  user_id: string;
+  title: string;
+  description?: string | null;
+  completed: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface Goal {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  completed: boolean;
+  target_date: string | null;
+  progress?: number;
+  category?: string | null;
+  is_archived?: boolean;
+  sort_order: number;
+  created_at: string;
+  // UI Helper properties
+  subobjectives?: SubObjective[];
+  isExpanded?: boolean;
 }
 
 export interface Habit {
   id: string;
   user_id: string;
   title: string;
+  description?: string | null;
   frequency: string;
   streak: number;
   target: number;
   category: string | null;
   last_completed_at: string | null;
+  is_archived?: boolean; 
+  sort_order?: number;   
 }
 
 export interface Quest {
@@ -72,7 +117,10 @@ export enum ViewState {
   DASHBOARD = 'DASHBOARD',
   TASKS = 'TASKS',
   HABITS = 'HABITS',
+  GOALS = 'GOALS',
   FOCUS = 'FOCUS',
   JOURNAL = 'JOURNAL',
-  PROFILE = 'PROFILE'
+  PROFILE = 'PROFILE',
+  IA = 'IA',
+  CYBER_KNIGHT = 'CYBER_KNIGHT'
 }

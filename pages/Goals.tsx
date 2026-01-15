@@ -1,85 +1,85 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
-import { Task, Subtask } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, MoreVertical, X, ArrowUp, ArrowDown } from 'lucide-react-native';
+import { Goal, SubObjective } from '../types';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, ArrowUp, ArrowDown, Flag } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
-// Enable LayoutAnimation on Android
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
   }
 }
 
-interface TasksProps {
-  tasks: Task[];
-  toggleTask: (id: string) => void;
-  addTask: (title: string, priority: Task['priority']) => void;
-  deleteTask: (id: string) => void;
+interface GoalsProps {
+  goals: Goal[];
+  toggleGoal: (id: string) => void;
+  addGoal: (title: string) => void;
+  deleteGoal: (id: string) => void;
   userId: string;
-  refreshTasks: () => void;
+  refreshGoals: () => void;
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, userId, refreshTasks }) => {
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newPriority, setNewPriority] = useState<Task['priority']>('medium');
-  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, userId, refreshGoals }) => {
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
+  const [showCompleted, setShowCompleted] = useState(false);
   
-  // Edit Modal State
+  // Edit Modal
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
   const handleAdd = () => {
-    if (newTaskTitle.trim()) {
-      addTask(newTaskTitle, newPriority);
-      setNewTaskTitle('');
+    if (newGoalTitle.trim()) {
+      addGoal(newGoalTitle);
+      setNewGoalTitle('');
     }
   };
 
-  const toggleExpand = (taskId: string) => {
+  const toggleExpand = (goalId: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const newSet = new Set(expandedTaskIds);
-    if (newSet.has(taskId)) {
-      newSet.delete(taskId);
+    const newSet = new Set(expandedGoalIds);
+    if (newSet.has(goalId)) {
+      newSet.delete(goalId);
     } else {
-      newSet.add(taskId);
+      newSet.add(goalId);
     }
-    setExpandedTaskIds(newSet);
+    setExpandedGoalIds(newSet);
   };
 
-  const openEditModal = (task: Task) => {
-      setSelectedTask(task);
-      setEditTitle(task.title);
+  const openEditModal = (goal: Goal) => {
+      setSelectedGoal(goal);
+      setEditTitle(goal.title);
       setEditModalVisible(true);
   };
 
-  const handleUpdateTask = async () => {
-      if (!selectedTask) return;
-      await supabase.from('tasks').update({ title: editTitle, priority: selectedTask.priority }).eq('id', selectedTask.id);
-      refreshTasks();
+  const handleUpdateGoal = async () => {
+      if (!selectedGoal) return;
+      await supabase.from('goals').update({ title: editTitle }).eq('id', selectedGoal.id);
+      refreshGoals();
       setEditModalVisible(false);
   };
 
   const handleMove = async (direction: 'up' | 'down') => {
-      if (!selectedTask) return;
-      // Simple reorder: swap sort_order or decrement/increment
-      const currentOrder = selectedTask.sort_order || 0;
+      if (!selectedGoal) return;
+      const currentOrder = selectedGoal.sort_order || 0;
       const newOrder = direction === 'up' ? currentOrder - 1 : currentOrder + 1;
       
-      await supabase.from('tasks').update({ sort_order: newOrder }).eq('id', selectedTask.id);
-      refreshTasks();
-      // Keep modal open or update selected task?
-      setSelectedTask({...selectedTask, sort_order: newOrder});
+      await supabase.from('goals').update({ sort_order: newOrder }).eq('id', selectedGoal.id);
+      refreshGoals();
+      setSelectedGoal({...selectedGoal, sort_order: newOrder});
   };
 
-  const activeTasks = tasks.filter(t => !t.completed);
-  const completedTasks = tasks.filter(t => t.completed);
+  const activeGoals = goals.filter(t => !t.completed);
+  const completedGoals = goals.filter(t => t.completed);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-          <Text style={styles.largeTitle}>Tasks</Text>
+          <Text style={styles.largeTitle}>Objectifs</Text>
+          <TouchableOpacity onPress={() => setShowCompleted(!showCompleted)} style={styles.toggleCompletedBtn}>
+              <Text style={styles.toggleText}>{showCompleted ? 'Masquer Terminés' : 'Voir Terminés'}</Text>
+          </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView 
@@ -90,37 +90,19 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
         <View style={styles.inputContainer}>
             <TextInput
             style={styles.textInput}
-            placeholder="Add a new task..."
+            placeholder="Nouvel objectif..."
             placeholderTextColor="#8E8E93"
-            value={newTaskTitle}
-            onChangeText={setNewTaskTitle}
+            value={newGoalTitle}
+            onChangeText={setNewGoalTitle}
             />
             <View style={styles.inputRow}>
-                <View style={styles.priorityGroup}>
-                    {(['low', 'medium', 'high'] as const).map(p => (
-                    <TouchableOpacity
-                        key={p}
-                        onPress={() => setNewPriority(p)}
-                        style={[
-                            styles.priorityPill,
-                            newPriority === p ? styles[`pill${p}`] : styles.pillInactive
-                        ]}
-                    >
-                        <Text style={[
-                            styles.priorityText,
-                            newPriority === p ? styles.priorityTextActive : styles.priorityTextInactive
-                        ]}>
-                            {p.charAt(0).toUpperCase() + p.slice(1)}
-                        </Text>
-                    </TouchableOpacity>
-                    ))}
-                </View>
+                <View style={{flex: 1}} />
                 <TouchableOpacity 
                     onPress={handleAdd}
-                    disabled={!newTaskTitle.trim()}
+                    disabled={!newGoalTitle.trim()}
                     style={styles.addButton}
                 >
-                    <Plus size={24} color={!newTaskTitle.trim() ? '#C7C7CC' : '#007AFF'} />
+                    <Plus size={24} color={!newGoalTitle.trim() ? '#C7C7CC' : '#007AFF'} />
                 </TouchableOpacity>
             </View>
         </View>
@@ -128,41 +110,41 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.listGroup}>
-            {activeTasks.length === 0 && (
-                <Text style={styles.emptyText}>No active tasks.</Text>
+            {activeGoals.length === 0 && (
+                <Text style={styles.emptyText}>Aucun objectif en cours.</Text>
             )}
-            {activeTasks.map((task, index) => (
-                <View key={task.id}>
-                    <TaskItem 
-                        task={task} 
-                        isExpanded={expandedTaskIds.has(task.id)}
-                        onToggle={() => toggleTask(task.id)} 
-                        onToggleExpand={() => toggleExpand(task.id)}
-                        onLongPress={() => openEditModal(task)}
+            {activeGoals.map((goal, index) => (
+                <View key={goal.id}>
+                    <GoalItem 
+                        goal={goal} 
+                        isExpanded={expandedGoalIds.has(goal.id)}
+                        onToggle={() => toggleGoal(goal.id)} 
+                        onToggleExpand={() => toggleExpand(goal.id)}
+                        onLongPress={() => openEditModal(goal)}
                         userId={userId}
-                        refreshTasks={refreshTasks}
+                        refreshGoals={refreshGoals}
                     />
-                    {index < activeTasks.length - 1 && <View style={styles.separator} />}
+                    {index < activeGoals.length - 1 && <View style={styles.separator} />}
                 </View>
             ))}
         </View>
 
-        {completedTasks.length > 0 && (
+        {showCompleted && completedGoals.length > 0 && (
              <View style={styles.completedGroup}>
-                <Text style={styles.groupHeader}>Completed</Text>
+                <Text style={styles.groupHeader}>Terminés</Text>
                 <View style={styles.listGroup}>
-                    {completedTasks.map((task, index) => (
-                        <View key={task.id}>
-                             <TaskItem 
-                                task={task} 
-                                isExpanded={expandedTaskIds.has(task.id)}
-                                onToggle={() => toggleTask(task.id)} 
-                                onToggleExpand={() => toggleExpand(task.id)}
-                                onLongPress={() => openEditModal(task)}
+                    {completedGoals.map((goal, index) => (
+                        <View key={goal.id}>
+                             <GoalItem 
+                                goal={goal} 
+                                isExpanded={expandedGoalIds.has(goal.id)}
+                                onToggle={() => toggleGoal(goal.id)} 
+                                onToggleExpand={() => toggleExpand(goal.id)}
+                                onLongPress={() => openEditModal(goal)}
                                 userId={userId}
-                                refreshTasks={refreshTasks}
+                                refreshGoals={refreshGoals}
                             />
-                            {index < completedTasks.length - 1 && <View style={styles.separator} />}
+                            {index < completedGoals.length - 1 && <View style={styles.separator} />}
                         </View>
                     ))}
                 </View>
@@ -180,7 +162,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
           <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Edit Task</Text>
+                      <Text style={styles.modalTitle}>Modifier l'Objectif</Text>
                       <TouchableOpacity onPress={() => setEditModalVisible(false)}>
                           <X size={24} color="#000" />
                       </TouchableOpacity>
@@ -192,15 +174,15 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
                       onChangeText={setEditTitle} 
                   />
 
-                  <Text style={styles.modalLabel}>Reorder</Text>
+                  <Text style={styles.modalLabel}>Réorganiser</Text>
                   <View style={styles.reorderRow}>
                       <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('up')}>
                            <ArrowUp size={20} color="#000" />
-                           <Text>Move Up</Text>
+                           <Text>Monter</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('down')}>
                            <ArrowDown size={20} color="#000" />
-                           <Text>Move Down</Text>
+                           <Text>Descendre</Text>
                       </TouchableOpacity>
                   </View>
 
@@ -208,11 +190,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
                   <TouchableOpacity 
                     style={styles.deleteActionBtn} 
                     onPress={() => {
-                        if (selectedTask) {
-                            Alert.alert("Delete Task", "Are you sure?", [
-                                { text: "Cancel", style: "cancel"},
-                                { text: "Delete", style: 'destructive', onPress: () => {
-                                    deleteTask(selectedTask.id);
+                        if (selectedGoal) {
+                            Alert.alert("Supprimer", "Êtes-vous sûr ?", [
+                                { text: "Annuler", style: "cancel"},
+                                { text: "Supprimer", style: 'destructive', onPress: () => {
+                                    deleteGoal(selectedGoal.id);
                                     setEditModalVisible(false);
                                 }}
                             ])
@@ -220,11 +202,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
                     }}
                    >
                       <Trash2 size={20} color="#FF3B30" />
-                      <Text style={styles.deleteText}>Delete Task</Text>
+                      <Text style={styles.deleteText}>Supprimer l'Objectif</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateTask}>
-                      <Text style={styles.saveBtnText}>Save Changes</Text>
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateGoal}>
+                      <Text style={styles.saveBtnText}>Enregistrer</Text>
                   </TouchableOpacity>
               </View>
           </View>
@@ -234,43 +216,42 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
   );
 };
 
-interface TaskItemProps {
-    task: Task;
+interface GoalItemProps {
+    goal: Goal;
     isExpanded: boolean;
     onToggle: () => void;
     onToggleExpand: () => void;
     onLongPress: () => void;
     userId: string;
-    refreshTasks: () => void;
+    refreshGoals: () => void;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshTasks }) => {
-    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshGoals }) => {
+    const [newSubGoalTitle, setNewSubGoalTitle] = useState('');
     
-    const addSubtask = async () => {
-        if (!newSubtaskTitle.trim()) return;
-        await supabase.from('subtasks').insert({
-            parent_task_id: task.id,
+    const addSubGoal = async () => {
+        if (!newSubGoalTitle.trim()) return;
+        await supabase.from('subobjectives').insert({
+            parent_goal_id: goal.id,
             user_id: userId,
-            title: newSubtaskTitle,
+            title: newSubGoalTitle,
             completed: false,
-            sort_order: task.subtasks ? task.subtasks.length : 0
+            sort_order: goal.subobjectives ? goal.subobjectives.length : 0
         });
-        setNewSubtaskTitle('');
-        refreshTasks();
+        setNewSubGoalTitle('');
+        refreshGoals();
     };
 
-    const toggleSubtask = async (subtask: Subtask) => {
-        const newStatus = !subtask.completed;
-        await supabase.from('subtasks').update({ completed: newStatus }).eq('id', subtask.id);
-        refreshTasks(); // Or optimistic update via props
+    const toggleSubGoal = async (subObjective: SubObjective) => {
+        const newStatus = !subObjective.completed;
+        await supabase.from('subobjectives').update({ completed: newStatus }).eq('id', subObjective.id);
+        refreshGoals(); 
     };
 
-    const priorityColors = {
-        low: '#34C759',    // System Green
-        medium: '#FF9500', // System Orange
-        high: '#FF3B30'    // System Red
-    };
+    const deleteSubGoal = async (id: string) => {
+         await supabase.from('subobjectives').delete().eq('id', id);
+         refreshGoals();
+    }
 
     return (
         <View style={styles.taskItemContainer}>
@@ -284,25 +265,24 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                     onPress={onToggle}
                     style={[
                         styles.checkbox,
-                        task.completed && { backgroundColor: '#007AFF', borderColor: '#007AFF' }
+                        goal.completed && { backgroundColor: '#FF9500', borderColor: '#FF9500' }
                     ]}
                 >
-                    {task.completed && <Check size={14} color="white" strokeWidth={4} />}
+                    {goal.completed && <Check size={14} color="white" strokeWidth={4} />}
                 </TouchableOpacity>
                 
                 <View style={styles.taskContent}>
-                    <Text style={[styles.taskTitle, task.completed && styles.taskTitleCompleted]}>
-                        {task.title}
+                    <Text style={[styles.taskTitle, goal.completed && styles.taskTitleCompleted]}>
+                        {goal.title}
                     </Text>
-                    {task.subtasks && task.subtasks.length > 0 && (
+                    {goal.subobjectives && goal.subobjectives.length > 0 && (
                         <Text style={styles.subtaskSummary}>
-                            {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length} subtasks
+                            {goal.subobjectives.filter(s => s.completed).length}/{goal.subobjectives.length} étapes
                         </Text>
                     )}
                 </View>
 
                 <View style={styles.rightActions}>
-                     <View style={[styles.priorityDot, { backgroundColor: priorityColors[task.priority] }]} />
                      {isExpanded ? <ChevronUp size={20} color="#C7C7CC" /> : <ChevronDown size={20} color="#C7C7CC" />}
                 </View>
             </TouchableOpacity>
@@ -310,28 +290,31 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
             {/* EXPANDED SECTION */}
             {isExpanded && (
                 <View style={styles.expandedSection}>
-                    {task.subtasks?.map(subtask => (
-                        <View key={subtask.id} style={styles.subtaskRow}>
-                            <TouchableOpacity onPress={() => toggleSubtask(subtask)} style={styles.subtaskCheckbox}>
-                                {subtask.completed && <View style={styles.subtaskChecked} />}
+                    {goal.subobjectives?.map(subObjective => (
+                        <View key={subObjective.id} style={styles.subtaskRow}>
+                            <TouchableOpacity onPress={() => toggleSubGoal(subObjective)} style={styles.subtaskCheckbox}>
+                                {subObjective.completed && <View style={styles.subtaskChecked} />}
                             </TouchableOpacity>
-                            <Text style={[styles.subtaskTitle, subtask.completed && styles.subtaskTitleCompleted]}>
-                                {subtask.title}
+                            <Text style={[styles.subtaskTitle, subObjective.completed && styles.subtaskTitleCompleted]}>
+                                {subObjective.title}
                             </Text>
+                            <TouchableOpacity onPress={() => deleteSubGoal(subObjective.id)} style={{marginLeft: 'auto'}}>
+                                <X size={14} color="#C7C7CC" />
+                            </TouchableOpacity>
                         </View>
                     ))}
                     
                     <View style={styles.addSubtaskRow}>
                         <TextInput
                             style={styles.subtaskInput}
-                            placeholder="Add subtask..."
+                            placeholder="Ajouter une étape..."
                             placeholderTextColor="#8E8E93"
-                            value={newSubtaskTitle}
-                            onChangeText={setNewSubtaskTitle}
-                            onSubmitEditing={addSubtask}
+                            value={newSubGoalTitle}
+                            onChangeText={setNewSubGoalTitle}
+                            onSubmitEditing={addSubGoal}
                         />
-                        <TouchableOpacity onPress={addSubtask} disabled={!newSubtaskTitle.trim()}>
-                            <Plus size={20} color={newSubtaskTitle.trim() ? "#007AFF" : "#C7C7CC"} />
+                        <TouchableOpacity onPress={addSubGoal} disabled={!newSubGoalTitle.trim()}>
+                            <Plus size={20} color={newSubGoalTitle.trim() ? "#007AFF" : "#C7C7CC"} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -344,18 +327,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
-    paddingTop: 20, // Reduced top padding as SafeAreaView handles it
+    paddingTop: 20,
   },
   header: {
     paddingHorizontal: 16,
     marginBottom: 16,
     marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
   },
   largeTitle: {
     fontSize: 34,
     fontWeight: '700',
     color: '#000000',
     letterSpacing: 0.37,
+  },
+  toggleCompletedBtn: {
+      padding: 8,
+  },
+  toggleText: {
+      color: '#007AFF',
+      fontSize: 15,
   },
   keyboardAvoid: {
     zIndex: 10,
@@ -378,33 +371,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  priorityGroup: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  priorityPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  pillInactive: {
-    backgroundColor: '#F2F2F7',
-  },
-  pilllow: { backgroundColor: '#E0F8E5' },
-  pillmedium: { backgroundColor: '#FFF5E0' },
-  pillhigh: { backgroundColor: '#FFEBEA' },
-  priorityText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  priorityTextInactive: { color: '#8E8E93' },
-  priorityTextActive: { color: '#000000' },
   addButton: {
     padding: 4,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 150, // Extra space for bottom nav
+    paddingBottom: 150,
   },
   listGroup: {
     backgroundColor: '#FFFFFF',
@@ -470,11 +442,6 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       gap: 12,
   },
-  priorityDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-  },
   expandedSection: {
       paddingLeft: 52,
       paddingRight: 16,
@@ -498,12 +465,13 @@ const styles = StyleSheet.create({
   subtaskChecked: {
       width: 10,
       height: 10,
-      backgroundColor: '#007AFF',
+      backgroundColor: '#FF9500',
       borderRadius: 2,
   },
   subtaskTitle: {
       fontSize: 15,
       color: '#333',
+      flex: 1,
   },
   subtaskTitleCompleted: {
       color: '#C7C7CC',
@@ -522,7 +490,6 @@ const styles = StyleSheet.create({
       color: '#000',
       marginRight: 8,
   },
-  // Modal Styles
   modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.5)',
@@ -603,4 +570,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default Tasks;
+export default Goals;

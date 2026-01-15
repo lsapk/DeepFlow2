@@ -31,6 +31,7 @@ export const MOCK_TASKS: Task[] = [
     completed: false,
     due_date: new Date().toISOString(),
     priority: "high",
+    sort_order: 0,
     created_at: new Date().toISOString()
   },
   {
@@ -41,6 +42,7 @@ export const MOCK_TASKS: Task[] = [
     completed: true,
     due_date: new Date().toISOString(),
     priority: "medium",
+    sort_order: 1,
     created_at: new Date().toISOString()
   },
   {
@@ -51,6 +53,7 @@ export const MOCK_TASKS: Task[] = [
     completed: false,
     due_date: null,
     priority: "low",
+    sort_order: 2,
     created_at: new Date().toISOString()
   }
 ];
