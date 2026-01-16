@@ -43,6 +43,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
   const handleSave = async () => {
       if (!title.trim()) return;
 
+      const maxOrder = habits.length > 0 ? Math.max(...habits.map(h => h.sort_order || 0)) : 0;
+
       const habitData = {
           user_id: userId,
           title,
@@ -59,7 +61,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
               ...habitData,
               streak: 0,
               is_archived: false,
-              sort_order: 0 
+              sort_order: maxOrder + 1 
           });
       }
 
@@ -74,14 +76,24 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
   };
 
   const handleDelete = async (id: string) => {
-      Alert.alert("Delete Habit", "Cannot be undone.", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Delete", style: "destructive", onPress: async () => {
+      Alert.alert("Supprimer", "Cette action est irréversible.", [
+          { text: "Annuler", style: "cancel" },
+          { text: "Supprimer", style: "destructive", onPress: async () => {
               await supabase.from('habits').delete().eq('id', id);
               setModalVisible(false);
               refreshHabits();
           }}
       ]);
+  };
+
+  const handleMove = async (direction: 'up' | 'down') => {
+      if (!editingHabit) return;
+      const currentOrder = editingHabit.sort_order || 0;
+      const newOrder = direction === 'up' ? currentOrder - 1 : currentOrder + 1;
+      
+      await supabase.from('habits').update({ sort_order: newOrder }).eq('id', editingHabit.id);
+      setEditingHabit({...editingHabit, sort_order: newOrder});
+      refreshHabits();
   };
 
   const displayedHabits = habits.filter(h => !!h.is_archived === showArchived);
@@ -195,7 +207,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
                                 />
                           </View>
                           <View style={{flex: 1, marginLeft: 8}}>
-                                <Text style={styles.inputLabel}>Cible</Text>
+                                <Text style={styles.inputLabel}>Cible / jour</Text>
                                 <TextInput 
                                     style={styles.input} 
                                     value={target} 
@@ -207,19 +219,33 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
                       </View>
 
                       {editingHabit && (
-                          <View style={styles.editActions}>
-                                <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(editingHabit)}>
-                                    <Archive size={18} color="#FFF" />
-                                    <Text style={{color: '#FFF', fontWeight: '600'}}>
-                                        {editingHabit.is_archived ? "Désarchiver" : "Archiver"}
-                                    </Text>
+                          <>
+                            <Text style={styles.inputLabel}>Organisation</Text>
+                            <View style={styles.reorderRow}>
+                                <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('up')}>
+                                    <ArrowUp size={20} color="#FFF" />
+                                    <Text style={styles.reorderText}>Monter</Text>
                                 </TouchableOpacity>
-                                
-                                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(editingHabit.id)}>
-                                    <Trash2 size={18} color="#FF3B30" />
-                                    <Text style={{color: '#FF3B30', fontWeight: '600'}}>Supprimer</Text>
+                                <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('down')}>
+                                    <ArrowDown size={20} color="#FFF" />
+                                    <Text style={styles.reorderText}>Descendre</Text>
                                 </TouchableOpacity>
-                          </View>
+                            </View>
+
+                            <View style={styles.editActions}>
+                                    <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(editingHabit)}>
+                                        <Archive size={18} color="#FFF" />
+                                        <Text style={{color: '#FFF', fontWeight: '600'}}>
+                                            {editingHabit.is_archived ? "Désarchiver" : "Archiver"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    
+                                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(editingHabit.id)}>
+                                        <Trash2 size={18} color="#FF3B30" />
+                                        <Text style={{color: '#FF3B30', fontWeight: '600'}}>Supprimer</Text>
+                                    </TouchableOpacity>
+                            </View>
+                          </>
                       )}
 
                       <TouchableOpacity style={styles.saveMainBtn} onPress={handleSave}>
@@ -433,6 +459,25 @@ const styles = StyleSheet.create({
       backgroundColor: 'rgba(255, 59, 48, 0.1)',
       padding: 12,
       borderRadius: 10,
+  },
+  reorderRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 20,
+  },
+  reorderBtn: {
+      flex: 1,
+      backgroundColor: '#333',
+      padding: 12,
+      alignItems: 'center',
+      borderRadius: 10,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+  },
+  reorderText: {
+      color: '#FFF',
+      fontWeight: '600',
   },
   saveMainBtn: {
       flexDirection: 'row',

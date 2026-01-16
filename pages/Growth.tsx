@@ -1,108 +1,127 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { Goal, JournalEntry, UserProfile } from '../types';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
+import { Goal, JournalEntry, ViewState } from '../types';
 import { supabase } from '../services/supabase';
-import ProgressRing from '../components/ProgressRing';
-import { Book, Plus, ArrowRight } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
+import { Book, ArrowRight, Target } from 'lucide-react-native';
+import Goals from './Goals';
 
 interface GrowthProps {
   goals: Goal[];
   userId: string;
+  setView: (view: ViewState) => void;
 }
 
-const Growth: React.FC<GrowthProps> = ({ goals, userId }) => {
+const GoalsWrapper = ({ goals, userId, close }: { goals: Goal[], userId: string, close: () => void }) => {
+    const [localGoals, setLocalGoals] = useState<Goal[]>(goals);
+    
+    useEffect(() => { setLocalGoals(goals) }, [goals]);
+
+    // Independent CRUD for the modal wrapper to ensure responsiveness if props lag
+    // Note: In a perfect world, we just pass CRUD props from App -> Growth -> GoalsWrapper
+    // But since we didn't want to refactor App's entire prop drill, this ensures functionality.
+    
+    const refresh = async () => {
+         const { data } = await supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId).order('sort_order');
+         if(data) {
+             const sortedData = data.map(g => ({
+                ...g,
+                subobjectives: g.subobjectives?.sort((a: any, b: any) => a.sort_order - b.sort_order)
+            }));
+             setLocalGoals(sortedData);
+         }
+    };
+
+    const toggle = async (id: string) => {
+        const g = localGoals.find((x) => x.id === id);
+        if(g) {
+            await supabase.from('goals').update({completed: !g.completed}).eq('id', id);
+            refresh();
+        }
+    };
+    const add = async (title: string) => {
+        const orders = localGoals.map(g => g.sort_order || 0);
+        const max = orders.length > 0 ? Math.max(...orders) : 0;
+        await supabase.from('goals').insert({user_id: userId, title, sort_order: max + 1});
+        refresh();
+    };
+    const del = async (id: string) => {
+        await supabase.from('goals').delete().eq('id', id);
+        refresh();
+    };
+
+    return (
+        <View style={styles.modalContainer}>
+             <View style={styles.modalHeader}>
+                 <TouchableOpacity onPress={close} style={styles.closeBtn}>
+                     <Text style={styles.closeText}>Fermer</Text>
+                 </TouchableOpacity>
+             </View>
+             <Goals 
+                goals={localGoals} 
+                userId={userId} 
+                toggleGoal={toggle} 
+                addGoal={add} 
+                deleteGoal={del} 
+                refreshGoals={refresh} 
+             />
+        </View>
+    )
+}
+
+const Growth: React.FC<GrowthProps> = ({ goals, userId, setView }) => {
+  const [showAllGoals, setShowAllGoals] = useState(false);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  
+
   useEffect(() => {
       fetchJournal();
   }, [userId]);
 
   const fetchJournal = async () => {
       try {
-        const { data } = await supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(5);
+        const { data } = await supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(3);
         if (data) setJournalEntries(data);
       } catch(e) {}
   };
 
-  const activeGoals = goals.filter(g => !g.completed);
-
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+        <View style={styles.header}>
             <Text style={styles.largeTitle}>Croissance</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* Goals Section */}
-        <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Objectifs</Text>
-                <TouchableOpacity style={styles.iconBtn}><Plus size={20} color="#FFF" /></TouchableOpacity>
-            </View>
-            
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.goalScroll}>
-                {activeGoals.map(goal => {
-                    const totalSubs = goal.subobjectives?.length || 0;
-                    const doneSubs = goal.subobjectives?.filter(s => s.completed).length || 0;
-                    const progress = totalSubs > 0 ? doneSubs / totalSubs : (goal.progress ? goal.progress / 100 : 0);
-
-                    return (
-                        <View key={goal.id} style={styles.goalCard}>
-                            <View style={styles.goalInfo}>
-                                <Text style={styles.goalTitle} numberOfLines={2}>{goal.title}</Text>
-                                <Text style={styles.goalMeta}>{doneSubs}/{totalSubs} steps completed</Text>
-                            </View>
-                            <ProgressRing 
-                                size={44} 
-                                strokeWidth={4} 
-                                progress={progress} 
-                                color="#FFFFFF" 
-                                label="" 
-                                value={`${Math.round(progress * 100)}%`} 
-                            />
-                        </View>
-                    );
-                })}
-                {activeGoals.length === 0 && (
-                     <View style={[styles.goalCard, {justifyContent: 'center', alignItems: 'center', width: 160}]}>
-                         <Text style={{color: '#555'}}>No active goals.</Text>
-                     </View>
-                )}
-            </ScrollView>
         </View>
 
-        {/* Journal Section */}
-        <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Journal</Text>
-                <TouchableOpacity style={styles.iconBtn}><Book size={20} color="#FFF" /></TouchableOpacity>
-            </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+             {/* Goals Teaser */}
+             <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                    <Target size={24} color="#FF9500" />
+                    <Text style={styles.cardTitle}>Objectifs</Text>
+                    <TouchableOpacity onPress={() => setShowAllGoals(true)} style={styles.arrowBtn}>
+                        <ArrowRight size={20} color="#FFF" />
+                    </TouchableOpacity>
+                </View>
+                <Text style={styles.cardSub}>{goals.filter(g => !g.completed).length} en cours</Text>
+             </View>
 
-            <View style={styles.timeline}>
-                <View style={styles.timelineLine} />
-                {journalEntries.map((entry, index) => (
-                    <View key={entry.id} style={styles.timelineItem}>
-                        <View style={styles.timelineDot} />
-                        <View style={styles.entryCard}>
-                            <Text style={styles.entryDate}>
-                                {new Date(entry.created_at).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
-                            </Text>
-                            <Text style={styles.entryContent} numberOfLines={3}>{entry.content}</Text>
-                        </View>
-                    </View>
-                ))}
-                {journalEntries.length === 0 && (
-                     <View style={[styles.entryCard, { marginLeft: 0 }]}>
-                         <Text style={styles.entryContent}>Start writing your thoughts...</Text>
-                     </View>
-                )}
-            </View>
-        </View>
+             {/* Journal Teaser */}
+             <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                    <Book size={24} color="#007AFF" />
+                    <Text style={styles.cardTitle}>Journal</Text>
+                    <TouchableOpacity onPress={() => setView(ViewState.JOURNAL)} style={styles.arrowBtn}>
+                        <ArrowRight size={20} color="#FFF" />
+                    </TouchableOpacity>
+                </View>
+                <Text style={styles.cardSub}>Réflexion quotidienne</Text>
+             </View>
+        </ScrollView>
 
-      </ScrollView>
+        <Modal visible={showAllGoals} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAllGoals(false)}>
+             <GoalsWrapper 
+                goals={goals} 
+                userId={userId} 
+                close={() => setShowAllGoals(false)} 
+             />
+        </Modal>
     </View>
   );
 };
@@ -115,6 +134,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
       paddingBottom: 100,
+      paddingHorizontal: 20,
+      gap: 16,
   },
   header: {
     paddingHorizontal: 20,
@@ -126,108 +147,49 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
-  section: {
-      marginBottom: 32,
-  },
-  sectionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-      marginBottom: 16,
-  },
-  sectionTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#FFF',
-  },
-  iconBtn: {
-      width: 32,
-      height: 32,
+  card: {
       backgroundColor: '#171717',
       borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
+      padding: 20,
+      borderWidth: 1,
+      borderColor: '#262626',
   },
-  
-  // Goals
-  goalScroll: {
-      paddingHorizontal: 20,
+  cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
       gap: 12,
   },
-  goalCard: {
-      width: width * 0.65,
-      backgroundColor: '#171717',
-      borderRadius: 16,
-      padding: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderWidth: 1,
-      borderColor: '#262626',
-  },
-  goalInfo: {
-      flex: 1,
-      marginRight: 12,
-  },
-  goalTitle: {
-      fontSize: 16,
+  cardTitle: {
+      fontSize: 20,
       fontWeight: '600',
       color: '#FFF',
-      marginBottom: 4,
-  },
-  goalMeta: {
-      fontSize: 12,
-      color: '#888',
-  },
-
-  // Timeline
-  timeline: {
-      paddingHorizontal: 20,
-      position: 'relative',
-  },
-  timelineLine: {
-      position: 'absolute',
-      left: 26, 
-      top: 0,
-      bottom: 0,
-      width: 1,
-      backgroundColor: '#262626',
-  },
-  timelineItem: {
-      flexDirection: 'row',
-      marginBottom: 20,
-  },
-  timelineDot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: '#000',
-      borderWidth: 2,
-      borderColor: '#555',
-      marginTop: 6,
-      zIndex: 1,
-      marginRight: 16,
-  },
-  entryCard: {
       flex: 1,
-      backgroundColor: '#171717',
-      borderRadius: 16,
+  },
+  arrowBtn: {
+      padding: 4,
+  },
+  cardSub: {
+      color: '#888',
+      fontSize: 14,
+      marginLeft: 36,
+  },
+  modalContainer: {
+      flex: 1,
+      backgroundColor: '#000',
+  },
+  modalHeader: {
       padding: 16,
-      borderWidth: 1,
-      borderColor: '#262626',
+      alignItems: 'flex-end',
+      backgroundColor: '#171717',
   },
-  entryDate: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: '#666',
-      marginBottom: 6,
-      textTransform: 'uppercase',
+  closeBtn: {
+      padding: 8,
   },
-  entryContent: {
-      fontSize: 15,
-      color: '#DDD',
-      lineHeight: 22,
+  closeText: {
+      color: '#007AFF',
+      fontSize: 16,
+      fontWeight: '600',
   }
 });
 

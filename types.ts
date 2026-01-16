@@ -119,5 +119,6 @@ export enum ViewState {
   EXPLORE = 'EXPLORE',  // IA + Cyber Knight
   FOCUS_MODE = 'FOCUS_MODE', // Full screen focus
   TASKS = 'TASKS',
-  HABITS = 'HABITS'
+  HABITS = 'HABITS',
+  JOURNAL = 'JOURNAL'
 }

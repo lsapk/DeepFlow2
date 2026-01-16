@@ -10,6 +10,7 @@ import Focus from './pages/Focus';
 import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
+import Journal from './pages/Journal';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabase';
 
@@ -57,9 +58,15 @@ const App: React.FC = () => {
   // --- REALTIME ---
   const setupRealtimeSubscription = (userId: string) => {
     const channel = supabase.channel('db-changes')
+      // Tasks & Subtasks
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => fetchTasks(userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subtasks', filter: `user_id=eq.${userId}` }, () => fetchTasks(userId))
+      // Habits
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId))
+      // Goals & Subobjectives
       .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subobjectives', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
+      // Player Profile (XP, Level)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, () => fetchPlayer(userId))
       .subscribe();
 
@@ -70,17 +77,43 @@ const App: React.FC = () => {
 
   // --- FETCHERS ---
   const fetchTasks = async (userId: string) => {
-    const { data } = await supabase.from('tasks').select('*').eq('user_id', userId).order('sort_order').order('created_at', { ascending: false });
-    if (data) setTasks(data);
+    const { data } = await supabase
+        .from('tasks')
+        .select('*, subtasks(*)')
+        .eq('user_id', userId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false });
+    
+    if (data) {
+        const sortedData = data.map(t => ({
+            ...t,
+            subtasks: t.subtasks?.sort((a: any, b: any) => a.sort_order - b.sort_order)
+        }));
+        setTasks(sortedData);
+    }
   };
+
   const fetchGoals = async (userId: string) => {
-    const { data } = await supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId).order('sort_order');
-    if (data) setGoals(data);
+    const { data } = await supabase
+        .from('goals')
+        .select('*, subobjectives(*)')
+        .eq('user_id', userId)
+        .order('sort_order', { ascending: true });
+    
+    if (data) {
+         const sortedData = data.map(g => ({
+            ...g,
+            subobjectives: g.subobjectives?.sort((a: any, b: any) => a.sort_order - b.sort_order)
+        }));
+        setGoals(sortedData);
+    }
   };
+
   const fetchHabits = async (userId: string) => {
     const { data } = await supabase.from('habits').select('*').eq('user_id', userId).order('sort_order').order('created_at', { ascending: true });
     if (data) setHabits(data);
   };
+
   const fetchPlayer = async (userId: string) => {
     const { data } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
     if (data) setPlayer(data);
@@ -113,6 +146,7 @@ const App: React.FC = () => {
   };
 
   // --- ACTIONS (Optimistic Updates) ---
+  // Ces actions permettent une UI réactive instantanée avant la confirmation serveur
   
   const incrementHabit = async (id: string) => {
       const habit = habits.find(h => h.id === id);
@@ -121,13 +155,9 @@ const App: React.FC = () => {
       const newStreak = habit.streak + 1;
       const now = new Date().toISOString();
       
-      // 1. Optimistic UI Update
       setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: now } : h));
-      
-      // 2. DB Update
       await supabase.from('habits').update({ streak: newStreak, last_completed_at: now }).eq('id', id);
       
-      // 3. XP Reward
       const newXp = player.experience_points + 20;
       await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
   };
@@ -138,13 +168,9 @@ const App: React.FC = () => {
     
     const newStatus = !task.completed;
     
-    // 1. Optimistic UI
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: newStatus } : t));
-    
-    // 2. DB Update
     await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
 
-    // 3. XP Reward (only on complete)
     if (newStatus && player) {
         const newXp = player.experience_points + 50;
         await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
@@ -153,30 +179,16 @@ const App: React.FC = () => {
 
   const addTask = async (title: string, priority: Task['priority']) => {
       if (!user) return;
-      const optimisticTask: Task = {
-          id: 'temp-' + Date.now(),
+      const maxOrder = tasks.length > 0 ? Math.max(...tasks.map(t => t.sort_order)) : 0;
+      
+      const { error } = await supabase.from('tasks').insert({
           user_id: user.id,
           title,
           priority,
           completed: false,
-          created_at: new Date().toISOString(),
-          sort_order: 0,
-          description: null,
-          due_date: null
-      };
-      setTasks(prev => [optimisticTask, ...prev]);
-      
-      const { data, error } = await supabase.from('tasks').insert({
-          user_id: user.id,
-          title,
-          priority,
-          completed: false
-      }).select().single();
-
-      if (!error && data) {
-          // Replace optimistic task with real one
-          setTasks(prev => prev.map(t => t.id === optimisticTask.id ? data : t));
-      }
+          sort_order: maxOrder + 1
+      });
+      if (!error) fetchTasks(user.id);
   };
 
   const deleteTask = async (id: string) => {
@@ -205,17 +217,18 @@ const App: React.FC = () => {
                 setView={setCurrentView}
             />
         );
-      case ViewState.TASKS: // ViewState for full tasks list if needed, currently reusing logic
-          // If you want a dedicated Tasks page, separate from Dashboard:
+      case ViewState.TASKS: 
           return <Tasks tasks={tasks} toggleTask={toggleTask} addTask={addTask} deleteTask={deleteTask} userId={user.id} refreshTasks={() => fetchTasks(user.id)} />;
-      case ViewState.HABITS: // Dedicated Habits Page
+      case ViewState.HABITS: 
           return <Habits habits={habits} incrementHabit={incrementHabit} userId={user.id} refreshHabits={() => fetchHabits(user.id)} />;
       case ViewState.GROWTH:
-        return <Growth goals={goals} userId={user.id} />;
+        return <Growth goals={goals} userId={user.id} setView={setCurrentView} />;
       case ViewState.EXPLORE:
         return <Explore player={player} />;
       case ViewState.FOCUS_MODE:
         return <Focus onExit={() => setCurrentView(ViewState.TODAY)} />;
+      case ViewState.JOURNAL:
+        return <Journal userId={user.id} />;
       default:
         return <Dashboard 
             user={user} player={player} tasks={tasks} habits={habits}

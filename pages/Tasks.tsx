@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Task, Subtask } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, ArrowUp, ArrowDown } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, ArrowUp, ArrowDown, Archive } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 if (Platform.OS === 'android') {
@@ -57,6 +57,18 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
       await supabase.from('tasks').update({ title: editTitle }).eq('id', selectedTask.id);
       refreshTasks();
       setEditModalVisible(false);
+  };
+
+  const handleMove = async (direction: 'up' | 'down') => {
+       if (!selectedTask) return;
+       const currentOrder = selectedTask.sort_order || 0;
+       const newOrder = direction === 'up' ? currentOrder - 1 : currentOrder + 1;
+       
+       // Simple swap logic or shift. For simplicity, just update self. 
+       // A real reorder updates neighbours, but for personal list, distinct sort_order is enough.
+       await supabase.from('tasks').update({ sort_order: newOrder }).eq('id', selectedTask.id);
+       refreshTasks();
+       setSelectedTask({...selectedTask, sort_order: newOrder});
   };
 
   const activeTasks = tasks.filter(t => !t.completed);
@@ -179,6 +191,16 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
                       color="#FFF"
                   />
 
+                  <Text style={styles.modalLabel}>Organiser</Text>
+                  <View style={styles.reorderRow}>
+                      <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('up')}>
+                           <ArrowUp size={20} color="#FFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('down')}>
+                           <ArrowDown size={20} color="#FFF" />
+                      </TouchableOpacity>
+                  </View>
+
                   <TouchableOpacity 
                     style={styles.deleteActionBtn} 
                     onPress={() => {
@@ -219,6 +241,32 @@ interface TaskItemProps {
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshTasks }) => {
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+    const addSubtask = async () => {
+        if (!newSubtaskTitle.trim()) return;
+        
+        await supabase.from('subtasks').insert({
+            parent_task_id: task.id,
+            user_id: userId,
+            title: newSubtaskTitle,
+            completed: false,
+            sort_order: task.subtasks ? task.subtasks.length : 0
+        });
+        setNewSubtaskTitle('');
+        refreshTasks();
+    };
+
+    const toggleSubtask = async (sub: Subtask) => {
+        await supabase.from('subtasks').update({ completed: !sub.completed }).eq('id', sub.id);
+        refreshTasks();
+    };
+
+    const deleteSubtask = async (id: string) => {
+        await supabase.from('subtasks').delete().eq('id', id);
+        refreshTasks();
+    };
+
     return (
         <View style={styles.taskItemContainer}>
             <TouchableOpacity 
@@ -241,8 +289,50 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                     <Text style={[styles.taskTitle, task.completed && styles.taskTitleCompleted]}>
                         {task.title}
                     </Text>
+                    {task.subtasks && task.subtasks.length > 0 && (
+                        <Text style={styles.subtaskCount}>
+                            {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                        </Text>
+                    )}
                 </View>
+
+                {/* Petit bouton flèche */}
+                <TouchableOpacity onPress={onToggleExpand} style={styles.expandBtn}>
+                     {isExpanded ? <ChevronUp size={16} color="#666" /> : <ChevronDown size={16} color="#666" />}
+                </TouchableOpacity>
             </TouchableOpacity>
+
+            {/* Subtasks Section */}
+            {isExpanded && (
+                <View style={styles.subtaskList}>
+                    {task.subtasks?.map(sub => (
+                        <View key={sub.id} style={styles.subtaskRow}>
+                            <TouchableOpacity onPress={() => toggleSubtask(sub)} style={styles.subCheck}>
+                                {sub.completed && <View style={styles.subCheckInner} />}
+                            </TouchableOpacity>
+                            <Text style={[styles.subtaskText, sub.completed && styles.subtaskTextDone]}>
+                                {sub.title}
+                            </Text>
+                            <TouchableOpacity onPress={() => deleteSubtask(sub.id)}>
+                                <X size={14} color="#666" />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                    <View style={styles.addSubtaskRow}>
+                        <TextInput 
+                            style={styles.subInput} 
+                            placeholder="Ajouter sous-tâche..." 
+                            placeholderTextColor="#666"
+                            value={newSubtaskTitle}
+                            onChangeText={setNewSubtaskTitle}
+                            onSubmitEditing={addSubtask}
+                        />
+                        <TouchableOpacity onPress={addSubtask}>
+                            <Plus size={18} color="#007AFF" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
         </View>
     )
 }
@@ -371,7 +461,67 @@ const styles = StyleSheet.create({
     color: '#666',
     textDecorationLine: 'line-through',
   },
+  subtaskCount: {
+      fontSize: 11,
+      color: '#666',
+      marginTop: 2,
+  },
+  expandBtn: {
+      padding: 8,
+  },
   
+  // Subtasks
+  subtaskList: {
+      backgroundColor: '#121212',
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      borderTopWidth: 1,
+      borderTopColor: '#262626',
+  },
+  subtaskRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 0.5,
+      borderBottomColor: '#222',
+  },
+  subCheck: {
+      width: 16,
+      height: 16,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: '#555',
+      marginRight: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  subCheckInner: {
+      width: 10,
+      height: 10,
+      backgroundColor: '#007AFF',
+      borderRadius: 2,
+  },
+  subtaskText: {
+      color: '#DDD',
+      fontSize: 14,
+      flex: 1,
+  },
+  subtaskTextDone: {
+      color: '#555',
+      textDecorationLine: 'line-through',
+  },
+  addSubtaskRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 10,
+  },
+  subInput: {
+      flex: 1,
+      color: '#FFF',
+      fontSize: 14,
+      marginRight: 10,
+  },
+
   // Modal
   modalOverlay: {
       flex: 1,
@@ -407,6 +557,25 @@ const styles = StyleSheet.create({
       color: '#FFF',
       borderWidth: 1,
       borderColor: '#333',
+  },
+  modalLabel: {
+      color: '#666',
+      fontSize: 12,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      fontWeight: '600',
+  },
+  reorderRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 20,
+  },
+  reorderBtn: {
+      flex: 1,
+      backgroundColor: '#333',
+      padding: 12,
+      alignItems: 'center',
+      borderRadius: 8,
   },
   deleteActionBtn: {
       flexDirection: 'row',

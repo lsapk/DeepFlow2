@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, ArrowUp, ArrowDown, Flag } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, ArrowUp, ArrowDown } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 if (Platform.OS === 'android') {
