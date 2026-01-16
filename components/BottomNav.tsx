@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { Home, Bot, Shield, User } from 'lucide-react-native';
+import { LayoutDashboard, TrendingUp, Compass } from 'lucide-react-native';
 import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,42 +13,37 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
   const insets = useSafeAreaInsets();
   
   const navItems = [
-    { view: ViewState.DASHBOARD, icon: Home, label: 'Accueil' },
-    { view: ViewState.IA, icon: Bot, label: 'IA' },
-    { view: ViewState.CYBER_KNIGHT, icon: Shield, label: 'Cyber Knight' }, // Gamification Hub
-    { view: ViewState.PROFILE, icon: User, label: 'Profil' },
+    { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Today' },
+    { view: ViewState.GROWTH, icon: TrendingUp, label: 'Growth' },
+    { view: ViewState.EXPLORE, icon: Compass, label: 'Explore' },
   ];
 
   return (
     <View style={[
         styles.container, 
         { 
-            paddingBottom: Math.max(insets.bottom, 12),
-            height: 65 + Math.max(insets.bottom, 12) 
+            paddingBottom: Math.max(insets.bottom, 20),
+            height: 65 + Math.max(insets.bottom, 20) 
         }
     ]}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentView === item.view;
-        // Check if active is one of the sub-pages of Dashboard (Tasks, Habits, etc) -> Keep Home active visually? 
-        // For now, simple strict equality.
-        const isActuallyActive = isActive || (item.view === ViewState.DASHBOARD && [ViewState.TASKS, ViewState.HABITS, ViewState.GOALS, ViewState.FOCUS, ViewState.JOURNAL].includes(currentView));
 
         return (
           <TouchableOpacity
             key={item.view}
             onPress={() => setView(item.view)}
             style={styles.tab}
-            activeOpacity={0.5}
+            activeOpacity={0.7}
           >
-            <Icon 
-                size={26} 
-                color={isActuallyActive ? '#007AFF' : '#999999'} 
-                strokeWidth={isActuallyActive ? 2.5 : 2}
-            />
-            <Text style={[styles.label, { color: isActuallyActive ? '#007AFF' : '#999999' }]}>
-              {item.label}
-            </Text>
+            <View style={[styles.iconContainer, isActive && styles.activeIconContainer]}>
+                <Icon 
+                    size={26} 
+                    color={isActive ? '#FFFFFF' : '#555555'} 
+                    strokeWidth={isActive ? 2.5 : 2}
+                />
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -59,12 +54,12 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderTopWidth: 0.5,
-    borderTopColor: '#C6C6C8',
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    justifyContent: 'space-between',
+    backgroundColor: '#000000',
+    borderTopWidth: 1,
+    borderTopColor: '#1C1C1E',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    justifyContent: 'space-around',
     alignItems: 'flex-start',
     position: 'absolute',
     bottom: 0,
@@ -77,10 +72,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
   },
-  label: {
-    fontSize: 10,
-    marginTop: 4,
-    fontWeight: '500',
+  iconContainer: {
+      padding: 8,
+      borderRadius: 12,
+  },
+  activeIconContainer: {
+      // Optional: Add subtle background for active state if desired
+      // backgroundColor: '#1C1C1E', 
   },
 });
 

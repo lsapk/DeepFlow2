@@ -114,13 +114,8 @@ export interface JournalEntry {
 
 export enum ViewState {
   AUTH = 'AUTH',
-  DASHBOARD = 'DASHBOARD',
-  TASKS = 'TASKS',
-  HABITS = 'HABITS',
-  GOALS = 'GOALS',
-  FOCUS = 'FOCUS',
-  JOURNAL = 'JOURNAL',
-  PROFILE = 'PROFILE',
-  IA = 'IA',
-  CYBER_KNIGHT = 'CYBER_KNIGHT'
+  TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
+  GROWTH = 'GROWTH',    // Goals + Journal
+  EXPLORE = 'EXPLORE',  // IA + Cyber Knight
+  FOCUS_MODE = 'FOCUS_MODE' // Full screen focus
 }

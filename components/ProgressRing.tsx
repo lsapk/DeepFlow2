@@ -21,7 +21,7 @@ const ProgressRing: React.FC<ProgressRingProps> = ({ progress, size, strokeWidth
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
         <Svg width={size} height={size} style={{ position: 'absolute' }}>
           <Circle
-            stroke="#E5E5EA"
+            stroke="#2C2C2C" // Dark grey track
             cx={size / 2}
             cy={size / 2}
             r={radius}
@@ -40,8 +40,8 @@ const ProgressRing: React.FC<ProgressRingProps> = ({ progress, size, strokeWidth
           />
         </Svg>
         <View style={styles.innerContent}>
-            <Text style={styles.label}>{label}</Text>
             <Text style={styles.value}>{value}</Text>
+             {label ? <Text style={styles.label}>{label}</Text> : null}
         </View>
       </View>
     </View>
@@ -56,13 +56,13 @@ const styles = StyleSheet.create({
   label: {
       fontSize: 10,
       color: '#8E8E93',
-      marginBottom: 2,
+      marginTop: 2,
       fontWeight: '600',
   },
   value: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '700',
-      color: '#000',
+      color: '#FFFFFF',
   }
 });
 
