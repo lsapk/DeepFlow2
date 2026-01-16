@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Task, Subtask } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, ArrowUp, ArrowDown, Archive } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, AlignLeft, Save } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 if (Platform.OS === 'android') {
@@ -26,7 +26,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  
+  // Edit Form State
   const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editDate, setEditDate] = useState(''); // Simple string format for now
 
   const handleAdd = () => {
     if (newTaskTitle.trim()) {
@@ -49,26 +53,21 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
   const openEditModal = (task: Task) => {
       setSelectedTask(task);
       setEditTitle(task.title);
+      setEditDesc(task.description || '');
+      setEditDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
       setEditModalVisible(true);
   };
 
   const handleUpdateTask = async () => {
       if (!selectedTask) return;
-      await supabase.from('tasks').update({ title: editTitle }).eq('id', selectedTask.id);
+      await supabase.from('tasks').update({ 
+          title: editTitle,
+          description: editDesc,
+          due_date: editDate ? new Date(editDate).toISOString() : null
+      }).eq('id', selectedTask.id);
+      
       refreshTasks();
       setEditModalVisible(false);
-  };
-
-  const handleMove = async (direction: 'up' | 'down') => {
-       if (!selectedTask) return;
-       const currentOrder = selectedTask.sort_order || 0;
-       const newOrder = direction === 'up' ? currentOrder - 1 : currentOrder + 1;
-       
-       // Simple swap logic or shift. For simplicity, just update self. 
-       // A real reorder updates neighbours, but for personal list, distinct sort_order is enough.
-       await supabase.from('tasks').update({ sort_order: newOrder }).eq('id', selectedTask.id);
-       refreshTasks();
-       setSelectedTask({...selectedTask, sort_order: newOrder});
   };
 
   const activeTasks = tasks.filter(t => !t.completed);
@@ -178,50 +177,71 @@ const Tasks: React.FC<TasksProps> = ({ tasks, toggleTask, addTask, deleteTask, u
           <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Modifier</Text>
+                      <Text style={styles.modalTitle}>Modifier Tâche</Text>
                       <TouchableOpacity onPress={() => setEditModalVisible(false)}>
                           <X size={24} color="#FFF" />
                       </TouchableOpacity>
                   </View>
 
-                  <TextInput 
-                      style={styles.modalInput} 
-                      value={editTitle} 
-                      onChangeText={setEditTitle} 
-                      color="#FFF"
-                  />
+                  <ScrollView>
+                    <Text style={styles.label}>Titre</Text>
+                    <TextInput 
+                        style={styles.modalInput} 
+                        value={editTitle} 
+                        onChangeText={setEditTitle} 
+                        color="#FFF"
+                    />
 
-                  <Text style={styles.modalLabel}>Organiser</Text>
-                  <View style={styles.reorderRow}>
-                      <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('up')}>
-                           <ArrowUp size={20} color="#FFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('down')}>
-                           <ArrowDown size={20} color="#FFF" />
-                      </TouchableOpacity>
-                  </View>
+                    <Text style={styles.label}>Description</Text>
+                    <View style={styles.inputWithIcon}>
+                         <AlignLeft size={18} color="#666" style={{marginRight: 10}} />
+                         <TextInput 
+                            style={[styles.modalInput, {flex: 1, height: 'auto', minHeight: 40}]} 
+                            value={editDesc} 
+                            onChangeText={setEditDesc} 
+                            placeholder="Détails de la tâche..."
+                            placeholderTextColor="#666"
+                            multiline
+                            color="#FFF"
+                        />
+                    </View>
 
-                  <TouchableOpacity 
-                    style={styles.deleteActionBtn} 
-                    onPress={() => {
-                        if (selectedTask) {
-                            Alert.alert("Supprimer", "Êtes-vous sûr ?", [
-                                { text: "Annuler", style: "cancel"},
-                                { text: "Supprimer", style: 'destructive', onPress: () => {
-                                    deleteTask(selectedTask.id);
-                                    setEditModalVisible(false);
-                                }}
-                            ])
-                        }
-                    }}
-                   >
-                      <Trash2 size={20} color="#FF3B30" />
-                      <Text style={styles.deleteText}>Supprimer</Text>
-                  </TouchableOpacity>
+                    <Text style={styles.label}>Date d'échéance (YYYY-MM-DD)</Text>
+                    <View style={styles.inputWithIcon}>
+                        <Calendar size={18} color="#666" style={{marginRight: 10}} />
+                        <TextInput 
+                            style={styles.modalInput} 
+                            value={editDate} 
+                            onChangeText={setEditDate} 
+                            placeholder="ex: 2024-12-31"
+                            placeholderTextColor="#666"
+                            color="#FFF"
+                        />
+                    </View>
 
-                  <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateTask}>
-                      <Text style={styles.saveBtnText}>Enregistrer</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateTask}>
+                        <Save size={20} color="black" />
+                        <Text style={styles.saveBtnText}>Enregistrer</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={styles.deleteActionBtn} 
+                        onPress={() => {
+                            if (selectedTask) {
+                                Alert.alert("Supprimer", "Êtes-vous sûr ?", [
+                                    { text: "Annuler", style: "cancel"},
+                                    { text: "Supprimer", style: 'destructive', onPress: () => {
+                                        deleteTask(selectedTask.id);
+                                        setEditModalVisible(false);
+                                    }}
+                                ])
+                            }
+                        }}
+                    >
+                        <Trash2 size={20} color="#FF3B30" />
+                        <Text style={styles.deleteText}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
               </View>
           </View>
       </Modal>
@@ -289,6 +309,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                     <Text style={[styles.taskTitle, task.completed && styles.taskTitleCompleted]}>
                         {task.title}
                     </Text>
+                    {task.due_date && (
+                        <Text style={styles.dueDateText}>
+                            📅 {new Date(task.due_date).toLocaleDateString()}
+                        </Text>
+                    )}
                     {task.subtasks && task.subtasks.length > 0 && (
                         <Text style={styles.subtaskCount}>
                             {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
@@ -305,6 +330,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
             {/* Subtasks Section */}
             {isExpanded && (
                 <View style={styles.subtaskList}>
+                    {task.description && (
+                        <Text style={styles.taskDescPreview}>{task.description}</Text>
+                    )}
+                    
                     {task.subtasks?.map(sub => (
                         <View key={sub.id} style={styles.subtaskRow}>
                             <TouchableOpacity onPress={() => toggleSubtask(sub)} style={styles.subCheck}>
@@ -461,6 +490,11 @@ const styles = StyleSheet.create({
     color: '#666',
     textDecorationLine: 'line-through',
   },
+  dueDateText: {
+      fontSize: 11,
+      color: '#007AFF',
+      marginTop: 2,
+  },
   subtaskCount: {
       fontSize: 11,
       color: '#666',
@@ -477,6 +511,12 @@ const styles = StyleSheet.create({
       paddingBottom: 16,
       borderTopWidth: 1,
       borderTopColor: '#262626',
+  },
+  taskDescPreview: {
+      fontSize: 13,
+      color: '#888',
+      marginBottom: 10,
+      fontStyle: 'italic',
   },
   subtaskRow: {
       flexDirection: 'row',
@@ -548,34 +588,30 @@ const styles = StyleSheet.create({
       fontWeight: '700',
       color: '#FFF',
   },
+  label: {
+      fontSize: 12,
+      color: '#888',
+      marginBottom: 6,
+      marginTop: 12,
+      textTransform: 'uppercase',
+  },
   modalInput: {
       backgroundColor: '#000',
       padding: 12,
       borderRadius: 8,
       fontSize: 16,
-      marginBottom: 20,
       color: '#FFF',
       borderWidth: 1,
       borderColor: '#333',
   },
-  modalLabel: {
-      color: '#666',
-      fontSize: 12,
-      marginBottom: 8,
-      textTransform: 'uppercase',
-      fontWeight: '600',
-  },
-  reorderRow: {
+  inputWithIcon: {
       flexDirection: 'row',
-      gap: 12,
-      marginBottom: 20,
-  },
-  reorderBtn: {
-      flex: 1,
-      backgroundColor: '#333',
-      padding: 12,
       alignItems: 'center',
+      backgroundColor: '#000',
       borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#333',
+      paddingHorizontal: 12,
   },
   deleteActionBtn: {
       flexDirection: 'row',
@@ -584,7 +620,8 @@ const styles = StyleSheet.create({
       padding: 12,
       backgroundColor: 'rgba(255,59,48,0.1)',
       borderRadius: 8,
-      marginBottom: 20,
+      marginTop: 20,
+      marginBottom: 10,
       gap: 8,
   },
   deleteText: {
@@ -596,6 +633,10 @@ const styles = StyleSheet.create({
       padding: 14,
       borderRadius: 12,
       alignItems: 'center',
+      marginTop: 20,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
   },
   saveBtnText: {
       color: 'black',

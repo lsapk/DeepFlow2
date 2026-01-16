@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Platform } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
 import { Check, Flame, Plus, Play, Menu, ArrowRight } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface DashboardProps {
   user: UserProfile;
@@ -16,6 +17,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incrementHabit, toggleTask, openFocus, openProfile, setView }) => {
+  const insets = useSafeAreaInsets();
   
   const isSameDay = (d1: Date, d2: Date) => {
       return d1.getDate() === d2.getDate() &&
@@ -35,8 +37,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
   const activeTasks = tasks.filter(t => !t.completed).slice(0, 5); // Show top 5
 
   return (
-    <View style={styles.container}>
-      {/* Header Minimaliste */}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header avec espacement dynamique */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => setView(ViewState.EXPLORE)}>
             <Menu size={24} color="#FFF" />
@@ -136,7 +138,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
 
       </ScrollView>
 
-      {/* Floating Focus Button */}
+      {/* Floating Focus Button - Position remontée */}
       <TouchableOpacity style={styles.fab} onPress={openFocus} activeOpacity={0.8}>
           <Play size={24} color="#000" fill="#000" style={{marginLeft: 4}} />
       </TouchableOpacity>
@@ -154,8 +156,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingVertical: 12, 
+    marginBottom: 10,
   },
   iconBtn: {
       width: 40,
@@ -182,8 +184,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   scrollContent: {
-    paddingBottom: 100,
-    paddingTop: 20,
+    paddingBottom: 130, // Espace pour le FAB et la Nav
+    paddingTop: 10,
   },
   welcomeSection: {
       paddingHorizontal: 20,
@@ -325,10 +327,10 @@ const styles = StyleSheet.create({
       fontStyle: 'italic',
   },
 
-  // FAB
+  // FAB - Adjusted position to 110 to avoid cut-off
   fab: {
       position: 'absolute',
-      bottom: 90,
+      bottom: 110, 
       right: 20,
       width: 60,
       height: 60,
@@ -341,6 +343,7 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.15,
       shadowRadius: 10,
       elevation: 5,
+      zIndex: 100,
   }
 });
 

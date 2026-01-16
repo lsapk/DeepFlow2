@@ -58,15 +58,13 @@ const App: React.FC = () => {
   // --- REALTIME ---
   const setupRealtimeSubscription = (userId: string) => {
     const channel = supabase.channel('db-changes')
-      // Tasks & Subtasks
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => fetchTasks(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subtasks', filter: `user_id=eq.${userId}` }, () => fetchTasks(userId))
-      // Habits
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId))
-      // Goals & Subobjectives
+      // On écoute aussi habit_completions pour mettre à jour l'UI si l'app web complète une habitude
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'habit_completions', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId)) 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subobjectives', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
-      // Player Profile (XP, Level)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, () => fetchPlayer(userId))
       .subscribe();
 
@@ -145,19 +143,31 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
   };
 
-  // --- ACTIONS (Optimistic Updates) ---
-  // Ces actions permettent une UI réactive instantanée avant la confirmation serveur
+  // --- ACTIONS ---
   
   const incrementHabit = async (id: string) => {
       const habit = habits.find(h => h.id === id);
-      if (!habit || !player) return;
+      if (!habit || !player || !user) return;
 
       const newStreak = habit.streak + 1;
-      const now = new Date().toISOString();
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const todayDate = now.toISOString().split('T')[0];
       
-      setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: now } : h));
-      await supabase.from('habits').update({ streak: newStreak, last_completed_at: now }).eq('id', id);
+      // Optimistic update
+      setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: nowIso } : h));
       
+      // 1. Update Habit Row
+      await supabase.from('habits').update({ streak: newStreak, last_completed_at: nowIso }).eq('id', id);
+      
+      // 2. Insert into habit_completions (Crucial for Web App Sync)
+      await supabase.from('habit_completions').insert({
+          habit_id: id,
+          user_id: user.id,
+          completed_date: todayDate
+      });
+      
+      // 3. Update XP
       const newXp = player.experience_points + 20;
       await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
   };
