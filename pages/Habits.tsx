@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { Habit } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, ArrowUp, ArrowDown, Save, RefreshCw, Target } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, ArrowUp, ArrowDown, Save, RefreshCw } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 interface HabitsProps {
@@ -16,7 +16,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
   const [modalVisible, setModalVisible] = useState(false);
   
   // Form State
-  const [editingHabit, setEditingHabit] = useState<Habit | null>(null); // If null, we are creating
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [frequency, setFrequency] = useState('daily');
@@ -53,15 +53,13 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
       };
 
       if (editingHabit) {
-          // Update
           await supabase.from('habits').update(habitData).eq('id', editingHabit.id);
       } else {
-          // Create
           await supabase.from('habits').insert({
               ...habitData,
               streak: 0,
               is_archived: false,
-              sort_order: 0 // Add to top
+              sort_order: 0 
           });
       }
 
@@ -76,7 +74,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
   };
 
   const handleDelete = async (id: string) => {
-      Alert.alert("Delete Habit", "This action cannot be undone.", [
+      Alert.alert("Delete Habit", "Cannot be undone.", [
           { text: "Cancel", style: "cancel" },
           { text: "Delete", style: "destructive", onPress: async () => {
               await supabase.from('habits').delete().eq('id', id);
@@ -86,32 +84,21 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
       ]);
   };
 
-  const handleMove = async (direction: 'up' | 'down') => {
-      if (!editingHabit) return;
-      const currentOrder = editingHabit.sort_order || 0;
-      const newOrder = direction === 'up' ? currentOrder - 1 : currentOrder + 1;
-      
-      await supabase.from('habits').update({ sort_order: newOrder }).eq('id', editingHabit.id);
-      refreshHabits();
-      setEditingHabit({ ...editingHabit, sort_order: newOrder });
-  };
-
-  // Filter habits based on view mode
   const displayedHabits = habits.filter(h => !!h.is_archived === showArchived);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.largeTitle}>{showArchived ? 'Archived' : 'Habits'}</Text>
+        <Text style={styles.largeTitle}>{showArchived ? 'Archivées' : 'Habitudes'}</Text>
         <View style={styles.headerButtons}>
             <TouchableOpacity 
                 style={[styles.iconBtn, showArchived && styles.iconBtnActive]} 
                 onPress={() => setShowArchived(!showArchived)}
             >
-                <Archive size={22} color={showArchived ? "white" : "#007AFF"} />
+                <Archive size={20} color={showArchived ? "white" : "#FFF"} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-                <Plus size={24} color="white" />
+                <Plus size={24} color="black" />
             </TouchableOpacity>
         </View>
       </View>
@@ -119,7 +106,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {displayedHabits.length === 0 && (
             <Text style={styles.emptyText}>
-                {showArchived ? "No archived habits." : "No active habits. Create one!"}
+                {showArchived ? "Aucune archive." : "Aucune habitude active."}
             </Text>
         )}
         {displayedHabits.map(habit => {
@@ -134,19 +121,19 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
                 >
                     <View style={styles.cardHeader}>
                         <View style={styles.headerLeft}>
-                            <View style={[styles.iconContainer, { backgroundColor: isCompletedToday ? '#34C759' : '#FFF5E0' }]}>
-                                <Flame size={20} color={isCompletedToday ? "white" : "#FF9500"} fill={isCompletedToday ? "white" : "#FF9500"} />
+                            <View style={[styles.iconContainer, { backgroundColor: isCompletedToday ? '#34C759' : '#333' }]}>
+                                <Flame size={16} color={isCompletedToday ? "white" : "#666"} fill={isCompletedToday ? "white" : "#666"} />
                             </View>
                             <Text style={styles.categoryLabel}>{habit.category?.toUpperCase() || 'GENERAL'}</Text>
                         </View>
-                        <Text style={styles.streakCount}>{habit.streak} day streak</Text>
+                        <Text style={styles.streakCount}>{habit.streak} jrs</Text>
                     </View>
 
                     <Text style={styles.habitTitle}>{habit.title}</Text>
 
                     <View style={styles.cardFooter}>
                         <View style={styles.freqBadge}>
-                             <RefreshCw size={12} color="#8E8E93" style={{marginRight: 4}} />
+                             <RefreshCw size={12} color="#666" style={{marginRight: 4}} />
                              <Text style={styles.frequencyText}>{habit.frequency}</Text>
                         </View>
                         
@@ -159,14 +146,10 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
                                     isCompletedToday ? styles.actionButtonCompleted : styles.actionButtonDefault
                                 ]}
                             >
-                                <Text style={[styles.actionButtonText, isCompletedToday && { color: '#007AFF' }]}>
-                                    {isCompletedToday ? 'Done' : 'Complete'}
+                                <Text style={[styles.actionButtonText, isCompletedToday && { color: '#000' }]}>
+                                    {isCompletedToday ? 'Fait' : 'Valider'}
                                 </Text>
-                                {isCompletedToday && <Check size={16} color="#007AFF" style={{ marginLeft: 4 }} />}
                             </TouchableOpacity>
-                        )}
-                        {showArchived && (
-                            <Text style={styles.archivedLabel}>Archived</Text>
                         )}
                     </View>
                 </TouchableOpacity>
@@ -184,90 +167,64 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
           <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>{editingHabit ? 'Edit Habit' : 'New Habit'}</Text>
+                      <Text style={styles.modalTitle}>{editingHabit ? 'Modifier' : 'Nouvelle Habitude'}</Text>
                       <TouchableOpacity onPress={() => setModalVisible(false)}>
-                          <X size={24} color="#000" />
+                          <X size={24} color="#FFF" />
                       </TouchableOpacity>
                   </View>
 
                   <ScrollView showsVerticalScrollIndicator={false}>
-                      <Text style={styles.inputLabel}>Title</Text>
+                      <Text style={styles.inputLabel}>Titre</Text>
                       <TextInput 
                           style={styles.input} 
                           value={title} 
                           onChangeText={setTitle} 
-                          placeholder="e.g. Read 10 pages"
+                          placeholder="Ex: Méditation"
+                          placeholderTextColor="#666"
                       />
 
                       <View style={styles.rowInputs}>
                           <View style={{flex: 1, marginRight: 8}}>
-                                <Text style={styles.inputLabel}>Category</Text>
+                                <Text style={styles.inputLabel}>Catégorie</Text>
                                 <TextInput 
                                     style={styles.input} 
                                     value={category} 
                                     onChangeText={setCategory} 
-                                    placeholder="Health"
+                                    placeholder="Santé"
+                                    placeholderTextColor="#666"
                                 />
                           </View>
                           <View style={{flex: 1, marginLeft: 8}}>
-                                <Text style={styles.inputLabel}>Target / Day</Text>
+                                <Text style={styles.inputLabel}>Cible</Text>
                                 <TextInput 
                                     style={styles.input} 
                                     value={target} 
                                     onChangeText={setTarget} 
                                     keyboardType="numeric"
-                                    placeholder="1"
+                                    placeholderTextColor="#666"
                                 />
                           </View>
                       </View>
 
-                      <Text style={styles.inputLabel}>Frequency</Text>
-                      <View style={styles.freqSelector}>
-                          {['daily', 'weekly'].map(f => (
-                              <TouchableOpacity 
-                                key={f} 
-                                style={[styles.freqBtn, frequency === f && styles.freqBtnActive]}
-                                onPress={() => setFrequency(f)}
-                              >
-                                  <Text style={[styles.freqBtnText, frequency === f && {color: 'white'}]}>{f}</Text>
-                              </TouchableOpacity>
-                          ))}
-                      </View>
-
                       {editingHabit && (
                           <View style={styles.editActions}>
-                                <Text style={styles.inputLabel}>Reorder</Text>
-                                <View style={styles.reorderRow}>
-                                    <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('up')}>
-                                        <ArrowUp size={20} color="#000" />
-                                        <Text>Up</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.reorderBtn} onPress={() => handleMove('down')}>
-                                        <ArrowDown size={20} color="#000" />
-                                        <Text>Down</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <Text style={styles.inputLabel}>Danger Zone</Text>
-                                <View style={styles.dangerRow}>
-                                    <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(editingHabit)}>
-                                        <Archive size={18} color="#007AFF" />
-                                        <Text style={{color: '#007AFF', fontWeight: '600'}}>
-                                            {editingHabit.is_archived ? "Unarchive" : "Archive"}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    
-                                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(editingHabit.id)}>
-                                        <Trash2 size={18} color="#FF3B30" />
-                                        <Text style={{color: '#FF3B30', fontWeight: '600'}}>Delete</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(editingHabit)}>
+                                    <Archive size={18} color="#FFF" />
+                                    <Text style={{color: '#FFF', fontWeight: '600'}}>
+                                        {editingHabit.is_archived ? "Désarchiver" : "Archiver"}
+                                    </Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(editingHabit.id)}>
+                                    <Trash2 size={18} color="#FF3B30" />
+                                    <Text style={{color: '#FF3B30', fontWeight: '600'}}>Supprimer</Text>
+                                </TouchableOpacity>
                           </View>
                       )}
 
                       <TouchableOpacity style={styles.saveMainBtn} onPress={handleSave}>
-                          <Save size={20} color="white" />
-                          <Text style={styles.saveMainBtnText}>Save Habit</Text>
+                          <Save size={20} color="black" />
+                          <Text style={styles.saveMainBtnText}>Enregistrer</Text>
                       </TouchableOpacity>
                   </ScrollView>
               </View>
@@ -280,8 +237,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
-    paddingTop: 60,
+    backgroundColor: '#000000',
+    paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
@@ -289,12 +246,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     marginBottom: 16,
+    marginTop: 10,
   },
   largeTitle: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#000000',
-    letterSpacing: 0.37,
+    color: '#FFF',
   },
   headerButtons: {
       flexDirection: 'row',
@@ -304,18 +261,18 @@ const styles = StyleSheet.create({
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#E5E5EA',
+      backgroundColor: '#171717',
       alignItems: 'center',
       justifyContent: 'center',
   },
   iconBtnActive: {
-      backgroundColor: '#007AFF',
+      backgroundColor: '#333',
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -326,19 +283,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
       textAlign: 'center',
-      color: '#8E8E93',
+      color: '#666',
       marginTop: 20,
       fontStyle: 'italic',
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: '#171717',
+    borderRadius: 16,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -361,25 +315,25 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8E8E93',
+    color: '#666',
     letterSpacing: 0.5,
   },
   streakCount: {
     fontSize: 13,
-    color: '#8E8E93',
+    color: '#666',
   },
   habitTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#000000',
+    color: '#FFF',
     marginBottom: 20,
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 0.5,
-    borderTopColor: '#E5E5EA',
+    borderTopWidth: 1,
+    borderTopColor: '#262626',
     paddingTop: 16,
   },
   freqBadge: {
@@ -387,8 +341,8 @@ const styles = StyleSheet.create({
       alignItems: 'center',
   },
   frequencyText: {
-    fontSize: 15,
-    color: '#8E8E93',
+    fontSize: 14,
+    color: '#666',
     textTransform: 'capitalize',
   },
   actionButton: {
@@ -396,36 +350,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: 20,
   },
   actionButtonDefault: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FFF',
   },
   actionButtonCompleted: {
-    backgroundColor: '#E0F2FF',
+    backgroundColor: '#34C759',
   },
   actionButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  archivedLabel: {
-      color: '#8E8E93',
-      fontStyle: 'italic',
+    color: '#000',
   },
   
   // MODAL
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-      backgroundColor: '#F2F2F7',
+      backgroundColor: '#171717',
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       padding: 20,
-      maxHeight: '85%',
+      maxHeight: '90%',
   },
   modalHeader: {
       flexDirection: 'row',
@@ -436,66 +386,33 @@ const styles = StyleSheet.create({
   modalTitle: {
       fontSize: 20,
       fontWeight: '700',
+      color: '#FFF',
   },
   inputLabel: {
-      fontSize: 13,
-      color: '#8E8E93',
+      fontSize: 12,
+      color: '#666',
       fontWeight: '600',
       marginBottom: 6,
       textTransform: 'uppercase',
   },
   input: {
-      backgroundColor: 'white',
+      backgroundColor: '#000',
       borderRadius: 10,
-      padding: 12,
+      padding: 14,
       fontSize: 16,
       marginBottom: 16,
+      color: '#FFF',
+      borderWidth: 1,
+      borderColor: '#333',
   },
   rowInputs: {
       flexDirection: 'row',
   },
-  freqSelector: {
-      flexDirection: 'row',
-      backgroundColor: '#E5E5EA',
-      borderRadius: 10,
-      padding: 2,
-      marginBottom: 20,
-  },
-  freqBtn: {
-      flex: 1,
-      paddingVertical: 8,
-      alignItems: 'center',
-      borderRadius: 8,
-  },
-  freqBtnActive: {
-      backgroundColor: '#007AFF',
-  },
-  freqBtnText: {
-      fontWeight: '600',
-      color: '#000',
-  },
   editActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 20,
       marginTop: 10,
-  },
-  reorderRow: {
-      flexDirection: 'row',
-      gap: 12,
-      marginBottom: 20,
-  },
-  reorderBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      backgroundColor: 'white',
-      padding: 10,
-      borderRadius: 10,
-  },
-  dangerRow: {
-      flexDirection: 'row',
-      gap: 12,
-      marginBottom: 20,
   },
   archiveBtn: {
       flex: 1,
@@ -503,7 +420,7 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      backgroundColor: '#E0F2FF',
+      backgroundColor: '#333',
       padding: 12,
       borderRadius: 10,
   },
@@ -513,13 +430,13 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      backgroundColor: '#FFEBEA',
+      backgroundColor: 'rgba(255, 59, 48, 0.1)',
       padding: 12,
       borderRadius: 10,
   },
   saveMainBtn: {
       flexDirection: 'row',
-      backgroundColor: '#007AFF',
+      backgroundColor: '#FFF',
       padding: 16,
       borderRadius: 12,
       alignItems: 'center',
@@ -529,9 +446,9 @@ const styles = StyleSheet.create({
       marginBottom: 40,
   },
   saveMainBtnText: {
-      color: 'white',
+      color: 'black',
       fontWeight: '700',
-      fontSize: 17,
+      fontSize: 16,
   }
 });
 

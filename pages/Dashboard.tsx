@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Dimensions, StatusBar } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit } from '../types';
-import { Check, Flame, Plus, Play, Menu, Sparkles, Search } from 'lucide-react-native';
-
-const { width } = Dimensions.get('window');
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, StatusBar } from 'react-native';
+import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
+import { Check, Flame, Plus, Play, Menu, ArrowRight } from 'lucide-react-native';
 
 interface DashboardProps {
   user: UserProfile;
@@ -14,10 +12,11 @@ interface DashboardProps {
   toggleTask: (id: string) => void;
   openFocus: () => void;
   openProfile: () => void;
+  setView: (view: ViewState) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incrementHabit, toggleTask, openFocus, openProfile }) => {
-  // Correction Bug Date : Comparaison stricte Jour/Mois/Année
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incrementHabit, toggleTask, openFocus, openProfile, setView }) => {
+  
   const isSameDay = (d1: Date, d2: Date) => {
       return d1.getDate() === d2.getDate() &&
              d1.getMonth() === d2.getMonth() &&
@@ -33,47 +32,39 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
       return aDone ? 1 : -1;
   });
 
-  const activeTasks = tasks.filter(t => !t.completed);
-  
+  const activeTasks = tasks.filter(t => !t.completed).slice(0, 5); // Show top 5
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      
-      {/* ChatGPT Style Header */}
+      {/* Header Minimaliste */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => setView(ViewState.EXPLORE)}>
             <Menu size={24} color="#FFF" />
         </TouchableOpacity>
 
-        <View style={styles.pillContainer}>
-            <Sparkles size={14} color="#C4B5FD" style={{ marginRight: 6 }} />
-            <Text style={styles.pillText}>DeepFlow Plus</Text>
-        </View>
+        <Text style={styles.headerTitle}>DeepFlow</Text>
 
-        <View style={styles.headerRight}>
-             <TouchableOpacity style={[styles.iconBtn, { marginRight: 8 }]}>
-                <Search size={24} color="#FFF" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={openProfile} style={styles.avatarContainer}>
-                 <Image 
-                    source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
-                    style={styles.avatar} 
-                />
-            </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={openProfile} style={styles.avatarContainer}>
+            <Image 
+            source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
+            style={styles.avatar} 
+        />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         <View style={styles.welcomeSection}>
-            <Text style={styles.greeting}>Bonjour, {user.display_name?.split(' ')[0]}</Text>
-            <Text style={styles.subGreeting}>Prêt à conquérir la journée ?</Text>
+            <Text style={styles.greeting}>Bonjour {user.display_name?.split(' ')[0]}</Text>
         </View>
 
-        {/* Habits Row */}
+        {/* Habits Section */}
         <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Habitudes</Text>
+                <TouchableOpacity onPress={() => setView(ViewState.HABITS)}>
+                    <ArrowRight size={20} color="#666" />
+                </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScroll}>
                 {sortedHabits.map(habit => {
@@ -91,7 +82,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
                                         <Check size={14} color="#000" strokeWidth={3} />
                                     </View>
                                 ) : (
-                                    <Flame size={20} color="#777" />
+                                    <Flame size={20} color="#666" />
                                 )}
                                 <Text style={styles.habitStreak}>{habit.streak}</Text>
                             </View>
@@ -99,25 +90,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
                         </TouchableOpacity>
                     )
                 })}
-                <TouchableOpacity style={styles.addHabitCard}>
+                <TouchableOpacity style={styles.addHabitCard} onPress={() => setView(ViewState.HABITS)}>
                     <Plus size={24} color="#444" />
                 </TouchableOpacity>
             </ScrollView>
         </View>
 
-        {/* Tasks List */}
+        {/* Tasks Section */}
         <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Tâches</Text>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{activeTasks.length}</Text>
-                </View>
+                <Text style={styles.sectionTitle}>Tâches Prioritaires</Text>
+                <TouchableOpacity onPress={() => setView(ViewState.TASKS)}>
+                    <ArrowRight size={20} color="#666" />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.taskList}>
                 {activeTasks.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>Tout est calme ici.</Text>
+                        <Text style={styles.emptyText}>Aucune tâche urgente.</Text>
                     </View>
                 ) : (
                     activeTasks.map((task) => (
@@ -145,9 +136,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
 
       </ScrollView>
 
-      {/* Minimalist Floating Focus Button */}
+      {/* Floating Focus Button */}
       <TouchableOpacity style={styles.fab} onPress={openFocus} activeOpacity={0.8}>
-          <Play size={20} color="#000" fill="#000" />
+          <Play size={24} color="#000" fill="#000" style={{marginLeft: 4}} />
       </TouchableOpacity>
     </View>
   );
@@ -171,34 +162,20 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 20,
-      backgroundColor: '#171717', // Dark Grey Button
   },
-  pillContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#1F1F1F',
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: '#2C2C2C',
-  },
-  pillText: {
-      color: '#E5E7EB',
+  headerTitle: {
+      fontSize: 18,
       fontWeight: '600',
-      fontSize: 14,
-  },
-  headerRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      color: '#FFF',
   },
   avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#333',
   },
   avatar: {
     width: '100%',
@@ -213,14 +190,10 @@ const styles = StyleSheet.create({
       marginBottom: 30,
   },
   greeting: {
-      fontSize: 28,
+      fontSize: 32,
       fontWeight: '700',
       color: '#FFFFFF',
-      marginBottom: 4,
-  },
-  subGreeting: {
-      fontSize: 15,
-      color: '#9CA3AF',
+      letterSpacing: -0.5,
   },
   sectionContainer: {
       marginBottom: 32,
@@ -228,25 +201,14 @@ const styles = StyleSheet.create({
   sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
       paddingHorizontal: 20,
       marginBottom: 16,
-      gap: 8,
   },
   sectionTitle: {
       fontSize: 18,
       fontWeight: '600',
       color: '#FFFFFF',
-  },
-  badge: {
-      backgroundColor: '#2C2C2C',
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 12,
-  },
-  badgeText: {
-      color: '#FFF',
-      fontSize: 12,
-      fontWeight: '600',
   },
   
   // Habits
@@ -255,19 +217,19 @@ const styles = StyleSheet.create({
       gap: 12,
   },
   habitCard: {
-      width: 120,
-      height: 100,
+      width: 110,
+      height: 110,
       backgroundColor: '#171717',
-      borderRadius: 16,
+      borderRadius: 20,
       padding: 14,
       justifyContent: 'space-between',
       borderWidth: 1,
       borderColor: '#262626',
   },
   habitCardDone: {
-      backgroundColor: '#1A1A1A', // Slightly lighter or different tone? Keep dark for consistency
+      backgroundColor: '#1C1C1E',
       borderColor: '#333',
-      opacity: 0.6,
+      opacity: 0.5,
   },
   habitTop: {
       flexDirection: 'row',
@@ -276,7 +238,7 @@ const styles = StyleSheet.create({
   },
   habitStreak: {
       fontSize: 13,
-      color: '#666',
+      color: '#888',
       fontWeight: '600',
   },
   checkCircle: {
@@ -288,19 +250,19 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
   },
   habitTitle: {
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 13,
+      fontWeight: '600',
       color: '#EEE',
-      lineHeight: 20,
+      lineHeight: 18,
   },
   textMuted: {
-      color: '#777',
+      color: '#666',
       textDecorationLine: 'line-through',
   },
   addHabitCard: {
       width: 50,
-      height: 100,
-      borderRadius: 16,
+      height: 110,
+      borderRadius: 20,
       borderWidth: 1,
       borderColor: '#262626',
       borderStyle: 'dashed',
@@ -338,7 +300,7 @@ const styles = StyleSheet.create({
       borderColor: '#FFF',
   },
   checkboxHigh: {
-      borderColor: '#EF4444', // Red border for high priority
+      borderColor: '#EF4444', 
   },
   taskText: {
       fontSize: 15,
@@ -368,15 +330,15 @@ const styles = StyleSheet.create({
       position: 'absolute',
       bottom: 90,
       right: 20,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
       backgroundColor: '#FFFFFF',
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: '#FFF',
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.1,
+      shadowOpacity: 0.15,
       shadowRadius: 10,
       elevation: 5,
   }

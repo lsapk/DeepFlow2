@@ -5,8 +5,9 @@ import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
-const CIRCLE_SIZE = width * 0.75;
-const STROKE_WIDTH = 20; // Thicker, Apple Watch style
+// Ajustement pour être sûr que ça rentre sur tous les écrans
+const CIRCLE_SIZE = Math.min(width * 0.75, 300); 
+const STROKE_WIDTH = 15;
 const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -30,7 +31,6 @@ const Focus: React.FC<FocusProps> = ({ onExit }) => {
     } else if (timeLeft === 0 && isActive) {
         setIsActive(false);
         saveSession();
-        // Play sound here ideally
     }
 
     return () => clearInterval(interval);
@@ -65,8 +65,7 @@ const Focus: React.FC<FocusProps> = ({ onExit }) => {
   const progress = 1 - (timeLeft / totalTime);
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
   
-  // Colors
-  const activeColor = sessionType === 'FOCUS' ? '#5856D6' : '#30B0C7'; // System Indigo & Teal
+  const activeColor = sessionType === 'FOCUS' ? '#FFFFFF' : '#30B0C7'; 
 
   return (
     <View style={styles.container}>
@@ -74,24 +73,19 @@ const Focus: React.FC<FocusProps> = ({ onExit }) => {
              <TouchableOpacity onPress={onExit} style={styles.exitButton}>
                 <X size={24} color="white" />
              </TouchableOpacity>
-             <Text style={styles.headerTitle}>Focus Mode</Text>
-             <View style={{width: 40}} /> 
         </View>
 
         <View style={styles.content}>
             <View style={styles.timerContainer}>
                 <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
-                    {/* Background Ring */}
                     <Circle
                         cx={CIRCLE_SIZE / 2}
                         cy={CIRCLE_SIZE / 2}
                         r={RADIUS}
-                        stroke="#1C1C1E" // Dark gray
+                        stroke="#1C1C1E"
                         strokeWidth={STROKE_WIDTH}
                         fill="transparent"
-                        opacity={0.3}
                     />
-                    {/* Progress Ring */}
                     <Circle
                         cx={CIRCLE_SIZE / 2}
                         cy={CIRCLE_SIZE / 2}
@@ -115,18 +109,12 @@ const Focus: React.FC<FocusProps> = ({ onExit }) => {
             </View>
 
             <View style={styles.controls}>
-                <TouchableOpacity 
-                    onPress={resetTimer}
-                    style={styles.controlBtnSecondary}
-                >
+                <TouchableOpacity onPress={resetTimer} style={styles.controlBtnSecondary}>
                     <RotateCcw size={24} color="#8E8E93" />
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                    onPress={toggleTimer}
-                    style={[styles.playBtn, { backgroundColor: activeColor }]}
-                >
-                    {isActive ? <Pause size={36} color="white" fill="white" /> : <Play size={36} color="white" fill="white" style={{ marginLeft: 4 }} />}
+                <TouchableOpacity onPress={toggleTimer} style={[styles.playBtn, { backgroundColor: activeColor }]}>
+                    {isActive ? <Pause size={32} color="black" fill="black" /> : <Play size={32} color="black" fill="black" style={{ marginLeft: 4 }} />}
                 </TouchableOpacity>
 
                 <TouchableOpacity 
@@ -151,16 +139,14 @@ const Focus: React.FC<FocusProps> = ({ onExit }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000', // Deep black OLED friendly
-    paddingTop: Platform.OS === 'android' ? 40 : 20,
+    backgroundColor: '#000000',
+    paddingTop: 20,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 20,
-    height: 44,
+    height: 60,
+    justifyContent: 'center',
   },
   exitButton: {
     width: 40,
@@ -169,11 +155,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#1C1C1E',
     borderRadius: 20,
-  },
-  headerTitle: {
-      color: 'white',
-      fontSize: 17,
-      fontWeight: '600',
   },
   content: {
     alignItems: 'center',
@@ -196,8 +177,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timeText: {
-    fontSize: 72,
-    fontWeight: '300', // Thin font like Apple Watch
+    fontSize: 60,
+    fontWeight: '300',
     color: 'white',
     fontVariant: ['tabular-nums'],
   },
@@ -210,7 +191,7 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 40,
+    gap: 30,
   },
   controlBtnSecondary: {
     width: 60,
@@ -221,21 +202,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playBtn: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
   },
   typeSwitchText: {
       color: '#8E8E93',
       fontWeight: '600',
-      fontSize: 13,
+      fontSize: 12,
   }
 });
 

@@ -1,66 +1,77 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { Bot, Gamepad2, Sparkles, Folder, Grid, Image as ImageIcon, MessageSquarePlus } from 'lucide-react-native';
+import { Bot, Gamepad2, Sparkles, ChevronRight } from 'lucide-react-native';
+import { PlayerProfile } from '../types';
 
-const Explore: React.FC = () => {
+interface ExploreProps {
+    player: PlayerProfile;
+}
+
+const Explore: React.FC<ExploreProps> = ({ player }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
             <Text style={styles.largeTitle}>Explore</Text>
       </View>
         
-      {/* Search Input style ChatGPT */}
       <View style={styles.searchContainer}>
           <View style={styles.searchInputWrapper}>
              <TextInput 
-                placeholder="Rechercher" 
+                placeholder="Discuter avec DeepFlow AI..." 
                 placeholderTextColor="#666" 
                 style={styles.searchInput}
              />
+             <Bot size={20} color="#666" />
           </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        <Text style={styles.sectionLabel}>Actions Rapides</Text>
-        
+        {/* IA Section */}
+        <Text style={styles.sectionLabel}>Assistant</Text>
         <TouchableOpacity style={styles.menuItem}>
-            <MessageSquarePlus size={22} color="#FFF" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Nouveau chat</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-            <ImageIcon size={22} color="#FFF" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Images</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-            <Grid size={22} color="#FFF" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Applis</Text>
-        </TouchableOpacity>
-
-        <View style={styles.spacer} />
-        <Text style={styles.sectionLabel}>Cyber Knight</Text>
-
-        <TouchableOpacity style={styles.menuItem}>
-            <Gamepad2 size={22} color="#C4B5FD" style={styles.menuIcon} />
-            <View>
-                <Text style={[styles.menuText, {color: '#C4B5FD'}]}>Accéder au QG</Text>
-                <Text style={styles.menuSubText}>Gérer l'avatar et les crédits</Text>
+            <View style={[styles.iconBox, { backgroundColor: '#171717' }]}>
+                 <Sparkles size={22} color="#FFF" />
             </View>
+            <View style={{flex: 1}}>
+                <Text style={styles.menuText}>Nouveau Chat IA</Text>
+                <Text style={styles.menuSubText}>Posez une question ou planifiez votre journée.</Text>
+            </View>
+            <ChevronRight size={16} color="#444" />
         </TouchableOpacity>
 
         <View style={styles.spacer} />
-        <Text style={styles.sectionLabel}>Projets</Text>
-
-        <TouchableOpacity style={styles.menuItem}>
-            <Folder size={22} color="#FFF" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Nouveau projet</Text>
-        </TouchableOpacity>
         
-         <TouchableOpacity style={styles.menuItem}>
-            <Folder size={22} color="#FFF" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Développement personnel</Text>
+        {/* Gamification Section - REAL DATA */}
+        <Text style={styles.sectionLabel}>Cyber Knight QG</Text>
+
+        <TouchableOpacity style={styles.cardItem}>
+            <View style={styles.cardHeader}>
+                 <Gamepad2 size={24} color="#C4B5FD" />
+                 <Text style={styles.cardTitle}>Statut Joueur</Text>
+            </View>
+            
+            <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                    <Text style={styles.statValue}>{player?.level || 1}</Text>
+                    <Text style={styles.statLabel}>Niveau</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.stat}>
+                    <Text style={styles.statValue}>{player?.credits || 0}</Text>
+                    <Text style={styles.statLabel}>Crédits</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.stat}>
+                    <Text style={styles.statValue}>{player?.experience_points || 0}</Text>
+                    <Text style={styles.statLabel}>XP</Text>
+                </View>
+            </View>
+            
+            <View style={styles.xpBarBg}>
+                <View style={[styles.xpBarFill, { width: `${(player?.experience_points % 1000) / 10}%` }]} />
+            </View>
+            <Text style={styles.xpText}>Progression vers Niveau {(player?.level || 1) + 1}</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -96,13 +107,17 @@ const styles = StyleSheet.create({
       backgroundColor: '#171717',
       borderRadius: 12,
       paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingVertical: 14,
       borderWidth: 1,
       borderColor: '#262626',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
   },
   searchInput: {
       color: '#FFF',
       fontSize: 16,
+      flex: 1,
   },
   sectionLabel: {
       color: '#666',
@@ -110,19 +125,27 @@ const styles = StyleSheet.create({
       fontWeight: '600',
       marginBottom: 12,
       marginTop: 12,
+      textTransform: 'uppercase',
   },
   menuItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 14,
+      paddingVertical: 12,
+      gap: 16,
   },
-  menuIcon: {
-      marginRight: 16,
+  iconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#262626',
   },
   menuText: {
       color: '#FFF',
       fontSize: 16,
-      fontWeight: '500',
+      fontWeight: '600',
   },
   menuSubText: {
       color: '#666',
@@ -131,6 +154,65 @@ const styles = StyleSheet.create({
   },
   spacer: {
       height: 20,
+  },
+  cardItem: {
+      backgroundColor: '#171717',
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#262626',
+  },
+  cardHeader: {
+      flexDirection: 'row',
+      gap: 10,
+      alignItems: 'center',
+      marginBottom: 16,
+  },
+  cardTitle: {
+      color: '#C4B5FD',
+      fontSize: 18,
+      fontWeight: '600',
+  },
+  statsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+  },
+  stat: {
+      alignItems: 'center',
+      flex: 1,
+  },
+  statValue: {
+      color: '#FFF',
+      fontSize: 20,
+      fontWeight: '700',
+  },
+  statLabel: {
+      color: '#666',
+      fontSize: 12,
+      marginTop: 2,
+  },
+  divider: {
+      width: 1,
+      backgroundColor: '#333',
+      height: '80%',
+  },
+  xpBarBg: {
+      height: 6,
+      backgroundColor: '#333',
+      borderRadius: 3,
+      overflow: 'hidden',
+      marginBottom: 8,
+  },
+  xpBarFill: {
+      height: '100%',
+      backgroundColor: '#C4B5FD',
+      borderRadius: 3,
+  },
+  xpText: {
+      color: '#666',
+      fontSize: 11,
+      textAlign: 'center',
   }
 });
 

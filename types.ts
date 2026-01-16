@@ -117,5 +117,7 @@ export enum ViewState {
   TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
   GROWTH = 'GROWTH',    // Goals + Journal
   EXPLORE = 'EXPLORE',  // IA + Cyber Knight
-  FOCUS_MODE = 'FOCUS_MODE' // Full screen focus
+  FOCUS_MODE = 'FOCUS_MODE', // Full screen focus
+  TASKS = 'TASKS',
+  HABITS = 'HABITS'
 }
