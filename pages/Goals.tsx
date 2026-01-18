@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save, Minus } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 if (Platform.OS === 'android') {
@@ -20,21 +20,31 @@ interface GoalsProps {
 }
 
 const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, userId, refreshGoals }) => {
-  const [newGoalTitle, setNewGoalTitle] = useState('');
   const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   
-  // Edit Modal
+  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  
+  // Edit State
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editDate, setEditDate] = useState('');
+  const [formTitle, setFormTitle] = useState('');
+  const [formDesc, setFormDesc] = useState('');
+  const [formDate, setFormDate] = useState('');
+  const [formProgress, setFormProgress] = useState(0);
+
+  const openCreateModal = () => {
+    setFormTitle('');
+    setFormDesc('');
+    setFormDate('');
+    setFormProgress(0);
+    setCreateModalVisible(true);
+  };
 
   const handleAdd = () => {
-    if (newGoalTitle.trim()) {
-      addGoal(newGoalTitle);
-      setNewGoalTitle('');
+    if (formTitle.trim()) {
+      addGoal(formTitle);
+      setCreateModalVisible(false);
     }
   };
 
@@ -51,22 +61,29 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
 
   const openEditModal = (goal: Goal) => {
       setSelectedGoal(goal);
-      setEditTitle(goal.title);
-      setEditDesc(goal.description || '');
-      setEditDate(goal.target_date ? new Date(goal.target_date).toISOString().split('T')[0] : '');
+      setFormTitle(goal.title);
+      setFormDesc(goal.description || '');
+      setFormDate(goal.target_date ? new Date(goal.target_date).toISOString().split('T')[0] : '');
+      setFormProgress(goal.progress || 0);
       setEditModalVisible(true);
   };
 
   const handleUpdateGoal = async () => {
       if (!selectedGoal) return;
       await supabase.from('goals').update({ 
-          title: editTitle,
-          description: editDesc,
-          target_date: editDate ? new Date(editDate).toISOString() : null
+          title: formTitle,
+          description: formDesc,
+          target_date: formDate ? new Date(formDate).toISOString() : null,
+          progress: formProgress
       }).eq('id', selectedGoal.id);
       
       refreshGoals();
       setEditModalVisible(false);
+  };
+
+  const changeProgress = (delta: number) => {
+      const newVal = Math.max(0, Math.min(100, formProgress + delta));
+      setFormProgress(newVal);
   };
 
   const activeGoals = goals.filter(t => !t.completed);
@@ -76,36 +93,15 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
     <View style={styles.container}>
       <View style={styles.header}>
           <Text style={styles.largeTitle}>Objectifs</Text>
-          <TouchableOpacity onPress={() => setShowCompleted(!showCompleted)} style={styles.toggleCompletedBtn}>
-              <Text style={styles.toggleText}>{showCompleted ? 'Masquer Terminés' : 'Voir Terminés'}</Text>
-          </TouchableOpacity>
-      </View>
-
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
-        style={styles.keyboardAvoid}
-      >
-        <View style={styles.inputContainer}>
-            <TextInput
-            style={styles.textInput}
-            placeholder="Nouvel objectif..."
-            placeholderTextColor="#666"
-            value={newGoalTitle}
-            onChangeText={setNewGoalTitle}
-            />
-            <View style={styles.inputRow}>
-                <View style={{flex: 1}} />
-                <TouchableOpacity 
-                    onPress={handleAdd}
-                    disabled={!newGoalTitle.trim()}
-                    style={styles.addButton}
-                >
-                    <Plus size={24} color={!newGoalTitle.trim() ? '#666' : '#FFF'} />
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                <TouchableOpacity onPress={() => setShowCompleted(!showCompleted)} style={styles.toggleCompletedBtn}>
+                    <Text style={styles.toggleText}>{showCompleted ? 'Masquer' : 'Voir Terminés'}</Text>
                 </TouchableOpacity>
-            </View>
-        </View>
-      </KeyboardAvoidingView>
+                <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
+                        <Plus size={24} color="#000" />
+                </TouchableOpacity>
+          </View>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.listGroup}>
@@ -151,18 +147,18 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
         )}
       </ScrollView>
       
-      {/* Edit Modal */}
+      {/* Create / Edit Modal */}
       <Modal
-        visible={editModalVisible}
+        visible={createModalVisible || editModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}
+        onRequestClose={() => { setCreateModalVisible(false); setEditModalVisible(false); }}
       >
           <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Modifier l'Objectif</Text>
-                      <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                      <Text style={styles.modalTitle}>{createModalVisible ? 'Nouvel Objectif' : 'Modifier'}</Text>
+                      <TouchableOpacity onPress={() => { setCreateModalVisible(false); setEditModalVisible(false); }}>
                           <X size={24} color="#FFF" />
                       </TouchableOpacity>
                   </View>
@@ -170,18 +166,35 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                   <Text style={styles.modalLabel}>Titre</Text>
                   <TextInput 
                       style={styles.modalInput} 
-                      value={editTitle} 
-                      onChangeText={setEditTitle} 
+                      value={formTitle} 
+                      onChangeText={setFormTitle} 
                       color="#FFF"
                   />
+
+                  {editModalVisible && (
+                      <>
+                        <Text style={styles.modalLabel}>Progression ({formProgress}%)</Text>
+                        <View style={styles.progressControl}>
+                            <TouchableOpacity onPress={() => changeProgress(-10)} style={styles.progressBtn}>
+                                <Minus size={20} color="#FFF" />
+                            </TouchableOpacity>
+                            <View style={styles.progressBarBg}>
+                                <View style={[styles.progressBarFill, { width: `${formProgress}%` }]} />
+                            </View>
+                            <TouchableOpacity onPress={() => changeProgress(10)} style={styles.progressBtn}>
+                                <Plus size={20} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+                      </>
+                  )}
 
                   <Text style={styles.modalLabel}>Description</Text>
                    <View style={styles.inputWithIcon}>
                          <AlignLeft size={18} color="#666" style={{marginRight: 10}} />
                          <TextInput 
-                            style={[styles.modalInput, {flex: 1, height: 'auto', minHeight: 40, borderWidth: 0}]} 
-                            value={editDesc} 
-                            onChangeText={setEditDesc} 
+                            style={[styles.modalInput, {flex: 1, height: 'auto', minHeight: 40, borderWidth: 0, marginBottom: 0}]} 
+                            value={formDesc} 
+                            onChangeText={setFormDesc} 
                             placeholder="Détails..."
                             placeholderTextColor="#666"
                             multiline
@@ -193,9 +206,9 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                     <View style={styles.inputWithIcon}>
                         <Calendar size={18} color="#666" style={{marginRight: 10}} />
                         <TextInput 
-                            style={[styles.modalInput, { borderWidth: 0 }]} 
-                            value={editDate} 
-                            onChangeText={setEditDate} 
+                            style={[styles.modalInput, { borderWidth: 0, marginBottom: 0 }]} 
+                            value={formDate} 
+                            onChangeText={setFormDate} 
                             placeholder="ex: 2024-12-31"
                             placeholderTextColor="#666"
                             color="#FFF"
@@ -203,28 +216,30 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                     </View>
 
 
-                  <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateGoal}>
+                  <TouchableOpacity style={styles.saveBtn} onPress={createModalVisible ? handleAdd : handleUpdateGoal}>
                         <Save size={20} color="black" />
                         <Text style={styles.saveBtnText}>Enregistrer</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity 
-                    style={styles.deleteActionBtn} 
-                    onPress={() => {
-                        if (selectedGoal) {
-                            Alert.alert("Supprimer", "Êtes-vous sûr ?", [
-                                { text: "Annuler", style: "cancel"},
-                                { text: "Supprimer", style: 'destructive', onPress: () => {
-                                    deleteGoal(selectedGoal.id);
-                                    setEditModalVisible(false);
-                                }}
-                            ])
-                        }
-                    }}
-                   >
-                      <Trash2 size={20} color="#FF3B30" />
-                      <Text style={styles.deleteText}>Supprimer</Text>
-                  </TouchableOpacity>
+                  {editModalVisible && (
+                    <TouchableOpacity 
+                        style={styles.deleteActionBtn} 
+                        onPress={() => {
+                            if (selectedGoal) {
+                                Alert.alert("Supprimer", "Êtes-vous sûr ?", [
+                                    { text: "Annuler", style: "cancel"},
+                                    { text: "Supprimer", style: 'destructive', onPress: () => {
+                                        deleteGoal(selectedGoal.id);
+                                        setEditModalVisible(false);
+                                    }}
+                                ])
+                            }
+                        }}
+                    >
+                        <Trash2 size={20} color="#FF3B30" />
+                        <Text style={styles.deleteText}>Supprimer</Text>
+                    </TouchableOpacity>
+                  )}
               </View>
           </View>
       </Modal>
@@ -292,13 +307,14 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
                     <Text style={[styles.taskTitle, goal.completed && styles.taskTitleCompleted]}>
                         {goal.title}
                     </Text>
+                    {/* Progress Bar Mini */}
+                    {!goal.completed && (goal.progress || 0) > 0 && (
+                        <View style={styles.miniProgressBg}>
+                            <View style={[styles.miniProgressFill, { width: `${goal.progress}%` }]} />
+                        </View>
+                    )}
                     {goal.target_date && (
                          <Text style={styles.dateText}>🎯 {new Date(goal.target_date).toLocaleDateString()}</Text>
-                    )}
-                    {goal.subobjectives && goal.subobjectives.length > 0 && (
-                        <Text style={styles.subtaskSummary}>
-                            {goal.subobjectives.filter(s => s.completed).length}/{goal.subobjectives.length} étapes
-                        </Text>
                     )}
                 </View>
 
@@ -367,35 +383,17 @@ const styles = StyleSheet.create({
   toggleCompletedBtn: {
       padding: 8,
   },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   toggleText: {
       color: '#007AFF',
       fontSize: 15,
-  },
-  keyboardAvoid: {
-    zIndex: 10,
-  },
-  inputContainer: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-    backgroundColor: '#171717',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#262626',
-  },
-  textInput: {
-    fontSize: 17,
-    color: '#FFF',
-    marginBottom: 16,
-    paddingVertical: 0,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  addButton: {
-    padding: 4,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -462,11 +460,6 @@ const styles = StyleSheet.create({
       color: '#FF9500',
       marginTop: 2,
   },
-  subtaskSummary: {
-      fontSize: 12,
-      color: '#666',
-      marginTop: 2,
-  },
   rightActions: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -526,6 +519,47 @@ const styles = StyleSheet.create({
       color: '#FFF',
       marginRight: 8,
   },
+  
+  // Progress
+  miniProgressBg: {
+      height: 4,
+      backgroundColor: '#333',
+      borderRadius: 2,
+      marginTop: 6,
+      width: '60%',
+  },
+  miniProgressFill: {
+      height: '100%',
+      backgroundColor: '#007AFF',
+      borderRadius: 2,
+  },
+  progressControl: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 20,
+  },
+  progressBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: '#333',
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  progressBarBg: {
+      flex: 1,
+      height: 10,
+      backgroundColor: '#333',
+      borderRadius: 5,
+      overflow: 'hidden',
+  },
+  progressBarFill: {
+      height: '100%',
+      backgroundColor: '#007AFF',
+  },
+
+  // Modal
   modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.8)',

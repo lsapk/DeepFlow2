@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert } from 'react-native';
-import { Habit } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, FileText } from 'lucide-react-native';
+import { Habit, Goal } from '../types';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 interface HabitsProps {
   habits: Habit[];
+  goals: Goal[];
   incrementHabit: (id: string) => void;
   userId: string;
   refreshHabits: () => void;
 }
 
-const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refreshHabits }) => {
+const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']; // Dimanche to Samedi
+
+const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, refreshHabits }) => {
   const [showArchived, setShowArchived] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   
@@ -22,6 +25,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
   const [category, setCategory] = useState('');
   const [frequency, setFrequency] = useState('daily');
   const [target, setTarget] = useState('1');
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [linkedGoalId, setLinkedGoalId] = useState<string | null>(null);
 
   const openCreateModal = () => {
       setEditingHabit(null);
@@ -30,6 +35,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
       setCategory('General');
       setFrequency('daily');
       setTarget('1');
+      setSelectedDays([]); // Empty means everyday
+      setLinkedGoalId(null);
       setModalVisible(true);
   };
 
@@ -40,7 +47,17 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
       setCategory(habit.category || 'General');
       setFrequency(habit.frequency);
       setTarget(habit.target.toString());
+      setSelectedDays(habit.days_of_week || []);
+      setLinkedGoalId(habit.linked_goal_id || null);
       setModalVisible(true);
+  };
+
+  const toggleDay = (index: number) => {
+      if (selectedDays.includes(index)) {
+          setSelectedDays(selectedDays.filter(d => d !== index));
+      } else {
+          setSelectedDays([...selectedDays, index].sort());
+      }
   };
 
   const handleSave = async () => {
@@ -55,7 +72,9 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
           category,
           frequency,
           target: parseInt(target) || 1,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          days_of_week: selectedDays.length === 0 ? null : selectedDays,
+          linked_goal_id: linkedGoalId
       };
 
       if (editingHabit) {
@@ -146,8 +165,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
                         
                         {!showArchived && (
                             <TouchableOpacity 
-                                onPress={() => !isCompletedToday && incrementHabit(habit.id)}
-                                disabled={isCompletedToday}
+                                onPress={() => incrementHabit(habit.id)}
                                 style={[
                                     styles.actionButton, 
                                     isCompletedToday ? styles.actionButtonCompleted : styles.actionButtonDefault
@@ -222,6 +240,41 @@ const Habits: React.FC<HabitsProps> = ({ habits, incrementHabit, userId, refresh
                                 />
                           </View>
                       </View>
+
+                      {/* DAYS SELECTION */}
+                      <Text style={styles.inputLabel}>Jours (Vide = Tous les jours)</Text>
+                      <View style={styles.daysContainer}>
+                          {DAYS.map((d, index) => (
+                              <TouchableOpacity 
+                                key={index} 
+                                onPress={() => toggleDay(index)}
+                                style={[styles.dayCircle, selectedDays.includes(index) && styles.dayCircleActive]}
+                              >
+                                  <Text style={[styles.dayText, selectedDays.includes(index) && styles.dayTextActive]}>{d}</Text>
+                              </TouchableOpacity>
+                          ))}
+                      </View>
+
+                      {/* GOAL LINKING */}
+                      <Text style={styles.inputLabel}>Lier à un objectif</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.goalsContainer}>
+                          <TouchableOpacity 
+                                style={[styles.goalChip, !linkedGoalId && styles.goalChipActive]}
+                                onPress={() => setLinkedGoalId(null)}
+                           >
+                               <Text style={[styles.goalChipText, !linkedGoalId && styles.goalChipTextActive]}>Aucun</Text>
+                           </TouchableOpacity>
+                           {goals.map(g => (
+                               <TouchableOpacity 
+                                    key={g.id} 
+                                    style={[styles.goalChip, linkedGoalId === g.id && styles.goalChipActive]}
+                                    onPress={() => setLinkedGoalId(g.id)}
+                               >
+                                   <Target size={14} color={linkedGoalId === g.id ? "#000" : "#666"} />
+                                   <Text style={[styles.goalChipText, linkedGoalId === g.id && styles.goalChipTextActive]}>{g.title}</Text>
+                               </TouchableOpacity>
+                           ))}
+                      </ScrollView>
 
                       {editingHabit && (
                           <View style={styles.editActions}>
@@ -429,6 +482,54 @@ const styles = StyleSheet.create({
   },
   rowInputs: {
       flexDirection: 'row',
+  },
+  daysContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 20,
+  },
+  dayCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: '#333',
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  dayCircleActive: {
+      backgroundColor: '#007AFF',
+  },
+  dayText: {
+      color: '#888',
+      fontWeight: '600',
+  },
+  dayTextActive: {
+      color: '#FFF',
+  },
+  goalsContainer: {
+      flexDirection: 'row',
+      marginBottom: 20,
+  },
+  goalChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: '#333',
+      marginRight: 8,
+  },
+  goalChipActive: {
+      backgroundColor: '#FFF',
+  },
+  goalChipText: {
+      color: '#BBB',
+      fontSize: 13,
+  },
+  goalChipTextActive: {
+      color: '#000',
+      fontWeight: '600',
   },
   editActions: {
       flexDirection: 'row',

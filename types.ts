@@ -39,6 +39,7 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   sort_order: number;
   created_at: string;
+  linked_goal_id?: string | null;
   // UI Helper properties
   subtasks?: Subtask[]; 
   isExpanded?: boolean;
@@ -83,7 +84,9 @@ export interface Habit {
   category: string | null;
   last_completed_at: string | null;
   is_archived?: boolean; 
-  sort_order?: number;   
+  sort_order?: number;
+  days_of_week?: number[] | null;
+  linked_goal_id?: string | null;
 }
 
 export interface Quest {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SafeAreaView, StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from './components/BottomNav';
+import Sidebar from './components/Sidebar';
 import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal } from './types';
 import Dashboard from './pages/Dashboard';
 import Growth from './pages/Growth';
@@ -17,6 +18,7 @@ import { supabase } from './services/supabase';
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.AUTH);
   const [profileVisible, setProfileVisible] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   
   const [session, setSession] = useState<any>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -61,7 +63,6 @@ const App: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => fetchTasks(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subtasks', filter: `user_id=eq.${userId}` }, () => fetchTasks(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId))
-      // On écoute aussi habit_completions pour mettre à jour l'UI si l'app web complète une habitude
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habit_completions', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId)) 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subobjectives', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
@@ -140,36 +141,57 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     setProfileVisible(false);
+    setSidebarVisible(false);
     await supabase.auth.signOut();
   };
 
   // --- ACTIONS ---
   
-  const incrementHabit = async (id: string) => {
+  const toggleHabit = async (id: string) => {
       const habit = habits.find(h => h.id === id);
       if (!habit || !player || !user) return;
 
-      const newStreak = habit.streak + 1;
       const now = new Date();
-      const nowIso = now.toISOString();
       const todayDate = now.toISOString().split('T')[0];
       
-      // Optimistic update
-      setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: nowIso } : h));
-      
-      // 1. Update Habit Row
-      await supabase.from('habits').update({ streak: newStreak, last_completed_at: nowIso }).eq('id', id);
-      
-      // 2. Insert into habit_completions (Crucial for Web App Sync)
-      await supabase.from('habit_completions').insert({
-          habit_id: id,
-          user_id: user.id,
-          completed_date: todayDate
-      });
-      
-      // 3. Update XP
-      const newXp = player.experience_points + 20;
-      await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
+      // Check if completed today
+      const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toISOString().split('T')[0] === todayDate;
+
+      if (isCompletedToday) {
+          // UNCHECK LOGIC
+          const newStreak = Math.max(0, habit.streak - 1);
+          
+          // Optimistic
+          setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: null } : h));
+
+          // DB Updates
+          await supabase.from('habit_completions').delete().eq('habit_id', id).eq('completed_date', todayDate);
+          await supabase.from('habits').update({ streak: newStreak, last_completed_at: null }).eq('id', id); // Note: last_completed_at logic is simplified here, ideally should find prev completion
+          
+          // XP Revert
+          const newXp = Math.max(0, player.experience_points - 20);
+          await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
+
+      } else {
+          // CHECK LOGIC
+          const newStreak = habit.streak + 1;
+          const nowIso = now.toISOString();
+
+          // Optimistic
+          setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: nowIso } : h));
+
+          // DB Updates
+          await supabase.from('habits').update({ streak: newStreak, last_completed_at: nowIso }).eq('id', id);
+          await supabase.from('habit_completions').insert({
+              habit_id: id,
+              user_id: user.id,
+              completed_date: todayDate
+          });
+          
+          // XP Add
+          const newXp = player.experience_points + 20;
+          await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
+      }
   };
 
   const toggleTask = async (id: string) => {
@@ -187,7 +209,7 @@ const App: React.FC = () => {
     }
   };
 
-  const addTask = async (title: string, priority: Task['priority']) => {
+  const addTask = async (title: string, priority: Task['priority'], goalId?: string) => {
       if (!user) return;
       const maxOrder = tasks.length > 0 ? Math.max(...tasks.map(t => t.sort_order)) : 0;
       
@@ -196,7 +218,8 @@ const App: React.FC = () => {
           title,
           priority,
           completed: false,
-          sort_order: maxOrder + 1
+          sort_order: maxOrder + 1,
+          linked_goal_id: goalId || null
       });
       if (!error) fetchTasks(user.id);
   };
@@ -221,16 +244,16 @@ const App: React.FC = () => {
         return (
             <Dashboard 
                 user={user} player={player} tasks={tasks} habits={habits}
-                incrementHabit={incrementHabit} toggleTask={toggleTask}
+                toggleHabit={toggleHabit} toggleTask={toggleTask}
                 openFocus={() => setCurrentView(ViewState.FOCUS_MODE)}
-                openProfile={() => setProfileVisible(true)}
+                openMenu={() => setSidebarVisible(true)}
                 setView={setCurrentView}
             />
         );
       case ViewState.TASKS: 
-          return <Tasks tasks={tasks} toggleTask={toggleTask} addTask={addTask} deleteTask={deleteTask} userId={user.id} refreshTasks={() => fetchTasks(user.id)} />;
+          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={addTask} deleteTask={deleteTask} userId={user.id} refreshTasks={() => fetchTasks(user.id)} />;
       case ViewState.HABITS: 
-          return <Habits habits={habits} incrementHabit={incrementHabit} userId={user.id} refreshHabits={() => fetchHabits(user.id)} />;
+          return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} refreshHabits={() => fetchHabits(user.id)} />;
       case ViewState.GROWTH:
         return <Growth goals={goals} userId={user.id} setView={setCurrentView} />;
       case ViewState.EXPLORE:
@@ -242,9 +265,9 @@ const App: React.FC = () => {
       default:
         return <Dashboard 
             user={user} player={player} tasks={tasks} habits={habits}
-            incrementHabit={incrementHabit} toggleTask={toggleTask}
+            toggleHabit={toggleHabit} toggleTask={toggleTask}
             openFocus={() => setCurrentView(ViewState.FOCUS_MODE)}
-            openProfile={() => setProfileVisible(true)}
+            openMenu={() => setSidebarVisible(true)}
             setView={setCurrentView}
         />;
     }
@@ -259,6 +282,15 @@ const App: React.FC = () => {
         <View style={{ flex: 1 }}>
             {renderView()}
             
+            <Sidebar 
+                visible={sidebarVisible} 
+                onClose={() => setSidebarVisible(false)}
+                user={user}
+                setView={setCurrentView}
+                currentView={currentView}
+                onLogout={handleLogout}
+            />
+
             {user && player && (
                 <Profile 
                     visible={profileVisible} 

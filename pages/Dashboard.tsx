@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
 import { Check, Flame, Plus, Play, Menu, ArrowRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,14 +9,14 @@ interface DashboardProps {
   player: PlayerProfile;
   tasks: Task[];
   habits: Habit[];
-  incrementHabit: (id: string) => void;
+  toggleHabit: (id: string) => void;
   toggleTask: (id: string) => void;
   openFocus: () => void;
-  openProfile: () => void;
+  openMenu: () => void;
   setView: (view: ViewState) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incrementHabit, toggleTask, openFocus, openProfile, setView }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openMenu, setView }) => {
   const insets = useSafeAreaInsets();
   
   const isSameDay = (d1: Date, d2: Date) => {
@@ -26,8 +26,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
   };
 
   const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
   
-  const sortedHabits = [...habits].sort((a, b) => {
+  // Filter habits for today
+  const todaysHabits = habits.filter(h => {
+      // If days_of_week is null or empty, assume everyday
+      if (!h.days_of_week || h.days_of_week.length === 0) return true;
+      // Check if current day index is in array
+      return h.days_of_week.includes(dayOfWeek);
+  });
+  
+  const sortedHabits = [...todaysHabits].sort((a, b) => {
       const aDone = a.last_completed_at && isSameDay(new Date(a.last_completed_at), today);
       const bDone = b.last_completed_at && isSameDay(new Date(b.last_completed_at), today);
       if (aDone === bDone) return (a.sort_order || 0) - (b.sort_order || 0);
@@ -40,18 +49,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header avec espacement dynamique */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => setView(ViewState.EXPLORE)}>
+        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
             <Menu size={24} color="#FFF" />
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>DeepFlow</Text>
 
-        <TouchableOpacity onPress={openProfile} style={styles.avatarContainer}>
+        <View style={styles.avatarContainer}>
             <Image 
             source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
             style={styles.avatar} 
         />
-        </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -63,19 +72,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
         {/* Habits Section */}
         <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Habitudes</Text>
+                <Text style={styles.sectionTitle}>Habitudes du jour</Text>
                 <TouchableOpacity onPress={() => setView(ViewState.HABITS)}>
                     <ArrowRight size={20} color="#666" />
                 </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScroll}>
+                {sortedHabits.length === 0 && (
+                    <Text style={{color: '#666', fontStyle: 'italic', padding: 10}}>Rien de prévu aujourd'hui.</Text>
+                )}
                 {sortedHabits.map(habit => {
                     const isDone = habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), today);
                     return (
                         <TouchableOpacity 
                             key={habit.id} 
                             style={[styles.habitCard, isDone && styles.habitCardDone]} 
-                            onPress={() => !isDone && incrementHabit(habit.id)}
+                            onPress={() => toggleHabit(habit.id)}
                             activeOpacity={0.7}
                         >
                             <View style={styles.habitTop}>
@@ -127,9 +139,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
                             ]}>
                                 {task.completed && <Check size={12} color="#000" strokeWidth={3} />}
                             </View>
-                            <Text style={[styles.taskText, task.completed && styles.taskTextDone]} numberOfLines={1}>
-                                {task.title}
-                            </Text>
+                            <View style={{flex: 1}}>
+                                <Text style={[styles.taskText, task.completed && styles.taskTextDone]} numberOfLines={1}>
+                                    {task.title}
+                                </Text>
+                                {/* Indicator for linked Goal */}
+                                {task.linked_goal_id && <View style={styles.linkedDot} />}
+                            </View>
                         </TouchableOpacity>
                     ))
                 )}
@@ -138,7 +154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, incr
 
       </ScrollView>
 
-      {/* Floating Focus Button - Position remontée */}
+      {/* Floating Focus Button */}
       <TouchableOpacity style={styles.fab} onPress={openFocus} activeOpacity={0.8}>
           <Play size={24} color="#000" fill="#000" style={{marginLeft: 4}} />
       </TouchableOpacity>
@@ -314,6 +330,13 @@ const styles = StyleSheet.create({
       color: '#555',
       textDecorationLine: 'line-through',
   },
+  linkedDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#FF9500',
+      marginTop: 4,
+  },
   emptyState: {
       padding: 20,
       alignItems: 'center',
@@ -327,7 +350,7 @@ const styles = StyleSheet.create({
       fontStyle: 'italic',
   },
 
-  // FAB - Adjusted position to 110 to avoid cut-off
+  // FAB
   fab: {
       position: 'absolute',
       bottom: 110, 
