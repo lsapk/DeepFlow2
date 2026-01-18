@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { Habit, Goal } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 interface HabitsProps {
@@ -16,6 +16,7 @@ const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']; // Dimanche to Samedi
 
 const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, refreshHabits }) => {
   const [showArchived, setShowArchived] = useState(false);
+  const [showAllDays, setShowAllDays] = useState(false); // New Toggle
   const [modalVisible, setModalVisible] = useState(false);
   
   // Form State
@@ -109,19 +110,43 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       ]);
   };
 
-  const displayedHabits = habits.filter(h => !!h.is_archived === showArchived);
+  const todayIndex = new Date().getDay();
+
+  const displayedHabits = habits.filter(h => {
+      if (showArchived) return !!h.is_archived;
+      if (h.is_archived) return false;
+      
+      // Filter Logic:
+      // If "Show All Days" is ON, show everything.
+      // If "Show All Days" is OFF (Default), show only if today is in days_of_week OR days_of_week is empty/null (everyday)
+      if (showAllDays) return true;
+      if (!h.days_of_week || h.days_of_week.length === 0) return true;
+      return h.days_of_week.includes(todayIndex);
+  });
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.largeTitle}>{showArchived ? 'Archivées' : 'Habitudes'}</Text>
+        <View>
+             <Text style={styles.largeTitle}>Habitudes</Text>
+             <Text style={styles.subtitle}>{showAllDays ? 'Toutes les habitudes' : 'Aujourd\'hui'}</Text>
+        </View>
         <View style={styles.headerButtons}>
+            {/* Filter Toggle */}
+            <TouchableOpacity 
+                style={[styles.iconBtn, showAllDays && styles.iconBtnActive]} 
+                onPress={() => setShowAllDays(!showAllDays)}
+            >
+                <Filter size={20} color={showAllDays ? "white" : "#FFF"} />
+            </TouchableOpacity>
+
             <TouchableOpacity 
                 style={[styles.iconBtn, showArchived && styles.iconBtnActive]} 
                 onPress={() => setShowArchived(!showArchived)}
             >
                 <Archive size={20} color={showArchived ? "white" : "#FFF"} />
             </TouchableOpacity>
+            
             <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
                 <Plus size={24} color="black" />
             </TouchableOpacity>
@@ -131,16 +156,18 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {displayedHabits.length === 0 && (
             <Text style={styles.emptyText}>
-                {showArchived ? "Aucune archive." : "Aucune habitude active."}
+                {showArchived ? "Aucune archive." : (showAllDays ? "Aucune habitude crée." : "Rien de prévu aujourd'hui.")}
             </Text>
         )}
         {displayedHabits.map(habit => {
             const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toDateString() === new Date().toDateString();
-            
+            // Si on affiche "Tout", on veut savoir si c'est le bon jour pour le marquer visuellement peut-etre, mais ici on garde simple.
+            const isScheduledToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(todayIndex);
+
             return (
                 <TouchableOpacity 
                     key={habit.id} 
-                    style={styles.card}
+                    style={[styles.card, !isScheduledToday && styles.cardDimmed]}
                     onLongPress={() => openEditModal(habit)}
                     activeOpacity={0.8}
                 >
@@ -168,7 +195,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                                 onPress={() => incrementHabit(habit.id)}
                                 style={[
                                     styles.actionButton, 
-                                    isCompletedToday ? styles.actionButtonCompleted : styles.actionButtonDefault
+                                    isCompletedToday ? styles.actionButtonCompleted : styles.actionButtonDefault,
+                                    !isScheduledToday && { opacity: 0.5 }
                                 ]}
                             >
                                 <Text style={[styles.actionButtonText, isCompletedToday && { color: '#000' }]}>
@@ -182,13 +210,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
         })}
       </ScrollView>
 
-      {/* CREATE / EDIT MODAL */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
+      {/* CREATE / EDIT MODAL (Identique) */}
+      <Modal visible={modalVisible} transparent={true} animationType="slide" onRequestClose={() => setModalVisible(false)}>
           <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
@@ -200,76 +223,38 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
 
                   <ScrollView showsVerticalScrollIndicator={false}>
                       <Text style={styles.inputLabel}>Titre</Text>
-                      <TextInput 
-                          style={styles.input} 
-                          value={title} 
-                          onChangeText={setTitle} 
-                          placeholder="Ex: Méditation"
-                          placeholderTextColor="#666"
-                      />
-
+                      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Ex: Méditation" placeholderTextColor="#666" />
+                      
                       <Text style={styles.inputLabel}>Description</Text>
-                      <TextInput 
-                          style={[styles.input, { minHeight: 60 }]} 
-                          value={description} 
-                          onChangeText={setDescription} 
-                          placeholder="Détails optionnels..."
-                          placeholderTextColor="#666"
-                          multiline
-                      />
+                      <TextInput style={[styles.input, { minHeight: 60 }]} value={description} onChangeText={setDescription} placeholder="Détails optionnels..." placeholderTextColor="#666" multiline />
 
                       <View style={styles.rowInputs}>
                           <View style={{flex: 1, marginRight: 8}}>
                                 <Text style={styles.inputLabel}>Catégorie</Text>
-                                <TextInput 
-                                    style={styles.input} 
-                                    value={category} 
-                                    onChangeText={setCategory} 
-                                    placeholder="Santé"
-                                    placeholderTextColor="#666"
-                                />
+                                <TextInput style={styles.input} value={category} onChangeText={setCategory} placeholder="Santé" placeholderTextColor="#666" />
                           </View>
                           <View style={{flex: 1, marginLeft: 8}}>
                                 <Text style={styles.inputLabel}>Cible / jour</Text>
-                                <TextInput 
-                                    style={styles.input} 
-                                    value={target} 
-                                    onChangeText={setTarget} 
-                                    keyboardType="numeric"
-                                    placeholderTextColor="#666"
-                                />
+                                <TextInput style={styles.input} value={target} onChangeText={setTarget} keyboardType="numeric" placeholderTextColor="#666" />
                           </View>
                       </View>
 
-                      {/* DAYS SELECTION */}
                       <Text style={styles.inputLabel}>Jours (Vide = Tous les jours)</Text>
                       <View style={styles.daysContainer}>
                           {DAYS.map((d, index) => (
-                              <TouchableOpacity 
-                                key={index} 
-                                onPress={() => toggleDay(index)}
-                                style={[styles.dayCircle, selectedDays.includes(index) && styles.dayCircleActive]}
-                              >
+                              <TouchableOpacity key={index} onPress={() => toggleDay(index)} style={[styles.dayCircle, selectedDays.includes(index) && styles.dayCircleActive]}>
                                   <Text style={[styles.dayText, selectedDays.includes(index) && styles.dayTextActive]}>{d}</Text>
                               </TouchableOpacity>
                           ))}
                       </View>
 
-                      {/* GOAL LINKING */}
                       <Text style={styles.inputLabel}>Lier à un objectif</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.goalsContainer}>
-                          <TouchableOpacity 
-                                style={[styles.goalChip, !linkedGoalId && styles.goalChipActive]}
-                                onPress={() => setLinkedGoalId(null)}
-                           >
+                          <TouchableOpacity style={[styles.goalChip, !linkedGoalId && styles.goalChipActive]} onPress={() => setLinkedGoalId(null)}>
                                <Text style={[styles.goalChipText, !linkedGoalId && styles.goalChipTextActive]}>Aucun</Text>
                            </TouchableOpacity>
                            {goals.map(g => (
-                               <TouchableOpacity 
-                                    key={g.id} 
-                                    style={[styles.goalChip, linkedGoalId === g.id && styles.goalChipActive]}
-                                    onPress={() => setLinkedGoalId(g.id)}
-                               >
+                               <TouchableOpacity key={g.id} style={[styles.goalChip, linkedGoalId === g.id && styles.goalChipActive]} onPress={() => setLinkedGoalId(g.id)}>
                                    <Target size={14} color={linkedGoalId === g.id ? "#000" : "#666"} />
                                    <Text style={[styles.goalChipText, linkedGoalId === g.id && styles.goalChipTextActive]}>{g.title}</Text>
                                </TouchableOpacity>
@@ -280,11 +265,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                           <View style={styles.editActions}>
                                 <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(editingHabit)}>
                                     <Archive size={18} color="#FFF" />
-                                    <Text style={{color: '#FFF', fontWeight: '600'}}>
-                                        {editingHabit.is_archived ? "Désarchiver" : "Archiver"}
-                                    </Text>
+                                    <Text style={{color: '#FFF', fontWeight: '600'}}>{editingHabit.is_archived ? "Désarchiver" : "Archiver"}</Text>
                                 </TouchableOpacity>
-                                
                                 <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(editingHabit.id)}>
                                     <Trash2 size={18} color="#FF3B30" />
                                     <Text style={{color: '#FF3B30', fontWeight: '600'}}>Supprimer</Text>
@@ -322,6 +304,10 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     color: '#FFF',
+  },
+  subtitle: {
+      color: '#888',
+      fontSize: 14,
   },
   headerButtons: {
       flexDirection: 'row',
@@ -363,6 +349,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#262626',
+  },
+  cardDimmed: {
+      opacity: 0.6,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -439,7 +428,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   
-  // MODAL
+  // MODAL styles same as previous
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.8)',

@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
 import { UserProfile, ViewState } from '../types';
-import { LayoutDashboard, TrendingUp, Compass, CheckSquare, RefreshCw, Book, Zap, X, LogOut, Settings } from 'lucide-react-native';
+import { LayoutDashboard, TrendingUp, Compass, CheckSquare, RefreshCw, Book, Zap, X, LogOut } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SidebarProps {
@@ -15,15 +15,13 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, currentView, onLogout }) => {
   const insets = useSafeAreaInsets();
-  const screenHeight = Dimensions.get('window').height;
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Tableau de bord', view: ViewState.TODAY },
     { icon: CheckSquare, label: 'Tâches', view: ViewState.TASKS },
     { icon: RefreshCw, label: 'Habitudes', view: ViewState.HABITS },
-    { icon: TrendingUp, label: 'Objectifs', view: ViewState.GROWTH },
+    { icon: TrendingUp, label: 'Croissance & IA', view: ViewState.GROWTH }, // Renamed and repurposed
     { icon: Book, label: 'Journal', view: ViewState.JOURNAL },
-    { icon: Compass, label: 'Explore', view: ViewState.EXPLORE },
     { icon: Zap, label: 'Focus Mode', view: ViewState.FOCUS_MODE },
   ];
 
@@ -35,8 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
         <View style={styles.overlay}>
-            <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
-            
+            {/* Drawer à Gauche (First Child) */}
             <View style={[styles.drawer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
                 <View style={styles.header}>
                      {user && (
@@ -80,6 +77,9 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
                      </TouchableOpacity>
                 </View>
             </View>
+
+            {/* Backdrop à Droite (Second Child) */}
+            <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
         </View>
     </Modal>
   );
@@ -88,7 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
 const styles = StyleSheet.create({
   overlay: {
       flex: 1,
-      flexDirection: 'row',
+      flexDirection: 'row', // Align items horizontally
   },
   backdrop: {
       flex: 1,

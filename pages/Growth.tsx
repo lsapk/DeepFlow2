@@ -1,127 +1,117 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
-import { Goal, JournalEntry, ViewState } from '../types';
-import { supabase } from '../services/supabase';
-import { Book, ArrowRight, Target } from 'lucide-react-native';
-import Goals from './Goals';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image } from 'react-native';
+import { PlayerProfile, UserProfile, Task } from '../types';
+import { Bot, Gamepad2, Sparkles, Send, Shield } from 'lucide-react-native';
+import { generateCoaching } from '../services/ai';
 
 interface GrowthProps {
-  goals: Goal[];
-  userId: string;
-  setView: (view: ViewState) => void;
+  player: PlayerProfile;
+  user: UserProfile;
+  tasks: Task[]; // For AI context
 }
 
-const GoalsWrapper = ({ goals, userId, close }: { goals: Goal[], userId: string, close: () => void }) => {
-    const [localGoals, setLocalGoals] = useState<Goal[]>(goals);
-    
-    useEffect(() => { setLocalGoals(goals) }, [goals]);
+const Growth: React.FC<GrowthProps> = ({ player, user, tasks }) => {
+  const [chatInput, setChatInput] = useState('');
+  const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
+      { role: 'ai', text: `Bonjour ${user.display_name?.split(' ')[0]} ! Je suis ton Cyber Knight. Prêt à optimiser ta journée ?` }
+  ]);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-    // Independent CRUD for the modal wrapper to ensure responsiveness if props lag
-    // Note: In a perfect world, we just pass CRUD props from App -> Growth -> GoalsWrapper
-    // But since we didn't want to refactor App's entire prop drill, this ensures functionality.
-    
-    const refresh = async () => {
-         const { data } = await supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId).order('sort_order');
-         if(data) {
-             const sortedData = data.map(g => ({
-                ...g,
-                subobjectives: g.subobjectives?.sort((a: any, b: any) => a.sort_order - b.sort_order)
-            }));
-             setLocalGoals(sortedData);
-         }
-    };
+  const sendMessage = async () => {
+      if (!chatInput.trim()) return;
+      
+      const userMsg = chatInput;
+      setChatInput('');
+      setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+      setLoadingAi(true);
+      
+      // AI Call
+      const context = {
+          name: user.display_name,
+          level: player.level,
+          xp: player.experience_points,
+          pendingTasks: tasks.filter(t => !t.completed).length
+      };
 
-    const toggle = async (id: string) => {
-        const g = localGoals.find((x) => x.id === id);
-        if(g) {
-            await supabase.from('goals').update({completed: !g.completed}).eq('id', id);
-            refresh();
-        }
-    };
-    const add = async (title: string) => {
-        const orders = localGoals.map(g => g.sort_order || 0);
-        const max = orders.length > 0 ? Math.max(...orders) : 0;
-        await supabase.from('goals').insert({user_id: userId, title, sort_order: max + 1});
-        refresh();
-    };
-    const del = async (id: string) => {
-        await supabase.from('goals').delete().eq('id', id);
-        refresh();
-    };
-
-    return (
-        <View style={styles.modalContainer}>
-             <View style={styles.modalHeader}>
-                 <TouchableOpacity onPress={close} style={styles.closeBtn}>
-                     <Text style={styles.closeText}>Fermer</Text>
-                 </TouchableOpacity>
-             </View>
-             <Goals 
-                goals={localGoals} 
-                userId={userId} 
-                toggleGoal={toggle} 
-                addGoal={add} 
-                deleteGoal={del} 
-                refreshGoals={refresh} 
-             />
-        </View>
-    )
-}
-
-const Growth: React.FC<GrowthProps> = ({ goals, userId, setView }) => {
-  const [showAllGoals, setShowAllGoals] = useState(false);
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-
-  useEffect(() => {
-      fetchJournal();
-  }, [userId]);
-
-  const fetchJournal = async () => {
-      try {
-        const { data } = await supabase.from('journal_entries').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(3);
-        if (data) setJournalEntries(data);
-      } catch(e) {}
+      const response = await generateCoaching(userMsg, context);
+      
+      setMessages(prev => [...prev, { role: 'ai', text: response }]);
+      setLoadingAi(false);
   };
 
   return (
     <View style={styles.container}>
-        <View style={styles.header}>
-            <Text style={styles.largeTitle}>Croissance</Text>
+      <View style={styles.header}>
+            <Text style={styles.largeTitle}>QG & IA</Text>
+      </View>
+
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        ref={scrollViewRef}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      >
+        
+        {/* GAMIFICATION STATS */}
+        <View style={styles.statsCard}>
+            <View style={styles.cardHeader}>
+                 <View style={styles.levelBadge}>
+                     <Shield size={20} color="#000" fill="#FFF" />
+                     <Text style={styles.levelText}>NIVEAU {player.level}</Text>
+                 </View>
+                 <Text style={styles.creditsText}>{player.credits} Crédits</Text>
+            </View>
+            
+            <View style={styles.avatarRow}>
+                {/* Placeholder Avatar - In real app, render based on player.avatar_customization */}
+                 <View style={styles.avatarCircle}>
+                    <Gamepad2 size={40} color="#C4B5FD" />
+                 </View>
+                 <View style={{flex: 1}}>
+                     <Text style={styles.rankTitle}>Cyber Knight</Text>
+                     <Text style={styles.rankSub}>Expérience : {player.experience_points} XP</Text>
+                 </View>
+            </View>
+            
+            <View style={styles.xpBarBg}>
+                <View style={[styles.xpBarFill, { width: `${(player.experience_points % 1000) / 10}%` }]} />
+            </View>
+            <Text style={styles.xpNext}>Prochain niveau dans {1000 - (player.experience_points % 1000)} XP</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-             {/* Goals Teaser */}
-             <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <Target size={24} color="#FF9500" />
-                    <Text style={styles.cardTitle}>Objectifs</Text>
-                    <TouchableOpacity onPress={() => setShowAllGoals(true)} style={styles.arrowBtn}>
-                        <ArrowRight size={20} color="#FFF" />
-                    </TouchableOpacity>
-                </View>
-                <Text style={styles.cardSub}>{goals.filter(g => !g.completed).length} en cours</Text>
-             </View>
+        <Text style={styles.sectionLabel}>Assistant Tactique</Text>
 
-             {/* Journal Teaser */}
-             <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <Book size={24} color="#007AFF" />
-                    <Text style={styles.cardTitle}>Journal</Text>
-                    <TouchableOpacity onPress={() => setView(ViewState.JOURNAL)} style={styles.arrowBtn}>
-                        <ArrowRight size={20} color="#FFF" />
-                    </TouchableOpacity>
+        {/* CHAT INTERFACE */}
+        <View style={styles.chatContainer}>
+            {messages.map((msg, index) => (
+                <View key={index} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
+                    <Text style={msg.role === 'user' ? styles.userText : styles.aiText}>{msg.text}</Text>
                 </View>
-                <Text style={styles.cardSub}>Réflexion quotidienne</Text>
-             </View>
-        </ScrollView>
+            ))}
+            {loadingAi && (
+                <View style={[styles.messageBubble, styles.aiBubble, { width: 50 }]}>
+                    <ActivityIndicator size="small" color="#FFF" />
+                </View>
+            )}
+        </View>
 
-        <Modal visible={showAllGoals} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAllGoals(false)}>
-             <GoalsWrapper 
-                goals={goals} 
-                userId={userId} 
-                close={() => setShowAllGoals(false)} 
-             />
-        </Modal>
+      </ScrollView>
+
+      {/* INPUT AREA */}
+      <View style={styles.inputArea}>
+          <TextInput 
+            style={styles.textInput}
+            placeholder="Demandez conseil..."
+            placeholderTextColor="#666"
+            value={chatInput}
+            onChangeText={setChatInput}
+            onSubmitEditing={sendMessage}
+          />
+          <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
+              <Send size={20} color="#FFF" />
+          </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -132,64 +122,153 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     paddingTop: 10,
   },
-  scrollContent: {
-      paddingBottom: 100,
-      paddingHorizontal: 20,
-      gap: 16,
-  },
   header: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    paddingTop: 10,
+      paddingHorizontal: 20,
+      marginBottom: 10,
+      paddingTop: 10,
   },
   largeTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#FFF',
+      fontSize: 32,
+      fontWeight: '700',
+      color: '#FFF',
   },
-  card: {
+  scrollContent: {
+      paddingBottom: 20,
+      paddingHorizontal: 20,
+  },
+  statsCard: {
       backgroundColor: '#171717',
       borderRadius: 16,
-      padding: 20,
+      padding: 16,
       borderWidth: 1,
       borderColor: '#262626',
+      marginBottom: 24,
   },
   cardHeader: {
       flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 8,
-      gap: 12,
+      marginBottom: 16,
   },
-  cardTitle: {
-      fontSize: 20,
+  levelBadge: {
+      backgroundColor: '#C4B5FD',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      gap: 6,
+  },
+  levelText: {
+      color: '#000',
+      fontWeight: '700',
+      fontSize: 12,
+  },
+  creditsText: {
+      color: '#FACC15',
       fontWeight: '600',
+  },
+  avatarRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      marginBottom: 16,
+  },
+  avatarCircle: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: '#333',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#555',
+  },
+  rankTitle: {
       color: '#FFF',
-      flex: 1,
+      fontSize: 18,
+      fontWeight: '600',
   },
-  arrowBtn: {
-      padding: 4,
-  },
-  cardSub: {
+  rankSub: {
       color: '#888',
       fontSize: 14,
-      marginLeft: 36,
   },
-  modalContainer: {
+  xpBarBg: {
+      height: 8,
+      backgroundColor: '#333',
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginBottom: 6,
+  },
+  xpBarFill: {
+      height: '100%',
+      backgroundColor: '#C4B5FD',
+  },
+  xpNext: {
+      color: '#666',
+      fontSize: 11,
+      textAlign: 'right',
+  },
+  sectionLabel: {
+      color: '#666',
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 12,
+      textTransform: 'uppercase',
+  },
+  chatContainer: {
+      flex: 1,
+      gap: 12,
+  },
+  messageBubble: {
+      padding: 12,
+      borderRadius: 16,
+      maxWidth: '80%',
+  },
+  userBubble: {
+      backgroundColor: '#007AFF',
+      alignSelf: 'flex-end',
+      borderBottomRightRadius: 4,
+  },
+  aiBubble: {
+      backgroundColor: '#262626',
+      alignSelf: 'flex-start',
+      borderBottomLeftRadius: 4,
+  },
+  userText: {
+      color: '#FFF',
+      fontSize: 15,
+  },
+  aiText: {
+      color: '#EEE',
+      fontSize: 15,
+      lineHeight: 22,
+  },
+  inputArea: {
+      padding: 16,
+      backgroundColor: '#171717',
+      borderTopWidth: 1,
+      borderTopColor: '#333',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+  },
+  textInput: {
       flex: 1,
       backgroundColor: '#000',
-  },
-  modalHeader: {
-      padding: 16,
-      alignItems: 'flex-end',
-      backgroundColor: '#171717',
-  },
-  closeBtn: {
-      padding: 8,
-  },
-  closeText: {
-      color: '#007AFF',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      color: '#FFF',
       fontSize: 16,
-      fontWeight: '600',
+  },
+  sendBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#007AFF',
+      alignItems: 'center',
+      justifyContent: 'center',
   }
 });
 

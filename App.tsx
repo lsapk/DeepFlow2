@@ -6,7 +6,7 @@ import Sidebar from './components/Sidebar';
 import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal } from './types';
 import Dashboard from './pages/Dashboard';
 import Growth from './pages/Growth';
-import Explore from './pages/Explore';
+import Explore from './pages/Explore'; // Deprecated but keeping file structure consistent
 import Focus from './pages/Focus';
 import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
@@ -160,15 +160,10 @@ const App: React.FC = () => {
       if (isCompletedToday) {
           // UNCHECK LOGIC
           const newStreak = Math.max(0, habit.streak - 1);
-          
-          // Optimistic
           setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: null } : h));
-
-          // DB Updates
           await supabase.from('habit_completions').delete().eq('habit_id', id).eq('completed_date', todayDate);
-          await supabase.from('habits').update({ streak: newStreak, last_completed_at: null }).eq('id', id); // Note: last_completed_at logic is simplified here, ideally should find prev completion
+          await supabase.from('habits').update({ streak: newStreak, last_completed_at: null }).eq('id', id);
           
-          // XP Revert
           const newXp = Math.max(0, player.experience_points - 20);
           await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
 
@@ -176,11 +171,7 @@ const App: React.FC = () => {
           // CHECK LOGIC
           const newStreak = habit.streak + 1;
           const nowIso = now.toISOString();
-
-          // Optimistic
           setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: nowIso } : h));
-
-          // DB Updates
           await supabase.from('habits').update({ streak: newStreak, last_completed_at: nowIso }).eq('id', id);
           await supabase.from('habit_completions').insert({
               habit_id: id,
@@ -188,7 +179,6 @@ const App: React.FC = () => {
               completed_date: todayDate
           });
           
-          // XP Add
           const newXp = player.experience_points + 20;
           await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
       }
@@ -197,12 +187,9 @@ const App: React.FC = () => {
   const toggleTask = async (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-    
     const newStatus = !task.completed;
-    
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: newStatus } : t));
     await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
-
     if (newStatus && player) {
         const newXp = player.experience_points + 50;
         await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
@@ -212,7 +199,6 @@ const App: React.FC = () => {
   const addTask = async (title: string, priority: Task['priority'], goalId?: string) => {
       if (!user) return;
       const maxOrder = tasks.length > 0 ? Math.max(...tasks.map(t => t.sort_order)) : 0;
-      
       const { error } = await supabase.from('tasks').insert({
           user_id: user.id,
           title,
@@ -255,11 +241,13 @@ const App: React.FC = () => {
       case ViewState.HABITS: 
           return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} refreshHabits={() => fetchHabits(user.id)} />;
       case ViewState.GROWTH:
-        return <Growth goals={goals} userId={user.id} setView={setCurrentView} />;
+          // New Growth: AI + Stats
+        return <Growth player={player} user={user} tasks={tasks} />;
       case ViewState.EXPLORE:
-        return <Explore player={player} />;
+          // Fallback if needed, but menu points to Growth now
+        return <Growth player={player} user={user} tasks={tasks} />;
       case ViewState.FOCUS_MODE:
-        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} />;
+        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} />;
       case ViewState.JOURNAL:
         return <Journal userId={user.id} />;
       default:

@@ -105,6 +105,8 @@ export interface FocusSession {
   duration: number; // in minutes
   completed_at: string;
   session_type: string;
+  title?: string | null;
+  linked_task_id?: string | null;
 }
 
 export interface JournalEntry {
@@ -118,8 +120,8 @@ export interface JournalEntry {
 export enum ViewState {
   AUTH = 'AUTH',
   TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
-  GROWTH = 'GROWTH',    // Goals + Journal
-  EXPLORE = 'EXPLORE',  // IA + Cyber Knight
+  GROWTH = 'GROWTH',    // AI + Stats + Gamification
+  EXPLORE = 'EXPLORE',  // Deprecated / Merged into Growth
   FOCUS_MODE = 'FOCUS_MODE', // Full screen focus
   TASKS = 'TASKS',
   HABITS = 'HABITS',
