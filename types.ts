@@ -117,6 +117,14 @@ export interface JournalEntry {
   created_at: string;
 }
 
+export interface Reflection {
+  id: string;
+  user_id: string;
+  question: string;
+  answer: string;
+  created_at: string;
+}
+
 export enum ViewState {
   AUTH = 'AUTH',
   TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
@@ -125,5 +133,6 @@ export enum ViewState {
   FOCUS_MODE = 'FOCUS_MODE', // Full screen focus
   TASKS = 'TASKS',
   HABITS = 'HABITS',
-  JOURNAL = 'JOURNAL'
+  JOURNAL = 'JOURNAL',
+  REFLECTION = 'REFLECTION'
 }

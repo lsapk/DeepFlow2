@@ -12,6 +12,7 @@ import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
 import Journal from './pages/Journal';
+import ReflectionPage from './pages/Reflection';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabase';
 
@@ -243,6 +244,8 @@ const App: React.FC = () => {
       case ViewState.GROWTH:
           // New Growth: AI + Stats
         return <Growth player={player} user={user} tasks={tasks} />;
+      case ViewState.REFLECTION:
+        return <ReflectionPage userId={user.id} />;
       case ViewState.EXPLORE:
           // Fallback if needed, but menu points to Growth now
         return <Growth player={player} user={user} tasks={tasks} />;

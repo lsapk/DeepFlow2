@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
 import { UserProfile, ViewState } from '../types';
-import { LayoutDashboard, TrendingUp, Compass, CheckSquare, RefreshCw, Book, Zap, X, LogOut } from 'lucide-react-native';
+import { LayoutDashboard, TrendingUp, Compass, CheckSquare, RefreshCw, Book, Zap, X, LogOut, BrainCircuit } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SidebarProps {
@@ -20,7 +20,8 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
     { icon: LayoutDashboard, label: 'Tableau de bord', view: ViewState.TODAY },
     { icon: CheckSquare, label: 'Tâches', view: ViewState.TASKS },
     { icon: RefreshCw, label: 'Habitudes', view: ViewState.HABITS },
-    { icon: TrendingUp, label: 'Croissance & IA', view: ViewState.GROWTH }, // Renamed and repurposed
+    { icon: BrainCircuit, label: 'Réflexion', view: ViewState.REFLECTION }, // New Item
+    { icon: TrendingUp, label: 'Croissance & IA', view: ViewState.GROWTH },
     { icon: Book, label: 'Journal', view: ViewState.JOURNAL },
     { icon: Zap, label: 'Focus Mode', view: ViewState.FOCUS_MODE },
   ];

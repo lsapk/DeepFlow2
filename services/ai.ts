@@ -1,17 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini Client
-// NOTE: In a real production app, ensure process.env.API_KEY is properly injected via Expo config or .env
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Initialize Gemini Client with provided key
+const API_KEY = 'AIzaSyAdOinCnHfqjOyk6XBbTzQkR_IOdRvlliU';
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+// Using gemini-2.5-flash-latest for stability and speed
+const MODEL_NAME = 'gemini-2.5-flash-latest';
 
 export const generateCoaching = async (
   userMessage: string, 
   userContext: any
 ): Promise<string> => {
   try {
-    const model = 'gemini-2.5-flash-lite-latest'; // Fast model for chat
-
-    // Construct a context-aware prompt
     const systemPrompt = `
       You are DeepFlow, a gamified productivity coach.
       User Context:
@@ -22,19 +22,33 @@ export const generateCoaching = async (
       
       Your goal is to motivate the user, give short actionable advice, and act like a "Cyber Knight" companion.
       Keep responses concise (under 50 words) and encouraging.
+      Always reply in French.
     `;
 
     const response = await ai.models.generateContent({
-      model: model,
+      model: MODEL_NAME,
       contents: userMessage,
       config: {
         systemInstruction: systemPrompt,
       }
     });
 
-    return response.text || "Je analyse vos données... Continuez à avancer !";
+    return response.text || "J'analyse vos données... Continuez à avancer !";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Connexion neurale instable (Erreur IA). Mais je suis toujours là pour vous soutenir !";
+    return "Connexion neurale instable. Mais je suis toujours là pour vous soutenir !";
   }
+};
+
+export const generateReflectionQuestion = async (): Promise<string> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: "Generate a single, deep, introspective question for a daily productivity and personal growth journal. In French. Just the question.",
+        });
+        return response.text?.trim() || "Quelle a été votre plus grande victoire aujourd'hui ?";
+    } catch (error) {
+        console.error("Gemini Reflection Error:", error);
+        return "Qu'avez-vous appris aujourd'hui ?";
+    }
 };
