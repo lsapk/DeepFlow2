@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize Gemini Client with provided key
+// Note: Hardcoding API keys in frontend code is not recommended for production.
 const API_KEY = 'AIzaSyAdOinCnHfqjOyk6XBbTzQkR_IOdRvlliU';
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
