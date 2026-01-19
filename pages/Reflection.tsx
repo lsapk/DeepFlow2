@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal } from 'react-native';
 import { Reflection } from '../types';
-import { BrainCircuit, Sparkles, Send, X, History, Plus } from 'lucide-react-native';
+import { BrainCircuit, Sparkles, Send, X, Plus } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { generateReflectionQuestion } from '../services/ai';
 
@@ -19,12 +19,12 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId }) => {
   const [loadingAi, setLoadingAi] = useState(false);
 
   useEffect(() => {
-      fetchReflections();
+      if (userId) fetchReflections();
   }, [userId]);
 
   const fetchReflections = async () => {
       const { data } = await supabase
-        .from('reflections') // Assure-toi que la table existe
+        .from('reflections')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -229,8 +229,6 @@ const styles = StyleSheet.create({
       fontSize: 15,
       lineHeight: 22,
   },
-  
-  // Modal
   modalContainer: {
       flex: 1,
       backgroundColor: '#000',

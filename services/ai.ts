@@ -1,12 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize Gemini Client with provided key
-// Note: Hardcoding API keys in frontend code is not recommended for production.
 const API_KEY = 'AIzaSyAdOinCnHfqjOyk6XBbTzQkR_IOdRvlliU';
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-// Using gemini-2.5-flash-latest for stability and speed
-const MODEL_NAME = 'gemini-2.5-flash-latest';
+// Using a stable model alias to avoid 500 errors
+const MODEL_NAME = 'gemini-2.0-flash-exp'; 
 
 export const generateCoaching = async (
   userMessage: string, 
@@ -36,7 +35,7 @@ export const generateCoaching = async (
 
     return response.text || "J'analyse vos données... Continuez à avancer !";
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini Coaching Error:", error);
     return "Connexion neurale instable. Mais je suis toujours là pour vous soutenir !";
   }
 };
@@ -45,7 +44,7 @@ export const generateReflectionQuestion = async (): Promise<string> => {
     try {
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
-            contents: "Generate a single, deep, introspective question for a daily productivity and personal growth journal. In French. Just the question.",
+            contents: "Génère une seule question profonde et introspective pour un journal de productivité et de développement personnel. En Français. Juste la question, sans guillemets.",
         });
         return response.text?.trim() || "Quelle a été votre plus grande victoire aujourd'hui ?";
     } catch (error) {
