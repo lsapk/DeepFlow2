@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, Modal, TextInput, ScrollView } from 'react-native';
-import { Play, Pause, RotateCcw, X, Clock, CheckCircle, List, Plus, Save } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, Modal, TextInput, ScrollView, Alert } from 'react-native';
+import { Play, Pause, X, Clock, List, Plus, Save } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';
+import { addXp, REWARDS } from '../services/gamification';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.70, 280); 
@@ -74,7 +75,18 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
               title: sessionTitle || 'Session Focus',
               linked_task_id: linkedTaskId
           });
-          // Optionally mark linked task as done? We'll keep it manual for now.
+
+          // XP REWARD LOGIC
+          let xpAmount = REWARDS.FOCUS_SHORT;
+          if (durationMinutes >= 45) xpAmount = REWARDS.FOCUS_DEEP;
+          else if (durationMinutes >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
+
+          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
+          if (player) {
+              await addXp(user.id, xpAmount, player);
+              Alert.alert("Focus Terminé", `Bravo ! +${xpAmount} XP`);
+          }
+
           fetchHistory();
       }
       setViewMode('CONFIG'); 
@@ -93,6 +105,12 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
               session_type: 'focus',
               title: manualTitle || 'Session Manuelle'
           });
+          
+          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
+          if (player) {
+               await addXp(user.id, REWARDS.FOCUS_SHORT, player); // Fixed reward for manual to prevent exploit
+          }
+
           fetchHistory();
           setManualModalVisible(false);
           setManualTitle('');

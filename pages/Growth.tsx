@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image } from 'react-native';
 import { PlayerProfile, UserProfile, Task } from '../types';
-import { Send, Menu, Sparkles, TrendingUp, BrainCircuit } from 'lucide-react-native';
+import { Send, Menu, Sparkles, TrendingUp, BrainCircuit, Clock } from 'lucide-react-native';
 import { generateCoaching } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../services/supabase';
 
 interface GrowthProps {
   player: PlayerProfile;
@@ -22,6 +23,46 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
   const [loadingAi, setLoadingAi] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Chart Data State
+  const [weeklyFocusData, setWeeklyFocusData] = useState<number[]>([0,0,0,0,0,0,0]);
+  const [totalFocusTime, setTotalFocusTime] = useState(0);
+
+  useEffect(() => {
+      fetchFocusStats();
+  }, []);
+
+  const fetchFocusStats = async () => {
+      const { data: sessions } = await supabase
+          .from('focus_sessions')
+          .select('duration, completed_at')
+          .eq('user_id', user.id)
+          .gte('completed_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
+
+      if (sessions) {
+          const daysMap = new Array(7).fill(0);
+          let total = 0;
+          
+          sessions.forEach(session => {
+              const date = new Date(session.completed_at);
+              // Simple mapping: 0=Sunday to 6=Saturday. 
+              // To align with UI labels (L, M, M...), we need to shift based on today.
+              // Let's keep it simple: Index 0 = Today - 6 days, Index 6 = Today.
+              const today = new Date();
+              const diffTime = Math.abs(today.getTime() - date.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1; 
+              
+              if (diffDays >= 0 && diffDays < 7) {
+                  // Invert index so 6 is today (rightmost)
+                  daysMap[6 - diffDays] += session.duration;
+              }
+              total += session.duration;
+          });
+          
+          setWeeklyFocusData(daysMap);
+          setTotalFocusTime(total);
+      }
+  };
+
   const sendMessage = async () => {
       if (!chatInput.trim()) return;
       
@@ -34,7 +75,8 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
           name: user.display_name,
           level: player.level,
           xp: player.experience_points,
-          pendingTasks: tasks.filter(t => !t.completed).length
+          pendingTasks: tasks.filter(t => !t.completed).length,
+          weeklyFocusMinutes: totalFocusTime
       };
 
       const response = await generateCoaching(userMsg, context);
@@ -44,11 +86,15 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
   };
 
   const tasksDone = tasks.filter(t => t.completed).length;
-  const totalTasks = tasks.length || 1;
-  const completionRate = Math.round((tasksDone / totalTasks) * 100);
-
-  // Fake chart data bars
-  const chartData = [40, 60, 30, 80, 50, 70, completionRate];
+  // Normalize chart data for visualization (max height 100%)
+  const maxVal = Math.max(...weeklyFocusData, 60); // Min max is 60 mins to avoid huge bars for 1 min
+  
+  const dayLabels = [];
+  for (let i=6; i>=0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      dayLabels.push(d.toLocaleDateString('fr-FR', { weekday: 'narrow' }).toUpperCase());
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -75,22 +121,30 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         
-        {/* SECTION 1: GRAPHIQUE PERTINENT */}
+        {/* SECTION 1: GRAPHIQUE FOCUS RÉEL */}
         <View style={styles.analysisCard}>
             <View style={styles.cardHeader}>
-                <TrendingUp size={20} color="#C4B5FD" />
-                <Text style={styles.cardTitle}>Productivité Hebdo</Text>
+                <Clock size={20} color="#C4B5FD" />
+                <Text style={styles.cardTitle}>Temps de Focus (7 jours)</Text>
             </View>
             
             <View style={styles.chartContainer}>
-                {chartData.map((val, idx) => (
-                    <View key={idx} style={styles.barWrapper}>
-                        <View style={[styles.bar, { height: `${val}%`, backgroundColor: idx === 6 ? '#C4B5FD' : '#333' }]} />
-                        <Text style={styles.dayLabel}>{['L','M','M','J','V','S','D'][idx]}</Text>
-                    </View>
-                ))}
+                {weeklyFocusData.map((val, idx) => {
+                    const heightPct = (val / maxVal) * 100;
+                    return (
+                        <View key={idx} style={styles.barWrapper}>
+                            <View style={[
+                                styles.bar, 
+                                { height: `${Math.max(heightPct, 5)}%`, backgroundColor: idx === 6 ? '#C4B5FD' : '#333' }
+                            ]} />
+                            <Text style={styles.dayLabel}>{dayLabels[idx]}</Text>
+                        </View>
+                    )
+                })}
             </View>
-            <Text style={styles.chartFooter}>Votre performance est supérieure de 12% à la semaine dernière.</Text>
+            <Text style={styles.chartFooter}>
+                Total cette semaine : {Math.floor(totalFocusTime / 60)}h {totalFocusTime % 60}min
+            </Text>
         </View>
 
         {/* SECTION 2: ANALYSE APPROFONDIE (Resumé IA) */}
@@ -100,8 +154,9 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
                  <Text style={styles.insightTitle}>Analyse Tactique</Text>
              </View>
              <Text style={styles.insightText}>
-                 Vous avez complété {tasksDone} tâches critiques. 
-                 L'analyse suggère de se concentrer sur les habitudes matinales pour maximiser le gain d'XP.
+                 {tasksDone > 0 
+                    ? `Excellent travail. ${tasksDone} tâches terminées. Continuez à maintenir votre streak de focus pour maximiser vos gains.` 
+                    : "Aucune tâche terminée récemment. Essayez de commencer par une session de focus de 25 minutes."}
              </Text>
         </View>
 

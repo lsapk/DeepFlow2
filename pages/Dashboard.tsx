@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
-import { Check, Flame, Plus, Play, Menu, ArrowRight } from 'lucide-react-native';
+import { Check, Flame, Plus, Play, Menu, ArrowRight, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface DashboardProps {
@@ -43,6 +43,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
   const activeTasks = tasks.filter(t => !t.completed).slice(0, 5); 
 
+  // --- SCORE DE PRODUCTIVITÉ (Calcul Simplifié) ---
+  // Taux de complétion des tâches (40%) + Streak Habitudes (20%) + Niveau (40%)
+  const completedTasksCount = tasks.filter(t => t.completed).length;
+  const totalTasks = tasks.length || 1;
+  const completionRate = completedTasksCount / totalTasks;
+  const averageStreak = habits.length > 0 ? habits.reduce((acc, h) => acc + h.streak, 0) / habits.length : 0;
+  
+  // Score sur 100
+  let productivityScore = Math.round(
+      (completionRate * 40) + 
+      (Math.min(averageStreak, 30) / 30 * 20) + 
+      (Math.min(player.level, 50) / 50 * 40)
+  );
+  // Ensure meaningful number for new users
+  if (productivityScore < 10) productivityScore = 15; 
+
+  const getScoreColor = (score: number) => {
+      if (score >= 80) return '#4ADE80'; // Excellent
+      if (score >= 60) return '#C4B5FD'; // Bon
+      if (score >= 40) return '#FACC15'; // Moyen
+      return '#F87171'; // À améliorer
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* UNIFORM HEADER */}
@@ -63,6 +86,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        {/* PRODUCTIVITY SCORE CARD */}
+        <View style={styles.scoreCard}>
+            <View>
+                <Text style={styles.scoreLabel}>Score de Productivité</Text>
+                <Text style={styles.scoreLevel}>
+                    {productivityScore >= 80 ? 'Excellent' : productivityScore >= 60 ? 'Bon' : 'Moyen'}
+                </Text>
+            </View>
+            <View style={styles.scoreCircle}>
+                <Text style={[styles.scoreValue, { color: getScoreColor(productivityScore) }]}>{productivityScore}</Text>
+            </View>
+        </View>
+
         <View style={styles.welcomeSection}>
             <Text style={styles.greeting}>Bonjour {user.display_name?.split(' ')[0]}</Text>
             <Text style={styles.subGreeting}>Prêt à conquérir la journée, Cyber Knight ?</Text>
@@ -196,6 +232,45 @@ const styles = StyleSheet.create({
     paddingBottom: 130, 
     paddingTop: 10,
   },
+  // SCORE CARD
+  scoreCard: {
+      backgroundColor: '#171717',
+      marginHorizontal: 20,
+      marginBottom: 24,
+      borderRadius: 16,
+      padding: 20,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#262626',
+  },
+  scoreLabel: {
+      color: '#888',
+      fontSize: 12,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      marginBottom: 4,
+  },
+  scoreLevel: {
+      color: '#FFF',
+      fontSize: 24,
+      fontWeight: '700',
+  },
+  scoreCircle: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      borderWidth: 4,
+      borderColor: '#333',
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  scoreValue: {
+      fontSize: 20,
+      fontWeight: '700',
+  },
+
   welcomeSection: {
       paddingHorizontal: 20,
       marginBottom: 30,

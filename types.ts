@@ -9,6 +9,18 @@ export interface UserProfile {
   created_at: string;
 }
 
+export interface UserSettings {
+  id: string;
+  theme: string;
+  language: string;
+  notifications_enabled: boolean;
+  sound_enabled: boolean;
+  focus_mode: boolean;
+  clock_format: string;
+  karma_points?: number;
+  unlocked_features?: any;
+}
+
 export interface PlayerProfile {
   id: string;
   user_id: string;
@@ -91,6 +103,7 @@ export interface Habit {
 
 export interface Quest {
   id: string;
+  user_id: string;
   title: string;
   description: string;
   reward_xp: number;
@@ -98,6 +111,23 @@ export interface Quest {
   completed: boolean;
   target_value: number;
   current_progress: number;
+  quest_type: string;
+  expires_at?: string;
+}
+
+export interface Achievement {
+    id: string;
+    achievement_id: string; // string identifier like 'first_win'
+    title: string;
+    description: string;
+    icon: string;
+}
+
+export interface UnlockedAchievement {
+    id: string;
+    user_id: string;
+    achievement_id: string;
+    unlocked_at: string;
 }
 
 export interface FocusSession {
@@ -112,8 +142,10 @@ export interface FocusSession {
 export interface JournalEntry {
   id: string;
   user_id: string;
+  title: string;
   content: string;
-  mood: 'happy' | 'neutral' | 'sad' | 'energetic' | 'tired';
+  mood: 'happy' | 'neutral' | 'sad' | 'energetic' | 'tired' | string;
+  tags?: string[];
   created_at: string;
 }
 
@@ -125,6 +157,17 @@ export interface Reflection {
   created_at: string;
 }
 
+export interface CalendarEvent {
+    id: string;
+    title: string;
+    start_time?: string;
+    end_time?: string;
+    is_all_day: boolean;
+    type: 'task' | 'habit' | 'google';
+    status: 'pending' | 'completed';
+    meta?: any;
+}
+
 export enum ViewState {
   AUTH = 'AUTH',
   TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
@@ -134,5 +177,6 @@ export enum ViewState {
   TASKS = 'TASKS',
   HABITS = 'HABITS',
   JOURNAL = 'JOURNAL',
-  REFLECTION = 'REFLECTION'
+  REFLECTION = 'REFLECTION',
+  CALENDAR = 'CALENDAR'
 }

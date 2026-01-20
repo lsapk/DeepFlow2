@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { LayoutDashboard, BrainCircuit, Gamepad2 } from 'lucide-react-native';
+import { LayoutDashboard, BrainCircuit, Gamepad2, Calendar } from 'lucide-react-native';
 import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,6 +14,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
   
   const navItems = [
     { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Aujourd\'hui' },
+    { view: ViewState.CALENDAR, icon: Calendar, label: 'Calendrier' },
     { view: ViewState.GROWTH, icon: BrainCircuit, label: 'Évolution' }, // IA & Analyse
     { view: ViewState.CYBER_KNIGHT, icon: Gamepad2, label: 'Cyber Knight' }, // Gamification
   ];

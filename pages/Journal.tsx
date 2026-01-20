@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
-import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Calendar } from 'lucide-react-native';
+import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Tag } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
+import { addXp, REWARDS } from '../services/gamification';
 
 interface JournalProps {
   userId: string;
@@ -16,6 +17,7 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [mood, setMood] = useState<JournalEntry['mood']>('neutral');
+  const [tagsInput, setTagsInput] = useState('');
 
   useEffect(() => {
       fetchEntries();
@@ -33,20 +35,30 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
   const handleSave = async () => {
       if (!title.trim() || !content.trim()) return;
 
+      const tagsArray = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+
       const { error } = await supabase.from('journal_entries').insert({
           user_id: userId,
           title,
           content,
           mood,
+          tags: tagsArray, // Suppose the backend can handle this or it's a JSONB field
           created_at: new Date().toISOString()
       });
 
       if (!error) {
+          // XP Reward
+          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
+          if (player) {
+              await addXp(userId, REWARDS.JOURNAL, player);
+          }
+
           fetchEntries();
           setModalVisible(false);
           setTitle('');
           setContent('');
           setMood('neutral');
+          setTagsInput('');
       } else {
           Alert.alert("Erreur", "Impossible de sauvegarder l'entrée.");
       }
@@ -96,6 +108,7 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
                     </View>
                     <Text style={styles.cardTitle}>{entry.title}</Text>
                     <Text style={styles.cardContent} numberOfLines={3}>{entry.content}</Text>
+                    {/* Display tags if available (assuming data structure) */}
                 </View>
             ))}
         </ScrollView>
@@ -132,6 +145,15 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
                             value={title}
                             onChangeText={setTitle}
                         />
+                        
+                        <Text style={styles.label}>Tags (séparés par virgule)</Text>
+                        <TextInput 
+                            style={styles.input} 
+                            placeholder="ex: travail, idée, stress..." 
+                            placeholderTextColor="#666"
+                            value={tagsInput}
+                            onChangeText={setTagsInput}
+                        />
 
                         <Text style={styles.label}>Contenu</Text>
                         <TextInput 
@@ -146,7 +168,7 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
 
                         <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
                             <Save size={20} color="black" />
-                            <Text style={styles.saveBtnText}>Sauvegarder</Text>
+                            <Text style={styles.saveBtnText}>Sauvegarder (+20 XP)</Text>
                         </TouchableOpacity>
                     </ScrollView>
                 </View>
@@ -167,8 +189,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 16,
-    marginTop: 10,
+    paddingVertical: 12, 
+    marginBottom: 10,
   },
   largeTitle: {
     fontSize: 32,

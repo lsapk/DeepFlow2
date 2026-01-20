@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, StatusBar, View, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { SafeAreaView, StatusBar, View, ActivityIndicator, Modal, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
-import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal } from './types';
+import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal, Quest } from './types';
 import Dashboard from './pages/Dashboard';
 import Growth from './pages/Growth';
 import CyberKnight from './pages/CyberKnight';
@@ -13,8 +13,10 @@ import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
 import Journal from './pages/Journal';
 import ReflectionPage from './pages/Reflection';
+import CalendarPage from './pages/CalendarPage';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabase';
+import { Trophy, X } from 'lucide-react-native';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.AUTH);
@@ -29,7 +31,12 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Level Up State
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const prevLevelRef = useRef<number | null>(null);
 
   // --- INITIALIZATION ---
   useEffect(() => {
@@ -67,6 +74,7 @@ const App: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habit_completions', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId)) 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subobjectives', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quests', filter: `user_id=eq.${userId}` }, () => fetchQuests(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, () => fetchPlayer(userId))
       .subscribe();
 
@@ -114,9 +122,21 @@ const App: React.FC = () => {
     if (data) setHabits(data);
   };
 
+  const fetchQuests = async (userId: string) => {
+      const { data } = await supabase.from('quests').select('*').eq('user_id', userId).eq('completed', false);
+      if (data) setQuests(data);
+  };
+
   const fetchPlayer = async (userId: string) => {
     const { data } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
-    if (data) setPlayer(data);
+    if (data) {
+        // Level Up Detection
+        if (prevLevelRef.current !== null && data.level > prevLevelRef.current) {
+            setShowLevelUp(true);
+        }
+        prevLevelRef.current = data.level;
+        setPlayer(data);
+    }
   };
 
   const fetchData = async (userId: string) => {
@@ -129,7 +149,8 @@ const App: React.FC = () => {
           fetchPlayer(userId),
           fetchTasks(userId),
           fetchHabits(userId),
-          fetchGoals(userId)
+          fetchGoals(userId),
+          fetchQuests(userId)
       ]);
 
       setCurrentView(ViewState.TODAY);
@@ -154,22 +175,11 @@ const App: React.FC = () => {
 
       const now = new Date();
       const todayDate = now.toISOString().split('T')[0];
-      
       const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toISOString().split('T')[0] === todayDate;
 
-      if (isCompletedToday) {
-          const newStreak = Math.max(0, habit.streak - 1);
-          setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: null } : h));
-          await supabase.from('habit_completions').delete().eq('habit_id', id).eq('completed_date', todayDate);
-          await supabase.from('habits').update({ streak: newStreak, last_completed_at: null }).eq('id', id);
-          
-          const newXp = Math.max(0, player.experience_points - 20);
-          await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
-
-      } else {
+      if (!isCompletedToday) {
           const newStreak = habit.streak + 1;
           const nowIso = now.toISOString();
-          setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: nowIso } : h));
           await supabase.from('habits').update({ streak: newStreak, last_completed_at: nowIso }).eq('id', id);
           await supabase.from('habit_completions').insert({
               habit_id: id,
@@ -177,8 +187,8 @@ const App: React.FC = () => {
               completed_date: todayDate
           });
           
-          const newXp = player.experience_points + 20;
-          await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
+          const { addXp, REWARDS } = await import('./services/gamification');
+          await addXp(user.id, REWARDS.HABIT, player);
       }
   };
 
@@ -186,31 +196,13 @@ const App: React.FC = () => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     const newStatus = !task.completed;
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: newStatus } : t));
     await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
-    if (newStatus && player) {
-        const newXp = player.experience_points + 50;
-        await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
+    
+    if (newStatus && player && user) {
+        const { addXp, REWARDS } = await import('./services/gamification');
+        const reward = task.priority === 'high' ? REWARDS.TASK_HIGH : REWARDS.TASK_MEDIUM;
+        await addXp(user.id, reward, player);
     }
-  };
-
-  const addTask = async (title: string, priority: Task['priority'], goalId?: string) => {
-      if (!user) return;
-      const maxOrder = tasks.length > 0 ? Math.max(...tasks.map(t => t.sort_order)) : 0;
-      const { error } = await supabase.from('tasks').insert({
-          user_id: user.id,
-          title,
-          priority,
-          completed: false,
-          sort_order: maxOrder + 1,
-          linked_goal_id: goalId || null
-      });
-      if (!error) fetchTasks(user.id);
-  };
-
-  const deleteTask = async (id: string) => {
-      setTasks(prev => prev.filter(t => t.id !== id));
-      await supabase.from('tasks').delete().eq('id', id);
   };
 
   // --- RENDER ---
@@ -231,38 +223,49 @@ const App: React.FC = () => {
                 toggleHabit={toggleHabit} toggleTask={toggleTask}
                 openFocus={() => setCurrentView(ViewState.FOCUS_MODE)}
                 openMenu={() => setSidebarVisible(true)}
-                openProfile={() => setProfileVisible(true)} // FIXED
+                openProfile={() => setProfileVisible(true)}
                 setView={setCurrentView}
             />
         );
       case ViewState.TASKS: 
-          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={addTask} deleteTask={deleteTask} userId={user.id} refreshTasks={() => fetchTasks(user.id)} />;
+          return (
+            <Tasks 
+                tasks={tasks} goals={goals} 
+                toggleTask={toggleTask} 
+                addTask={async (t, p, g) => {
+                    const max = tasks.length > 0 ? Math.max(...tasks.map(x=>x.sort_order)) : 0;
+                    await supabase.from('tasks').insert({
+                        user_id: user.id, title: t, priority: p, completed: false, sort_order: max+1, linked_goal_id: g || null
+                    });
+                }} 
+                deleteTask={async (id) => await supabase.from('tasks').delete().eq('id', id)} 
+                userId={user.id} 
+                refreshTasks={() => fetchTasks(user.id)} 
+            />
+          );
       case ViewState.HABITS: 
-          return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} refreshHabits={() => fetchHabits(user.id)} />;
-      case ViewState.GROWTH: // EVOLUTION
-        return <Growth 
-                player={player} 
-                user={user} 
-                tasks={tasks} 
-                openMenu={() => setSidebarVisible(true)}
-                openProfile={() => setProfileVisible(true)}
-               />;
-      case ViewState.CYBER_KNIGHT: // GAMIFICATION HUB
-        return <CyberKnight 
-                player={player} 
-                user={user} 
-                tasks={tasks}
-                openMenu={() => setSidebarVisible(true)}
-                openProfile={() => setProfileVisible(true)}
-               />;
+          return (
+            <Habits 
+                habits={habits} goals={goals} 
+                incrementHabit={toggleHabit} 
+                userId={user.id} 
+                refreshHabits={() => fetchHabits(user.id)} 
+            />
+          );
+      case ViewState.GROWTH:
+        return <Growth player={player} user={user} tasks={tasks} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} />;
+      case ViewState.CYBER_KNIGHT:
+        // Now passing real quests
+        return <CyberKnight player={player} user={user} quests={quests} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} />;
       case ViewState.REFLECTION:
         return <ReflectionPage userId={user.id} />;
+      case ViewState.CALENDAR:
+        return <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} />;
       case ViewState.FOCUS_MODE:
         return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} />;
       case ViewState.JOURNAL:
         return <Journal userId={user.id} />;
       default:
-        // Default fallback (usually Dashboard)
         return (
             <Dashboard 
                 user={user} player={player} tasks={tasks} habits={habits}
@@ -305,10 +308,72 @@ const App: React.FC = () => {
             {session && user && !isFocusMode && (
                 <BottomNav currentView={currentView} setView={setCurrentView} />
             )}
+
+            {/* LEVEL UP MODAL */}
+            <Modal visible={showLevelUp} transparent animationType="fade">
+                <View style={styles.levelUpOverlay}>
+                    <View style={styles.levelUpCard}>
+                        <Trophy size={60} color="#FACC15" style={{marginBottom: 20}} />
+                        <Text style={styles.levelUpTitle}>NIVEAU SUPÉRIEUR !</Text>
+                        <Text style={styles.levelUpSub}>
+                            Félicitations, vous avez atteint le niveau <Text style={{color: '#C4B5FD', fontWeight: 'bold'}}>{player?.level}</Text>.
+                        </Text>
+                        <TouchableOpacity style={styles.claimBtn} onPress={() => setShowLevelUp(false)}>
+                            <Text style={styles.claimBtnText}>CONTINUER</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
         </SafeAreaView>
     </SafeAreaProvider>
   );
 };
+
+const styles = StyleSheet.create({
+    levelUpOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    levelUpCard: {
+        width: '80%',
+        backgroundColor: '#171717',
+        borderRadius: 24,
+        padding: 30,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#C4B5FD',
+        shadowColor: '#C4B5FD',
+        shadowOffset: {width: 0, height: 0},
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+    },
+    levelUpTitle: {
+        color: '#FFF',
+        fontSize: 24,
+        fontWeight: '900',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+    levelUpSub: {
+        color: '#DDD',
+        textAlign: 'center',
+        marginBottom: 30,
+        fontSize: 16,
+    },
+    claimBtn: {
+        backgroundColor: '#C4B5FD',
+        paddingHorizontal: 30,
+        paddingVertical: 14,
+        borderRadius: 30,
+    },
+    claimBtnText: {
+        color: '#000',
+        fontWeight: 'bold',
+        fontSize: 16,
+    }
+});
 
 export default App;

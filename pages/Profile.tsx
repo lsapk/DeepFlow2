@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert } from 'react-native';
-import { UserProfile, PlayerProfile } from '../types';
-import { LogOut, Bell, Moon, Volume2, Shield, CreditCard, ChevronRight, X } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator } from 'react-native';
+import { UserProfile, PlayerProfile, UserSettings } from '../types';
+import { LogOut, Bell, Moon, Volume2, Shield, CreditCard, ChevronRight, X, Clock } from 'lucide-react-native';
+import { supabase } from '../services/supabase';
 
 interface ProfileProps {
   user: UserProfile;
@@ -12,12 +13,51 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose }) => {
-  const [darkMode, setDarkMode] = useState(true);
-  const [notifs, setNotifs] = useState(true);
-  const [sound, setSound] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [settings, setSettings] = useState<UserSettings>({
+      id: user.id,
+      theme: 'dark',
+      language: 'fr',
+      notifications_enabled: true,
+      sound_enabled: true,
+      focus_mode: false,
+      clock_format: '24h'
+  });
+
+  useEffect(() => {
+      if (visible) fetchSettings();
+  }, [visible]);
+
+  const fetchSettings = async () => {
+      setLoading(true);
+      const { data, error } = await supabase.from('user_settings').select('*').eq('id', user.id).single();
+      if (data) {
+          setSettings(data);
+      } else {
+          // Init settings if missing
+          const defaultSettings = { 
+              id: user.id, 
+              theme: 'dark', 
+              language: 'fr', 
+              notifications_enabled: true,
+              sound_enabled: true,
+              focus_mode: false,
+              clock_format: '24h'
+          };
+          await supabase.from('user_settings').insert(defaultSettings);
+          setSettings(defaultSettings);
+      }
+      setLoading(false);
+  };
+
+  const updateSetting = async (key: keyof UserSettings, value: any) => {
+      const newSettings = { ...settings, [key]: value };
+      setSettings(newSettings); // Optimistic UI
+      await supabase.from('user_settings').update({ [key]: value }).eq('id', user.id);
+  };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Compte</Text>
@@ -26,55 +66,70 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                 </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                
-                <View style={styles.profileHeader}>
-                    <Image 
-                        source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
-                        style={styles.avatar} 
-                    />
-                    <Text style={styles.name}>{user.display_name}</Text>
-                    <Text style={styles.email}>{user.email}</Text>
-                    <View style={styles.levelBadge}>
-                        <Text style={styles.levelText}>Niveau {player.level} • {player.avatar_type}</Text>
-                    </View>
+            {loading ? (
+                <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+                    <ActivityIndicator size="large" color="#FFF" />
                 </View>
-
-                {/* Settings */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>PRÉFÉRENCES</Text>
-                    <View style={styles.card}>
-                        <SettingItem 
-                            icon={Moon} label="Mode Sombre" iconColor="#5856D6" 
-                            isSwitch value={darkMode} onToggle={() => setDarkMode(!darkMode)} 
+            ) : (
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    
+                    <View style={styles.profileHeader}>
+                        <Image 
+                            source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
+                            style={styles.avatar} 
                         />
-                        <View style={styles.separator} />
-                        <SettingItem 
-                            icon={Bell} label="Notifications" iconColor="#EF4444" 
-                            isSwitch value={notifs} onToggle={() => setNotifs(!notifs)} 
-                        />
-                        <View style={styles.separator} />
-                        <SettingItem 
-                            icon={Volume2} label="Sons" iconColor="#F59E0B" 
-                            isSwitch value={sound} onToggle={() => setSound(!sound)} 
-                        />
+                        <Text style={styles.name}>{user.display_name}</Text>
+                        <Text style={styles.email}>{user.email}</Text>
+                        <View style={styles.levelBadge}>
+                            <Text style={styles.levelText}>Niveau {player.level} • {player.avatar_type}</Text>
+                        </View>
                     </View>
-                </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>COMPTE</Text>
-                    <View style={styles.card}>
-                        <SettingItem icon={Shield} label="Sécurité" iconColor="#10B981" onPress={() => Alert.alert("Sécurité", "Authentification à deux facteurs activée.")} />
-                        <View style={styles.separator} />
-                        <SettingItem icon={CreditCard} label="Abonnement" iconColor="#3B82F6" onPress={() => Alert.alert("Plan", "Vous êtes sur le plan Gratuit.")} />
+                    {/* Settings */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionHeader}>PRÉFÉRENCES</Text>
+                        <View style={styles.card}>
+                            <SettingItem 
+                                icon={Moon} label="Mode Sombre" iconColor="#5856D6" 
+                                isSwitch value={settings.theme === 'dark'} 
+                                onToggle={(val: boolean) => updateSetting('theme', val ? 'dark' : 'light')} 
+                            />
+                            <View style={styles.separator} />
+                            <SettingItem 
+                                icon={Bell} label="Notifications" iconColor="#EF4444" 
+                                isSwitch value={settings.notifications_enabled} 
+                                onToggle={(val: boolean) => updateSetting('notifications_enabled', val)} 
+                            />
+                            <View style={styles.separator} />
+                            <SettingItem 
+                                icon={Volume2} label="Sons" iconColor="#F59E0B" 
+                                isSwitch value={settings.sound_enabled} 
+                                onToggle={(val: boolean) => updateSetting('sound_enabled', val)} 
+                            />
+                             <View style={styles.separator} />
+                            <SettingItem 
+                                icon={Clock} label="Mode Focus Auto" iconColor="#8E8E93" 
+                                isSwitch value={settings.focus_mode} 
+                                onToggle={(val: boolean) => updateSetting('focus_mode', val)} 
+                            />
+                        </View>
                     </View>
-                </View>
 
-                <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-                    <Text style={styles.logoutText}>Déconnexion</Text>
-                </TouchableOpacity>
+                    <View style={styles.section}>
+                        <Text style={styles.sectionHeader}>COMPTE</Text>
+                        <View style={styles.card}>
+                            <SettingItem icon={Shield} label="Sécurité" iconColor="#10B981" onPress={() => Alert.alert("Sécurité", "Géré via votre fournisseur d'authentification.")} />
+                            <View style={styles.separator} />
+                            <SettingItem icon={CreditCard} label="Abonnement" iconColor="#3B82F6" onPress={() => Alert.alert("Plan", "Vous êtes sur le plan Standard (Gratuit).")} />
+                        </View>
+                    </View>
 
-            </ScrollView>
+                    <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+                        <Text style={styles.logoutText}>Déconnexion</Text>
+                    </TouchableOpacity>
+
+                </ScrollView>
+            )}
         </View>
     </Modal>
   );
