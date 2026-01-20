@@ -5,11 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "scheme": "deepflow",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.deepflow.app"
     },
     "android": {
       "package": "com.deepflow.app"
+    },
+    "web": {
+      "bundler": "metro"
     }
   }
 }

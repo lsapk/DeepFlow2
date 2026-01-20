@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
-import { Calendar as CalendarIcon, Plus, RefreshCw, ChevronLeft, ChevronRight, CheckCircle2, Circle, Flame, Globe } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Flame, Globe, LogOut } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Task, Habit, CalendarEvent } from '../types';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+// Permet de terminer la session auth sur le web
+WebBrowser.maybeCompleteAuthSession();
 
 interface CalendarPageProps {
     tasks: Task[];
@@ -17,9 +22,27 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     const [dayEvents, setDayEvents] = useState<CalendarEvent[]>([]);
     
     // Google Calendar State
-    const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+    const [googleToken, setGoogleToken] = useState<string | null>(null);
     const [googleEvents, setGoogleEvents] = useState<CalendarEvent[]>([]);
     const [loadingGoogle, setLoadingGoogle] = useState(false);
+
+    // Configuration OAuth
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId: '913448608067-asdhst6j70ucnkj147c7s8tuj12jgmg2.apps.googleusercontent.com',
+        iosClientId: '913448608067-asdhst6j70ucnkj147c7s8tuj12jgmg2.apps.googleusercontent.com',
+        webClientId: '913448608067-asdhst6j70ucnkj147c7s8tuj12jgmg2.apps.googleusercontent.com',
+        scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+    });
+
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { authentication } = response;
+            if (authentication?.accessToken) {
+                setGoogleToken(authentication.accessToken);
+                fetchGoogleEvents(authentication.accessToken);
+            }
+        }
+    }, [response]);
 
     useEffect(() => {
         generateDailyEvents();
@@ -37,47 +60,78 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                d1.getDate() === d2.getDate();
     };
 
-    // --- GOOGLE CALENDAR LOGIC ---
-    // Dans une vraie app, cela utiliserait le Google Sign-In SDK (react-native-google-signin)
-    // Ici, nous simulons la connexion pour l'interface.
-    const connectGoogleCalendar = () => {
-        Alert.alert(
-            "Connexion Google",
-            "Pour activer la synchronisation réelle, assurez-vous que les identifiants OAuth Google Cloud sont configurés dans app.json. Voulez-vous simuler une connexion ?",
-            [
-                { text: "Annuler", style: "cancel" },
-                { 
-                    text: "Connecter (Simulé)", 
-                    onPress: () => {
-                        setLoadingGoogle(true);
-                        setTimeout(() => {
-                            setIsGoogleConnected(true);
-                            fetchGoogleEvents(); // Fetch simulated events
-                            setLoadingGoogle(false);
-                        }, 1500);
-                    } 
-                }
-            ]
-        );
-    };
+    const fetchGoogleEvents = async (token: string) => {
+        setLoadingGoogle(true);
+        try {
+            // Récupérer les événements (on prend une plage large autour d'aujourd'hui pour simplifier, ou on pourrait filtrer par timeMin/timeMax)
+            const timeMin = new Date();
+            timeMin.setDate(timeMin.getDate() - 30);
+            const timeMax = new Date();
+            timeMax.setDate(timeMax.getDate() + 30);
 
-    const fetchGoogleEvents = () => {
-        // En prod: appel API à https://www.googleapis.com/calendar/v3/calendars/primary/events
-        // Ici: on ajoute des événements fictifs pour montrer l'intégration UI
-        const mockEvents: CalendarEvent[] = [
-            { id: 'g1', title: 'Daily Stand-up (Google)', start_time: '10:00', end_time: '10:30', is_all_day: false, type: 'google', status: 'pending' },
-            { id: 'g2', title: 'Call Client (Google)', start_time: '14:00', end_time: '15:00', is_all_day: false, type: 'google', status: 'pending' }
-        ];
-        setGoogleEvents(mockEvents);
+            const response = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+            const data = await response.json();
+            
+            if (data.items) {
+                const events: CalendarEvent[] = data.items.map((item: any) => {
+                    let start = item.start.dateTime;
+                    let end = item.end.dateTime;
+                    let isAllDay = false;
+
+                    // Gestion des événements journée entière
+                    if (!start && item.start.date) {
+                        start = item.start.date;
+                        isAllDay = true;
+                    }
+                    if (!end && item.end.date) {
+                        end = item.end.date;
+                    }
+
+                    return {
+                        id: item.id,
+                        title: item.summary || 'Sans titre',
+                        start_time: isAllDay ? undefined : new Date(start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                        end_time: isAllDay ? undefined : (end ? new Date(end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : undefined),
+                        is_all_day: isAllDay,
+                        type: 'google',
+                        status: 'pending',
+                        meta: {
+                            rawStart: start,
+                            rawEnd: end
+                        }
+                    };
+                });
+                setGoogleEvents(events);
+            }
+        } catch (error) {
+            console.error("Erreur Google Calendar:", error);
+            Alert.alert("Erreur", "Impossible de récupérer les événements Google.");
+        } finally {
+            setLoadingGoogle(false);
+        }
     };
 
     const generateDailyEvents = () => {
         const events: CalendarEvent[] = [];
         const dayOfWeek = selectedDate.getDay();
 
-        // 1. Google Events (If connected)
-        if (isGoogleConnected && isSameDay(selectedDate, new Date())) { // Mock only shows for today
-            events.push(...googleEvents);
+        // 1. Google Events
+        if (googleEvents.length > 0) {
+            const daysGoogleEvents = googleEvents.filter(ev => {
+                // On vérifie si la date sélectionnée correspond au début de l'événement
+                // Note: C'est une vérification simplifiée. Pour les événements multi-jours, il faudrait une logique plus complexe.
+                if (ev.meta?.rawStart) {
+                    const evtDate = new Date(ev.meta.rawStart);
+                    return isSameDay(evtDate, selectedDate);
+                }
+                return false;
+            });
+            events.push(...daysGoogleEvents);
         }
 
         // 2. Habits
@@ -121,14 +175,18 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 
                 {/* Google Sync Button */}
                 <TouchableOpacity 
-                    style={[styles.syncBtn, isGoogleConnected && styles.syncBtnActive]}
-                    onPress={connectGoogleCalendar}
-                    disabled={isGoogleConnected}
+                    style={[styles.syncBtn, googleToken && styles.syncBtnActive]}
+                    onPress={() => !googleToken ? promptAsync() : setGoogleToken(null)}
+                    disabled={!request}
                 >
                     {loadingGoogle ? (
                         <ActivityIndicator size="small" color="#FFF" />
                     ) : (
-                        <Globe size={20} color={isGoogleConnected ? "#4ADE80" : "#FFF"} />
+                         googleToken ? (
+                             <LogOut size={20} color="#EF4444" /> // Disconnect icon if connected
+                         ) : (
+                            <Globe size={20} color="#FFF" />
+                         )
                     )}
                 </TouchableOpacity>
             </View>
@@ -149,9 +207,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 </TouchableOpacity>
             </View>
 
-            {!isGoogleConnected && (
-                <TouchableOpacity style={styles.googlePromo} onPress={connectGoogleCalendar}>
-                    <Text style={styles.googlePromoText}>Connecter Google Calendar pour voir vos événements</Text>
+            {!googleToken && (
+                <TouchableOpacity style={styles.googlePromo} onPress={() => promptAsync()} disabled={!request}>
+                    <Text style={styles.googlePromoText}>Connecter Google Calendar</Text>
                 </TouchableOpacity>
             )}
 
@@ -250,8 +308,8 @@ const styles = StyleSheet.create({
         borderColor: '#333',
     },
     syncBtnActive: {
-        borderColor: '#4ADE80',
-        backgroundColor: 'rgba(74, 222, 128, 0.1)',
+        borderColor: '#EF4444', // Red border to indicate logout option
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
     },
     dateNav: {
         flexDirection: 'row',
