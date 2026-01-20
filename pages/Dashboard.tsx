@@ -41,34 +41,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       return aDone ? 1 : -1;
   });
 
-  const activeTasks = tasks.filter(t => !t.completed).slice(0, 5); 
+  // FILTER: Only High Priority and Pending tasks on Dashboard
+  const activeTasks = tasks.filter(t => !t.completed && t.priority === 'high').slice(0, 5); 
 
-  // --- SCORE DE PRODUCTIVITÉ (Calcul Simplifié) ---
-  // Taux de complétion des tâches (40%) + Streak Habitudes (20%) + Niveau (40%)
+  // --- SCORE DE PRODUCTIVITÉ ---
   const completedTasksCount = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length || 1;
   const completionRate = completedTasksCount / totalTasks;
   const averageStreak = habits.length > 0 ? habits.reduce((acc, h) => acc + h.streak, 0) / habits.length : 0;
   
-  // Score sur 100
   let productivityScore = Math.round(
       (completionRate * 40) + 
       (Math.min(averageStreak, 30) / 30 * 20) + 
       (Math.min(player.level, 50) / 50 * 40)
   );
-  // Ensure meaningful number for new users
   if (productivityScore < 10) productivityScore = 15; 
 
   const getScoreColor = (score: number) => {
-      if (score >= 80) return '#4ADE80'; // Excellent
-      if (score >= 60) return '#C4B5FD'; // Bon
-      if (score >= 40) return '#FACC15'; // Moyen
-      return '#F87171'; // À améliorer
+      if (score >= 80) return '#4ADE80';
+      if (score >= 60) return '#C4B5FD';
+      if (score >= 40) return '#FACC15';
+      return '#F87171';
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* UNIFORM HEADER */}
+      {/* HEADER: Menu Left, Title Center, Avatar Right */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
             <Menu size={24} color="#FFF" />
@@ -145,10 +143,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </ScrollView>
         </View>
 
-        {/* Tasks Section */}
+        {/* Tasks Section (High Priority Only) */}
         <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Tâches Prioritaires</Text>
+                <Text style={styles.sectionTitle}>Urgences (High)</Text>
                 <TouchableOpacity onPress={() => setView(ViewState.TASKS)}>
                     <ArrowRight size={20} color="#666" />
                 </TouchableOpacity>
@@ -157,7 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             <View style={styles.taskList}>
                 {activeTasks.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>Aucune tâche urgente.</Text>
+                        <Text style={styles.emptyText}>Aucune tâche haute priorité.</Text>
                     </View>
                 ) : (
                     activeTasks.map((task) => (
@@ -170,7 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                             <View style={[
                                 styles.checkbox, 
                                 task.completed && styles.checkboxDone,
-                                task.priority === 'high' && styles.checkboxHigh
+                                styles.checkboxHigh
                             ]}>
                                 {task.completed && <Check size={12} color="#000" strokeWidth={3} />}
                             </View>
@@ -232,7 +230,6 @@ const styles = StyleSheet.create({
     paddingBottom: 130, 
     paddingTop: 10,
   },
-  // SCORE CARD
   scoreCard: {
       backgroundColor: '#171717',
       marginHorizontal: 20,

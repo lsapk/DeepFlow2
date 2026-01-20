@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, Modal, TextInput, ScrollView, Alert } from 'react-native';
-import { Play, Pause, X, Clock, List, Plus, Save } from 'lucide-react-native';
+import { Play, Pause, X, Clock, List, Plus, Save, Calendar } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';
@@ -18,12 +18,12 @@ interface FocusProps {
 }
 
 const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
-  // Modes: 'CONFIG' | 'RUNNING' | 'HISTORY'
   const [viewMode, setViewMode] = useState<'CONFIG' | 'RUNNING' | 'HISTORY'>('CONFIG');
   
   // Timer State
   const [isActive, setIsActive] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(25);
+  const [customDuration, setCustomDuration] = useState('');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [sessionTitle, setSessionTitle] = useState('');
   const [linkedTaskId, setLinkedTaskId] = useState<string | null>(null);
@@ -35,6 +35,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
   // Manual Form
   const [manualTitle, setManualTitle] = useState('');
   const [manualDuration, setManualDuration] = useState('25');
+  const [manualDate, setManualDate] = useState('');
 
   useEffect(() => {
     let interval: number | undefined;
@@ -58,7 +59,12 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
   };
 
   const startSession = () => {
-      setTimeLeft(durationMinutes * 60);
+      // Use custom duration if set, else preset
+      const minutes = customDuration ? parseInt(customDuration) : durationMinutes;
+      if (minutes <= 0) return;
+      
+      setDurationMinutes(minutes);
+      setTimeLeft(minutes * 60);
       setIsActive(true);
       setViewMode('RUNNING');
   };
@@ -96,24 +102,27 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
 
   const addManualSession = async () => {
       const dur = parseInt(manualDuration) || 25;
+      const dateStr = manualDate ? new Date(manualDate).toISOString() : new Date().toISOString();
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
           await supabase.from('focus_sessions').insert({
               user_id: user.id,
               duration: dur,
-              completed_at: new Date().toISOString(),
+              completed_at: dateStr,
               session_type: 'focus',
               title: manualTitle || 'Session Manuelle'
           });
           
           const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
           if (player) {
-               await addXp(user.id, REWARDS.FOCUS_SHORT, player); // Fixed reward for manual to prevent exploit
+               await addXp(user.id, REWARDS.FOCUS_SHORT, player);
           }
 
           fetchHistory();
           setManualModalVisible(false);
           setManualTitle('');
+          setManualDate('');
       }
   };
 
@@ -143,7 +152,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
         </View>
 
         {viewMode === 'CONFIG' && (
-            <View style={styles.configContainer}>
+            <ScrollView contentContainerStyle={styles.configContainer}>
                 <Text style={styles.title}>Configurer la Session</Text>
                 
                 <Text style={styles.label}>TITRE (Optionnel)</Text>
@@ -155,14 +164,28 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
                     onChangeText={setSessionTitle}
                 />
 
-                <Text style={styles.label}>DURÉE : {durationMinutes} min</Text>
+                <Text style={styles.label}>DURÉE : {customDuration ? customDuration : durationMinutes} min</Text>
                 <View style={styles.presetsRow}>
                     {[15, 25, 45, 60].map(m => (
-                        <TouchableOpacity key={m} onPress={() => setDurationMinutes(m)} style={[styles.presetBtn, durationMinutes === m && styles.presetBtnActive]}>
-                            <Text style={[styles.presetText, durationMinutes === m && { color: '#000' }]}>{m}</Text>
+                        <TouchableOpacity 
+                            key={m} 
+                            onPress={() => { setDurationMinutes(m); setCustomDuration(''); }} 
+                            style={[styles.presetBtn, (durationMinutes === m && !customDuration) && styles.presetBtnActive]}
+                        >
+                            <Text style={[styles.presetText, (durationMinutes === m && !customDuration) && { color: '#000' }]}>{m}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
+                
+                <Text style={styles.label}>OU DURÉE PERSONNALISÉE (min)</Text>
+                <TextInput 
+                    style={styles.input} 
+                    placeholder="Ex: 90" 
+                    placeholderTextColor="#666" 
+                    value={customDuration}
+                    onChangeText={setCustomDuration}
+                    keyboardType="numeric"
+                />
 
                 <Text style={styles.label}>LIER TÂCHE (Optionnel)</Text>
                 <ScrollView style={styles.taskPicker} horizontal showsHorizontalScrollIndicator={false}>
@@ -187,7 +210,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
                     <Play size={24} color="#000" fill="#000" />
                     <Text style={styles.startBtnText}>Lancer le Focus</Text>
                 </TouchableOpacity>
-            </View>
+            </ScrollView>
         )}
 
         {viewMode === 'RUNNING' && (
@@ -230,18 +253,21 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
                     </TouchableOpacity>
                 </View>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    {history.map(session => (
-                        <View key={session.id} style={styles.historyItem}>
-                            <View>
-                                <Text style={styles.hTitle}>{session.title || 'Session Focus'}</Text>
-                                <Text style={styles.hDate}>{new Date(session.completed_at).toLocaleDateString()}</Text>
+                    {history.map(session => {
+                        const d = session.completed_at ? new Date(session.completed_at) : new Date();
+                        return (
+                            <View key={session.id} style={styles.historyItem}>
+                                <View>
+                                    <Text style={styles.hTitle}>{session.title || 'Session Focus'}</Text>
+                                    <Text style={styles.hDate}>{d.toLocaleDateString()} {d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                                </View>
+                                <View style={styles.hBadge}>
+                                    <Clock size={12} color="#000" />
+                                    <Text style={styles.hDuration}>{session.duration}m</Text>
+                                </View>
                             </View>
-                            <View style={styles.hBadge}>
-                                <Clock size={12} color="#000" />
-                                <Text style={styles.hDuration}>{session.duration}m</Text>
-                            </View>
-                        </View>
-                    ))}
+                        );
+                    })}
                 </ScrollView>
             </View>
         )}
@@ -254,10 +280,25 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
                         <Text style={styles.modalTitle}>Ajout Manuel</Text>
                         <TouchableOpacity onPress={() => setManualModalVisible(false)}><X size={24} color="#FFF" /></TouchableOpacity>
                     </View>
+                    
                     <Text style={styles.label}>TITRE</Text>
                     <TextInput style={styles.input} value={manualTitle} onChangeText={setManualTitle} placeholder="Titre..." placeholderTextColor="#666" />
+                    
                     <Text style={styles.label}>DURÉE (min)</Text>
                     <TextInput style={styles.input} value={manualDuration} onChangeText={setManualDuration} keyboardType="numeric" placeholder="25" placeholderTextColor="#666" />
+                    
+                    <Text style={styles.label}>DATE (YYYY-MM-DD)</Text>
+                    <View style={styles.inputWithIcon}>
+                        <Calendar size={18} color="#666" style={{marginRight: 10}} />
+                        <TextInput 
+                            style={[styles.input, {borderWidth:0, marginBottom:0, flex:1}]} 
+                            value={manualDate} 
+                            onChangeText={setManualDate} 
+                            placeholder="Aujourd'hui" 
+                            placeholderTextColor="#666" 
+                        />
+                    </View>
+
                     <TouchableOpacity style={styles.saveBtn} onPress={addManualSession}>
                         <Save size={20} color="#000" />
                         <Text style={styles.saveBtnText}>Enregistrer</Text>
@@ -314,7 +355,7 @@ const styles = StyleSheet.create({
   },
   configContainer: {
       paddingHorizontal: 24,
-      flex: 1,
+      paddingBottom: 50,
   },
   label: {
       fontSize: 12,
@@ -322,6 +363,7 @@ const styles = StyleSheet.create({
       fontWeight: '600',
       marginBottom: 10,
       marginTop: 20,
+      textTransform: 'uppercase',
   },
   input: {
       backgroundColor: '#171717',
@@ -331,6 +373,15 @@ const styles = StyleSheet.create({
       fontSize: 16,
       borderWidth: 1,
       borderColor: '#333',
+  },
+  inputWithIcon: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#171717',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#333',
+      paddingHorizontal: 12,
   },
   presetsRow: {
       flexDirection: 'row',

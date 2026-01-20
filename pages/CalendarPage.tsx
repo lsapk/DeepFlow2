@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Flame, Globe, LogOut } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Flame, Globe, LogOut, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Task, Habit, CalendarEvent } from '../types';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 
-// Permet de terminer la session auth sur le web
 WebBrowser.maybeCompleteAuthSession();
 
 interface CalendarPageProps {
@@ -14,9 +13,10 @@ interface CalendarPageProps {
     habits: Habit[];
     toggleTask: (id: string) => void;
     toggleHabit: (id: string) => void;
+    openMenu?: () => void;
 }
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, toggleHabit }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, toggleHabit, openMenu }) => {
     const insets = useSafeAreaInsets();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [dayEvents, setDayEvents] = useState<CalendarEvent[]>([]);
@@ -63,7 +63,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     const fetchGoogleEvents = async (token: string) => {
         setLoadingGoogle(true);
         try {
-            // Récupérer les événements (on prend une plage large autour d'aujourd'hui pour simplifier, ou on pourrait filtrer par timeMin/timeMax)
             const timeMin = new Date();
             timeMin.setDate(timeMin.getDate() - 30);
             const timeMax = new Date();
@@ -123,8 +122,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         // 1. Google Events
         if (googleEvents.length > 0) {
             const daysGoogleEvents = googleEvents.filter(ev => {
-                // On vérifie si la date sélectionnée correspond au début de l'événement
-                // Note: C'est une vérification simplifiée. Pour les événements multi-jours, il faudrait une logique plus complexe.
                 if (ev.meta?.rawStart) {
                     const evtDate = new Date(ev.meta.rawStart);
                     return isSameDay(evtDate, selectedDate);
@@ -171,7 +168,14 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Calendrier</Text>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                    {openMenu && (
+                        <TouchableOpacity style={styles.syncBtn} onPress={openMenu}>
+                            <Menu size={24} color="#FFF" />
+                        </TouchableOpacity>
+                    )}
+                    <Text style={styles.headerTitle}>Calendrier</Text>
+                </View>
                 
                 {/* Google Sync Button */}
                 <TouchableOpacity 

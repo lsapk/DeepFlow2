@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, AlignLeft, Save, Target } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, AlignLeft, Save, Target, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 if (Platform.OS === 'android') {
@@ -18,32 +18,44 @@ interface TasksProps {
   deleteTask: (id: string) => void;
   userId: string;
   refreshTasks: () => void;
+  openMenu?: () => void; 
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, userId, refreshTasks }) => {
+const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, userId, refreshTasks, openMenu }) => {
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
-  
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
-  // Form State
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formPriority, setFormPriority] = useState<Task['priority']>('medium');
   const [formGoalId, setFormGoalId] = useState<string | null>(null);
+  const [formDate, setFormDate] = useState('');
 
   const openCreateModal = () => {
       setFormTitle('');
       setFormDesc('');
       setFormPriority('medium');
       setFormGoalId(null);
+      setFormDate('');
       setCreateModalVisible(true);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (formTitle.trim()) {
-      addTask(formTitle, formPriority, formGoalId || undefined);
+      const max = tasks.length > 0 ? Math.max(...tasks.map(x=>x.sort_order)) : 0;
+      await supabase.from('tasks').insert({
+          user_id: userId,
+          title: formTitle,
+          description: formDesc || null,
+          priority: formPriority,
+          completed: false,
+          sort_order: max + 1,
+          linked_goal_id: formGoalId || null,
+          due_date: formDate ? new Date(formDate).toISOString() : null
+      });
+      refreshTasks();
       setCreateModalVisible(false);
     }
   };
@@ -65,6 +77,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       setFormDesc(task.description || '');
       setFormPriority(task.priority);
       setFormGoalId(task.linked_goal_id || null);
+      setFormDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
       setEditModalVisible(true);
   };
 
@@ -74,7 +87,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
           title: formTitle,
           description: formDesc,
           linked_goal_id: formGoalId,
-          priority: formPriority
+          priority: formPriority,
+          due_date: formDate ? new Date(formDate).toISOString() : null
       }).eq('id', selectedTask.id);
       
       refreshTasks();
@@ -87,7 +101,14 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-          <Text style={styles.largeTitle}>Tâches</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+              {openMenu && (
+                  <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
+                      <Menu size={24} color="#FFF" />
+                  </TouchableOpacity>
+              )}
+              <Text style={styles.largeTitle}>Tâches</Text>
+          </View>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
                 <Plus size={24} color="#000" />
           </TouchableOpacity>
@@ -137,7 +158,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         )}
       </ScrollView>
 
-      {/* CREATE / EDIT MODAL (Reused structure) */}
+      {/* CREATE / EDIT MODAL */}
       <Modal
         visible={createModalVisible || editModalVisible}
         transparent={true}
@@ -165,6 +186,19 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                         color="#FFF"
                     />
 
+                    <Text style={styles.label}>Date d'échéance (YYYY-MM-DD)</Text>
+                    <View style={styles.inputWithIcon}>
+                        <Calendar size={18} color="#666" style={{marginRight: 10}} />
+                        <TextInput 
+                            style={[styles.modalInput, {flex: 1, height: 'auto', marginBottom: 0, borderWidth: 0}]} 
+                            value={formDate} 
+                            onChangeText={setFormDate} 
+                            placeholder="ex: 2024-12-31"
+                            placeholderTextColor="#666"
+                            color="#FFF"
+                        />
+                    </View>
+
                     <Text style={styles.label}>Priorité</Text>
                     <View style={styles.priorityRow}>
                          {(['low', 'medium', 'high'] as const).map(p => (
@@ -182,7 +216,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                     <View style={styles.inputWithIcon}>
                          <AlignLeft size={18} color="#666" style={{marginRight: 10}} />
                          <TextInput 
-                            style={[styles.modalInput, {flex: 1, height: 'auto', minHeight: 40, marginBottom: 0}]} 
+                            style={[styles.modalInput, {flex: 1, height: 'auto', minHeight: 60, marginBottom: 0, borderWidth: 0}]} 
                             value={formDesc} 
                             onChangeText={setFormDesc} 
                             placeholder="Détails de la tâche..."
@@ -304,6 +338,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                     <Text style={[styles.taskTitle, task.completed && styles.taskTitleCompleted]}>
                         {task.title}
                     </Text>
+                    {task.due_date && <Text style={styles.dateText}>📅 {new Date(task.due_date).toLocaleDateString()}</Text>}
+                    
                     {task.linked_goal_id && <View style={styles.linkedDot} />}
                     {task.subtasks && task.subtasks.length > 0 && (
                         <Text style={styles.subtaskCount}>
@@ -312,13 +348,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                     )}
                 </View>
 
-                {/* Petit bouton flèche */}
                 <TouchableOpacity onPress={onToggleExpand} style={styles.expandBtn}>
                      {isExpanded ? <ChevronUp size={16} color="#666" /> : <ChevronDown size={16} color="#666" />}
                 </TouchableOpacity>
             </TouchableOpacity>
 
-            {/* Subtasks Section */}
             {isExpanded && (
                 <View style={styles.subtaskList}>
                     {task.description && (
@@ -384,8 +418,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  keyboardAvoid: {
-    zIndex: 10,
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -444,6 +481,11 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '500',
   },
+  dateText: {
+      fontSize: 11,
+      color: '#007AFF',
+      marginTop: 2,
+  },
   taskTitleCompleted: {
     color: '#666',
     textDecorationLine: 'line-through',
@@ -463,8 +505,6 @@ const styles = StyleSheet.create({
   expandBtn: {
       padding: 8,
   },
-  
-  // Subtasks
   subtaskList: {
       backgroundColor: '#121212',
       paddingHorizontal: 16,
@@ -521,8 +561,6 @@ const styles = StyleSheet.create({
       fontSize: 14,
       marginRight: 10,
   },
-
-  // Modal
   modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.8)',

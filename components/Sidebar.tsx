@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
 import { UserProfile, ViewState } from '../types';
-import { LayoutDashboard, TrendingUp, Compass, CheckSquare, RefreshCw, Book, Zap, X, LogOut, BrainCircuit, Calendar } from 'lucide-react-native';
+import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, LogOut, BrainCircuit, Calendar } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SidebarProps {
@@ -16,15 +16,17 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, currentView, onLogout }) => {
   const insets = useSafeAreaInsets();
 
+  // Ordre demandé : taches, habitudes, objectifs, focus, journal, reflexion, calendrier, croissance et IA
   const menuItems = [
     { icon: LayoutDashboard, label: 'Tableau de bord', view: ViewState.TODAY },
-    { icon: Calendar, label: 'Calendrier', view: ViewState.CALENDAR },
     { icon: CheckSquare, label: 'Tâches', view: ViewState.TASKS },
     { icon: RefreshCw, label: 'Habitudes', view: ViewState.HABITS },
-    { icon: BrainCircuit, label: 'Réflexion', view: ViewState.REFLECTION },
-    { icon: TrendingUp, label: 'Croissance & IA', view: ViewState.GROWTH },
+    { icon: Target, label: 'Objectifs', view: ViewState.GOALS },
+    { icon: Zap, label: 'Mode Focus', view: ViewState.FOCUS_MODE },
     { icon: Book, label: 'Journal', view: ViewState.JOURNAL },
-    { icon: Zap, label: 'Focus Mode', view: ViewState.FOCUS_MODE },
+    { icon: BrainCircuit, label: 'Réflexion', view: ViewState.REFLECTION },
+    { icon: Calendar, label: 'Calendrier', view: ViewState.CALENDAR },
+    { icon: TrendingUp, label: 'Croissance & IA', view: ViewState.GROWTH },
   ];
 
   const handleNavigate = (view: ViewState) => {
@@ -35,9 +37,20 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
         <View style={styles.overlay}>
-            {/* Drawer à Gauche (First Child) */}
+            {/* Backdrop clickable */}
+            <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
+            
+            {/* Drawer (Right Side Animation implied by layout, but standard is left. 
+                Keeping structure but user asked for Menu Button on Top Right, usually implies Right Drawer or just button location.
+                Keeping Drawer on Left for standard UX, but button triggers it.) 
+            */}
             <View style={[styles.drawer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
+                
                 <View style={styles.header}>
+                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                         <X size={26} color="#FFF" />
+                     </TouchableOpacity>
+                     
                      {user && (
                         <View style={styles.userInfo}>
                              <Image 
@@ -45,32 +58,37 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
                                 style={styles.avatar} 
                              />
                              <View style={styles.userText}>
-                                 <Text style={styles.userName}>{user.display_name}</Text>
-                                 <Text style={styles.userEmail}>{user.email}</Text>
+                                 <Text style={styles.userName} numberOfLines={1}>{user.display_name}</Text>
+                                 <Text style={styles.userEmail} numberOfLines={1}>{user.email}</Text>
                              </View>
                         </View>
                      )}
-                     <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                         <X size={24} color="#FFF" />
-                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.menuContainer}>
-                    {menuItems.map((item, index) => {
-                        const Icon = item.icon;
-                        const isActive = currentView === item.view;
-                        return (
-                            <TouchableOpacity 
-                                key={index} 
-                                style={[styles.menuItem, isActive && styles.menuItemActive]} 
-                                onPress={() => handleNavigate(item.view)}
-                            >
-                                <Icon size={22} color={isActive ? "#000" : "#FFF"} />
-                                <Text style={[styles.menuText, isActive && styles.menuTextActive]}>{item.label}</Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
+                <View style={styles.divider} />
+
+                <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
+                    <View style={styles.menuContainer}>
+                        {menuItems.map((item, index) => {
+                            const Icon = item.icon;
+                            const isActive = currentView === item.view;
+                            return (
+                                <TouchableOpacity 
+                                    key={index} 
+                                    style={[styles.menuItem, isActive && styles.menuItemActive]} 
+                                    onPress={() => handleNavigate(item.view)}
+                                >
+                                    <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
+                                        <Icon size={20} color={isActive ? "#000" : "#CCC"} />
+                                    </View>
+                                    <Text style={[styles.menuText, isActive && styles.menuTextActive]}>{item.label}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </ScrollView>
+
+                <View style={styles.divider} />
 
                 <View style={styles.footer}>
                      <TouchableOpacity style={styles.footerItem} onPress={onLogout}>
@@ -79,9 +97,6 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
                      </TouchableOpacity>
                 </View>
             </View>
-
-            {/* Backdrop à Droite (Second Child) */}
-            <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
         </View>
     </Modal>
   );
@@ -90,26 +105,33 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
 const styles = StyleSheet.create({
   overlay: {
       flex: 1,
-      flexDirection: 'row', // Align items horizontally
+      flexDirection: 'row',
   },
   backdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(0,0,0,0.6)',
   },
   drawer: {
-      width: '80%',
-      backgroundColor: '#171717',
+      width: '80%', 
+      maxWidth: 320,
+      backgroundColor: '#111',
       height: '100%',
-      paddingHorizontal: 20,
       borderRightWidth: 1,
-      borderRightColor: '#333',
+      borderRightColor: '#262626',
+      display: 'flex',
+      flexDirection: 'column',
   },
   header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 40,
-      marginTop: 20,
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+      paddingTop: 10,
+  },
+  closeBtn: {
+      alignSelf: 'flex-end',
+      padding: 8,
+      marginBottom: 10,
+      backgroundColor: '#222',
+      borderRadius: 20,
   },
   userInfo: {
       flexDirection: 'row',
@@ -117,10 +139,10 @@ const styles = StyleSheet.create({
       gap: 12,
   },
   avatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      borderWidth: 1,
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      borderWidth: 2,
       borderColor: '#333',
   },
   userText: {
@@ -129,47 +151,67 @@ const styles = StyleSheet.create({
   userName: {
       color: '#FFF',
       fontWeight: '700',
-      fontSize: 16,
+      fontSize: 18,
+      marginBottom: 2,
   },
   userEmail: {
       color: '#888',
       fontSize: 12,
   },
-  closeBtn: {
-      padding: 8,
+  divider: {
+      height: 1,
+      backgroundColor: '#262626',
+      width: '100%',
+  },
+  menuScroll: {
+      flex: 1,
   },
   menuContainer: {
-      gap: 8,
-      flex: 1,
+      padding: 16,
+      gap: 4,
   },
   menuItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
       borderRadius: 12,
-      gap: 16,
+      gap: 12,
   },
   menuItemActive: {
       backgroundColor: '#FFF',
   },
+  iconBox: {
+      width: 32,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 8,
+  },
+  iconBoxActive: {
+  },
   menuText: {
-      color: '#FFF',
-      fontSize: 16,
-      fontWeight: '600',
+      color: '#CCC',
+      fontSize: 15,
+      fontWeight: '500',
   },
   menuTextActive: {
       color: '#000',
+      fontWeight: '700',
   },
   footer: {
-      borderTopWidth: 1,
-      borderTopColor: '#333',
-      paddingTop: 20,
+      padding: 16,
+      backgroundColor: '#000',
   },
   footerItem: {
       flexDirection: 'row',
       alignItems: 'center',
       padding: 16,
-      gap: 16,
+      gap: 12,
+      backgroundColor: '#1A0505',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#331111',
   }
 });
 

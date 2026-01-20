@@ -1,9 +1,17 @@
 import { supabase } from './supabase';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialisation du client Gemini (Ancien SDK compatible React Native)
-// Assurez-vous que process.env.API_KEY est défini dans votre configuration
-const genAI = new GoogleGenerativeAI(process.env.API_KEY || '');
+// Initialisation du client Gemini
+// NOTE: L'erreur 403 signifie que cette variable est vide ou invalide.
+// Assurez-vous d'avoir configuré votre variable d'environnement (ex: via app.config.js ou .env)
+const API_KEY = process.env.API_KEY;
+
+let genAI: GoogleGenerativeAI | null = null;
+if (API_KEY) {
+    genAI = new GoogleGenerativeAI(API_KEY);
+} else {
+    console.warn("Gemini API Key is missing in process.env.API_KEY. AI features will fail.");
+}
 
 // Helper pour logger l'utilisation
 async function logAiUsage(type: 'chat' | 'analysis') {
@@ -42,10 +50,11 @@ export const generateCoaching = async (
   userMessage: string, 
   userContext: any
 ): Promise<string> => {
+  if (!genAI) return "Clé API Gemini manquante. Veuillez configurer l'application.";
+
   await logAiUsage('chat');
   
   try {
-    // Utilisation de gemini-1.5-flash qui est très rapide et stable sur ce SDK
     const model = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
         systemInstruction: `
@@ -67,11 +76,13 @@ export const generateCoaching = async (
     return response.text();
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Erreur de connexion à l'IA. Vérifiez votre clé API.";
+    return "Erreur de connexion à l'IA. Vérifiez votre clé API et vos quotas.";
   }
 };
 
 export const generateReflectionQuestion = async (): Promise<string> => {
+  if (!genAI) return "Clé API manquante.";
+
   await logAiUsage('analysis');
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });

@@ -11,12 +11,13 @@ import Focus from './pages/Focus';
 import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
+import Goals from './pages/Goals';
 import Journal from './pages/Journal';
 import ReflectionPage from './pages/Reflection';
 import CalendarPage from './pages/CalendarPage';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabase';
-import { Trophy, X } from 'lucide-react-native';
+import { Trophy } from 'lucide-react-native';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.AUTH);
@@ -130,7 +131,6 @@ const App: React.FC = () => {
   const fetchPlayer = async (userId: string) => {
     const { data } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
     if (data) {
-        // Level Up Detection
         if (prevLevelRef.current !== null && data.level > prevLevelRef.current) {
             setShowLevelUp(true);
         }
@@ -168,7 +168,6 @@ const App: React.FC = () => {
   };
 
   // --- ACTIONS ---
-  
   const toggleHabit = async (id: string) => {
       const habit = habits.find(h => h.id === id);
       if (!habit || !player || !user) return;
@@ -205,6 +204,18 @@ const App: React.FC = () => {
     }
   };
 
+  const toggleGoal = async (id: string) => {
+     const goal = goals.find(g => g.id === id);
+     if (!goal) return;
+     const newStatus = !goal.completed;
+     await supabase.from('goals').update({ completed: newStatus }).eq('id', id);
+     
+     if (newStatus && player && user) {
+         const { addXp, REWARDS } = await import('./services/gamification');
+         await addXp(user.id, REWARDS.GOAL, player);
+     }
+  };
+
   // --- RENDER ---
   const renderView = () => {
     if (loading) return (
@@ -232,15 +243,11 @@ const App: React.FC = () => {
             <Tasks 
                 tasks={tasks} goals={goals} 
                 toggleTask={toggleTask} 
-                addTask={async (t, p, g) => {
-                    const max = tasks.length > 0 ? Math.max(...tasks.map(x=>x.sort_order)) : 0;
-                    await supabase.from('tasks').insert({
-                        user_id: user.id, title: t, priority: p, completed: false, sort_order: max+1, linked_goal_id: g || null
-                    });
-                }} 
+                addTask={async (t, p, g) => {}} 
                 deleteTask={async (id) => await supabase.from('tasks').delete().eq('id', id)} 
                 userId={user.id} 
                 refreshTasks={() => fetchTasks(user.id)} 
+                openMenu={() => setSidebarVisible(true)}
             />
           );
       case ViewState.HABITS: 
@@ -249,18 +256,35 @@ const App: React.FC = () => {
                 habits={habits} goals={goals} 
                 incrementHabit={toggleHabit} 
                 userId={user.id} 
-                refreshHabits={() => fetchHabits(user.id)} 
+                refreshHabits={() => fetchHabits(user.id)}
+                openMenu={() => setSidebarVisible(true)}
             />
+          );
+      case ViewState.GOALS:
+          return (
+             <Goals 
+                goals={goals} 
+                toggleGoal={toggleGoal}
+                addGoal={async (title) => {
+                    const max = goals.length > 0 ? Math.max(...goals.map(x=>x.sort_order)) : 0;
+                    await supabase.from('goals').insert({
+                         user_id: user.id, title, completed: false, sort_order: max+1, progress: 0
+                    });
+                }}
+                deleteGoal={async (id) => await supabase.from('goals').delete().eq('id', id)}
+                userId={user.id}
+                refreshGoals={() => fetchGoals(user.id)}
+                openMenu={() => setSidebarVisible(true)}
+             />
           );
       case ViewState.GROWTH:
         return <Growth player={player} user={user} tasks={tasks} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} />;
       case ViewState.CYBER_KNIGHT:
-        // Now passing real quests
         return <CyberKnight player={player} user={user} quests={quests} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} />;
       case ViewState.REFLECTION:
-        return <ReflectionPage userId={user.id} />;
+        return <ReflectionPage userId={user.id} openMenu={() => setSidebarVisible(true)} />;
       case ViewState.CALENDAR:
-        return <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} />;
+        return <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={() => setSidebarVisible(true)} />;
       case ViewState.FOCUS_MODE:
         return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} />;
       case ViewState.JOURNAL:

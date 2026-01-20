@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save, Minus } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save, Minus, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 if (Platform.OS === 'android') {
@@ -17,9 +17,10 @@ interface GoalsProps {
   deleteGoal: (id: string) => void;
   userId: string;
   refreshGoals: () => void;
+  openMenu?: () => void;
 }
 
-const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, userId, refreshGoals }) => {
+const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, userId, refreshGoals, openMenu }) => {
   const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   
@@ -92,10 +93,17 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-          <Text style={styles.largeTitle}>Objectifs</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+              {openMenu && (
+                  <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
+                      <Menu size={24} color="#FFF" />
+                  </TouchableOpacity>
+              )}
+              <Text style={styles.largeTitle}>Objectifs</Text>
+          </View>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
                 <TouchableOpacity onPress={() => setShowCompleted(!showCompleted)} style={styles.toggleCompletedBtn}>
-                    <Text style={styles.toggleText}>{showCompleted ? 'Masquer' : 'Voir Terminés'}</Text>
+                    <Text style={styles.toggleText}>{showCompleted ? 'Masquer' : 'Terminés'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
                         <Plus size={24} color="#000" />
@@ -379,6 +387,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     color: '#FFF',
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleCompletedBtn: {
       padding: 8,

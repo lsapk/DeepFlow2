@@ -176,6 +176,7 @@ export enum ViewState {
   FOCUS_MODE = 'FOCUS_MODE', // Full screen focus
   TASKS = 'TASKS',
   HABITS = 'HABITS',
+  GOALS = 'GOALS',    // Added Goal view
   JOURNAL = 'JOURNAL',
   REFLECTION = 'REFLECTION',
   CALENDAR = 'CALENDAR'

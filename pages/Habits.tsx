@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { Habit, Goal } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 interface HabitsProps {
@@ -10,13 +10,14 @@ interface HabitsProps {
   incrementHabit: (id: string) => void;
   userId: string;
   refreshHabits: () => void;
+  openMenu?: () => void;
 }
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']; // Dimanche to Samedi
 
-const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, refreshHabits }) => {
+const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, refreshHabits, openMenu }) => {
   const [showArchived, setShowArchived] = useState(false);
-  const [showAllDays, setShowAllDays] = useState(false); // New Toggle
+  const [showAllDays, setShowAllDays] = useState(false); 
   const [modalVisible, setModalVisible] = useState(false);
   
   // Form State
@@ -36,7 +37,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       setCategory('General');
       setFrequency('daily');
       setTarget('1');
-      setSelectedDays([]); // Empty means everyday
+      setSelectedDays([]); 
       setLinkedGoalId(null);
       setModalVisible(true);
   };
@@ -116,9 +117,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       if (showArchived) return !!h.is_archived;
       if (h.is_archived) return false;
       
-      // Filter Logic:
-      // If "Show All Days" is ON, show everything.
-      // If "Show All Days" is OFF (Default), show only if today is in days_of_week OR days_of_week is empty/null (everyday)
       if (showAllDays) return true;
       if (!h.days_of_week || h.days_of_week.length === 0) return true;
       return h.days_of_week.includes(todayIndex);
@@ -127,12 +125,18 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
-             <Text style={styles.largeTitle}>Habitudes</Text>
-             <Text style={styles.subtitle}>{showAllDays ? 'Toutes les habitudes' : 'Aujourd\'hui'}</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+             {openMenu && (
+                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                      <Menu size={24} color="#FFF" />
+                  </TouchableOpacity>
+             )}
+             <View>
+                 <Text style={styles.largeTitle}>Habitudes</Text>
+                 <Text style={styles.subtitle}>{showAllDays ? 'Toutes les habitudes' : 'Aujourd\'hui'}</Text>
+             </View>
         </View>
         <View style={styles.headerButtons}>
-            {/* Filter Toggle */}
             <TouchableOpacity 
                 style={[styles.iconBtn, showAllDays && styles.iconBtnActive]} 
                 onPress={() => setShowAllDays(!showAllDays)}
@@ -161,7 +165,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
         )}
         {displayedHabits.map(habit => {
             const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toDateString() === new Date().toDateString();
-            // Si on affiche "Tout", on veut savoir si c'est le bon jour pour le marquer visuellement peut-etre, mais ici on garde simple.
             const isScheduledToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(todayIndex);
 
             return (
