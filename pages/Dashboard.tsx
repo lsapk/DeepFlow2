@@ -13,10 +13,11 @@ interface DashboardProps {
   toggleTask: (id: string) => void;
   openFocus: () => void;
   openMenu: () => void;
+  openProfile: () => void;
   setView: (view: ViewState) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openMenu, setView }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openMenu, openProfile, setView }) => {
   const insets = useSafeAreaInsets();
   
   const isSameDay = (d1: Date, d2: Date) => {
@@ -26,13 +27,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   };
 
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+  const dayOfWeek = today.getDay(); 
   
-  // Filter habits for today
   const todaysHabits = habits.filter(h => {
-      // If days_of_week is null or empty, assume everyday
       if (!h.days_of_week || h.days_of_week.length === 0) return true;
-      // Check if current day index is in array
       return h.days_of_week.includes(dayOfWeek);
   });
   
@@ -43,11 +41,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       return aDone ? 1 : -1;
   });
 
-  const activeTasks = tasks.filter(t => !t.completed).slice(0, 5); // Show top 5
+  const activeTasks = tasks.filter(t => !t.completed).slice(0, 5); 
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header avec espacement dynamique */}
+      {/* UNIFORM HEADER */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
             <Menu size={24} color="#FFF" />
@@ -55,18 +53,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
         <Text style={styles.headerTitle}>DeepFlow</Text>
 
-        <View style={styles.avatarContainer}>
+        <TouchableOpacity onPress={openProfile}>
             <Image 
-            source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
-            style={styles.avatar} 
-        />
-        </View>
+                source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
+                style={styles.avatar} 
+            />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         <View style={styles.welcomeSection}>
             <Text style={styles.greeting}>Bonjour {user.display_name?.split(' ')[0]}</Text>
+            <Text style={styles.subGreeting}>Prêt à conquérir la journée, Cyber Knight ?</Text>
         </View>
 
         {/* Habits Section */}
@@ -143,7 +142,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                                 <Text style={[styles.taskText, task.completed && styles.taskTextDone]} numberOfLines={1}>
                                     {task.title}
                                 </Text>
-                                {/* Indicator for linked Goal */}
                                 {task.linked_goal_id && <View style={styles.linkedDot} />}
                             </View>
                         </TouchableOpacity>
@@ -186,21 +184,16 @@ const styles = StyleSheet.create({
       fontWeight: '600',
       color: '#FFF',
   },
-  avatarContainer: {
+  avatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: '#171717',
     borderWidth: 1,
     borderColor: '#333',
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
+    backgroundColor: '#171717',
   },
   scrollContent: {
-    paddingBottom: 130, // Espace pour le FAB et la Nav
+    paddingBottom: 130, 
     paddingTop: 10,
   },
   welcomeSection: {
@@ -212,6 +205,11 @@ const styles = StyleSheet.create({
       fontWeight: '700',
       color: '#FFFFFF',
       letterSpacing: -0.5,
+  },
+  subGreeting: {
+      color: '#888',
+      fontSize: 14,
+      marginTop: 4,
   },
   sectionContainer: {
       marginBottom: 32,

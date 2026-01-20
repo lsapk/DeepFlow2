@@ -6,7 +6,7 @@ import Sidebar from './components/Sidebar';
 import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal } from './types';
 import Dashboard from './pages/Dashboard';
 import Growth from './pages/Growth';
-import Explore from './pages/Explore'; // Deprecated but keeping file structure consistent
+import CyberKnight from './pages/CyberKnight';
 import Focus from './pages/Focus';
 import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
@@ -155,11 +155,9 @@ const App: React.FC = () => {
       const now = new Date();
       const todayDate = now.toISOString().split('T')[0];
       
-      // Check if completed today
       const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toISOString().split('T')[0] === todayDate;
 
       if (isCompletedToday) {
-          // UNCHECK LOGIC
           const newStreak = Math.max(0, habit.streak - 1);
           setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: null } : h));
           await supabase.from('habit_completions').delete().eq('habit_id', id).eq('completed_date', todayDate);
@@ -169,7 +167,6 @@ const App: React.FC = () => {
           await supabase.from('player_profiles').update({ experience_points: newXp }).eq('id', player.id);
 
       } else {
-          // CHECK LOGIC
           const newStreak = habit.streak + 1;
           const nowIso = now.toISOString();
           setHabits(prev => prev.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: nowIso } : h));
@@ -234,6 +231,7 @@ const App: React.FC = () => {
                 toggleHabit={toggleHabit} toggleTask={toggleTask}
                 openFocus={() => setCurrentView(ViewState.FOCUS_MODE)}
                 openMenu={() => setSidebarVisible(true)}
+                openProfile={() => setProfileVisible(true)} // FIXED
                 setView={setCurrentView}
             />
         );
@@ -241,26 +239,40 @@ const App: React.FC = () => {
           return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={addTask} deleteTask={deleteTask} userId={user.id} refreshTasks={() => fetchTasks(user.id)} />;
       case ViewState.HABITS: 
           return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} refreshHabits={() => fetchHabits(user.id)} />;
-      case ViewState.GROWTH:
-          // New Growth: AI + Stats
-        return <Growth player={player} user={user} tasks={tasks} />;
+      case ViewState.GROWTH: // EVOLUTION
+        return <Growth 
+                player={player} 
+                user={user} 
+                tasks={tasks} 
+                openMenu={() => setSidebarVisible(true)}
+                openProfile={() => setProfileVisible(true)}
+               />;
+      case ViewState.CYBER_KNIGHT: // GAMIFICATION HUB
+        return <CyberKnight 
+                player={player} 
+                user={user} 
+                tasks={tasks}
+                openMenu={() => setSidebarVisible(true)}
+                openProfile={() => setProfileVisible(true)}
+               />;
       case ViewState.REFLECTION:
         return <ReflectionPage userId={user.id} />;
-      case ViewState.EXPLORE:
-          // Fallback if needed, but menu points to Growth now
-        return <Growth player={player} user={user} tasks={tasks} />;
       case ViewState.FOCUS_MODE:
         return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} />;
       case ViewState.JOURNAL:
         return <Journal userId={user.id} />;
       default:
-        return <Dashboard 
-            user={user} player={player} tasks={tasks} habits={habits}
-            toggleHabit={toggleHabit} toggleTask={toggleTask}
-            openFocus={() => setCurrentView(ViewState.FOCUS_MODE)}
-            openMenu={() => setSidebarVisible(true)}
-            setView={setCurrentView}
-        />;
+        // Default fallback (usually Dashboard)
+        return (
+            <Dashboard 
+                user={user} player={player} tasks={tasks} habits={habits}
+                toggleHabit={toggleHabit} toggleTask={toggleTask}
+                openFocus={() => setCurrentView(ViewState.FOCUS_MODE)}
+                openMenu={() => setSidebarVisible(true)}
+                openProfile={() => setProfileVisible(true)}
+                setView={setCurrentView}
+            />
+        );
     }
   };
 

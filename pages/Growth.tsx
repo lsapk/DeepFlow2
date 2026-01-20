@@ -1,19 +1,23 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image } from 'react-native';
 import { PlayerProfile, UserProfile, Task } from '../types';
-import { Bot, Gamepad2, Sparkles, Send, Shield } from 'lucide-react-native';
+import { Send, Menu, Sparkles, TrendingUp, BrainCircuit } from 'lucide-react-native';
 import { generateCoaching } from '../services/ai';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface GrowthProps {
   player: PlayerProfile;
   user: UserProfile;
-  tasks: Task[]; // For AI context
+  tasks: Task[]; 
+  openMenu: () => void;
+  openProfile: () => void;
 }
 
-const Growth: React.FC<GrowthProps> = ({ player, user, tasks }) => {
+const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProfile }) => {
+  const insets = useSafeAreaInsets();
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-      { role: 'ai', text: `Bonjour ${user.display_name?.split(' ')[0]} ! Je suis ton Cyber Knight. Prêt à optimiser ta journée ?` }
+      { role: 'ai', text: `Analyse terminée. Je détecte une productivité stable. Comment puis-je t'aider à passer au niveau supérieur ?` }
   ]);
   const [loadingAi, setLoadingAi] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -26,7 +30,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks }) => {
       setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
       setLoadingAi(true);
       
-      // AI Call
       const context = {
           name: user.display_name,
           level: player.level,
@@ -40,10 +43,29 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks }) => {
       setLoadingAi(false);
   };
 
+  const tasksDone = tasks.filter(t => t.completed).length;
+  const totalTasks = tasks.length || 1;
+  const completionRate = Math.round((tasksDone / totalTasks) * 100);
+
+  // Fake chart data bars
+  const chartData = [40, 60, 30, 80, 50, 70, completionRate];
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* UNIFORM HEADER */}
       <View style={styles.header}>
-            <Text style={styles.largeTitle}>QG & IA</Text>
+        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+            <Menu size={24} color="#FFF" />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Évolution</Text>
+
+        <TouchableOpacity onPress={openProfile}>
+            <Image 
+                source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
+                style={styles.avatar} 
+            />
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
@@ -53,36 +75,39 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks }) => {
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         
-        {/* GAMIFICATION STATS */}
-        <View style={styles.statsCard}>
+        {/* SECTION 1: GRAPHIQUE PERTINENT */}
+        <View style={styles.analysisCard}>
             <View style={styles.cardHeader}>
-                 <View style={styles.levelBadge}>
-                     <Shield size={20} color="#000" fill="#FFF" />
-                     <Text style={styles.levelText}>NIVEAU {player.level}</Text>
-                 </View>
-                 <Text style={styles.creditsText}>{player.credits} Crédits</Text>
+                <TrendingUp size={20} color="#C4B5FD" />
+                <Text style={styles.cardTitle}>Productivité Hebdo</Text>
             </View>
             
-            <View style={styles.avatarRow}>
-                {/* Placeholder Avatar - In real app, render based on player.avatar_customization */}
-                 <View style={styles.avatarCircle}>
-                    <Gamepad2 size={40} color="#C4B5FD" />
-                 </View>
-                 <View style={{flex: 1}}>
-                     <Text style={styles.rankTitle}>Cyber Knight</Text>
-                     <Text style={styles.rankSub}>Expérience : {player.experience_points} XP</Text>
-                 </View>
+            <View style={styles.chartContainer}>
+                {chartData.map((val, idx) => (
+                    <View key={idx} style={styles.barWrapper}>
+                        <View style={[styles.bar, { height: `${val}%`, backgroundColor: idx === 6 ? '#C4B5FD' : '#333' }]} />
+                        <Text style={styles.dayLabel}>{['L','M','M','J','V','S','D'][idx]}</Text>
+                    </View>
+                ))}
             </View>
-            
-            <View style={styles.xpBarBg}>
-                <View style={[styles.xpBarFill, { width: `${(player.experience_points % 1000) / 10}%` }]} />
-            </View>
-            <Text style={styles.xpNext}>Prochain niveau dans {1000 - (player.experience_points % 1000)} XP</Text>
+            <Text style={styles.chartFooter}>Votre performance est supérieure de 12% à la semaine dernière.</Text>
         </View>
 
-        <Text style={styles.sectionLabel}>Assistant Tactique</Text>
+        {/* SECTION 2: ANALYSE APPROFONDIE (Resumé IA) */}
+        <View style={styles.insightBox}>
+             <View style={{flexDirection: 'row', gap: 10, marginBottom: 8}}>
+                 <BrainCircuit size={18} color="#4ADE80" />
+                 <Text style={styles.insightTitle}>Analyse Tactique</Text>
+             </View>
+             <Text style={styles.insightText}>
+                 Vous avez complété {tasksDone} tâches critiques. 
+                 L'analyse suggère de se concentrer sur les habitudes matinales pour maximiser le gain d'XP.
+             </Text>
+        </View>
 
-        {/* CHAT INTERFACE */}
+        <Text style={styles.sectionLabel}>Liaison Neurale (Chat IA)</Text>
+
+        {/* SECTION 3: CHAT */}
         <View style={styles.chatContainer}>
             {messages.map((msg, index) => (
                 <View key={index} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
@@ -102,7 +127,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks }) => {
       <View style={styles.inputArea}>
           <TextInput 
             style={styles.textInput}
-            placeholder="Demandez conseil..."
+            placeholder="Interroger l'IA..."
             placeholderTextColor="#666"
             value={chatInput}
             onChangeText={setChatInput}
@@ -120,95 +145,105 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
-    paddingTop: 10,
   },
   header: {
-      paddingHorizontal: 20,
-      marginBottom: 10,
-      paddingTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12, 
+    marginBottom: 10,
   },
-  largeTitle: {
-      fontSize: 32,
-      fontWeight: '700',
+  iconBtn: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  headerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
       color: '#FFF',
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#333',
+    backgroundColor: '#171717',
   },
   scrollContent: {
       paddingBottom: 20,
       paddingHorizontal: 20,
   },
-  statsCard: {
+  
+  // Chart Section
+  analysisCard: {
       backgroundColor: '#171717',
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
       borderColor: '#262626',
-      marginBottom: 24,
+      marginBottom: 16,
   },
   cardHeader: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 16,
+      gap: 10,
+      marginBottom: 20,
   },
-  levelBadge: {
-      backgroundColor: '#C4B5FD',
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
-      gap: 6,
-  },
-  levelText: {
-      color: '#000',
-      fontWeight: '700',
-      fontSize: 12,
-  },
-  creditsText: {
-      color: '#FACC15',
-      fontWeight: '600',
-  },
-  avatarRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
-      marginBottom: 16,
-  },
-  avatarCircle: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      backgroundColor: '#333',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: '#555',
-  },
-  rankTitle: {
+  cardTitle: {
       color: '#FFF',
-      fontSize: 18,
       fontWeight: '600',
+      fontSize: 16,
   },
-  rankSub: {
-      color: '#888',
-      fontSize: 14,
+  chartContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      height: 120,
+      alignItems: 'flex-end',
+      marginBottom: 16,
   },
-  xpBarBg: {
-      height: 8,
-      backgroundColor: '#333',
+  barWrapper: {
+      alignItems: 'center',
+      flex: 1,
+  },
+  bar: {
+      width: 8,
       borderRadius: 4,
-      overflow: 'hidden',
       marginBottom: 6,
   },
-  xpBarFill: {
-      height: '100%',
-      backgroundColor: '#C4B5FD',
-  },
-  xpNext: {
+  dayLabel: {
       color: '#666',
-      fontSize: 11,
-      textAlign: 'right',
+      fontSize: 10,
   },
+  chartFooter: {
+      color: '#888',
+      fontSize: 12,
+      fontStyle: 'italic',
+  },
+
+  // Insight Section
+  insightBox: {
+      backgroundColor: 'rgba(74, 222, 128, 0.05)',
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: 'rgba(74, 222, 128, 0.2)',
+      marginBottom: 24,
+  },
+  insightTitle: {
+      color: '#4ADE80',
+      fontWeight: '700',
+      fontSize: 14,
+  },
+  insightText: {
+      color: '#DDD',
+      fontSize: 14,
+      lineHeight: 20,
+  },
+
   sectionLabel: {
       color: '#666',
       fontSize: 13,
@@ -216,6 +251,8 @@ const styles = StyleSheet.create({
       marginBottom: 12,
       textTransform: 'uppercase',
   },
+  
+  // Chat
   chatContainer: {
       flex: 1,
       gap: 12,
@@ -252,6 +289,7 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
+      marginBottom: 80, // Space for BottomNav
   },
   textInput: {
       flex: 1,

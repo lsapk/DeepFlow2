@@ -128,8 +128,8 @@ export interface Reflection {
 export enum ViewState {
   AUTH = 'AUTH',
   TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
-  GROWTH = 'GROWTH',    // AI + Stats + Gamification
-  EXPLORE = 'EXPLORE',  // Deprecated / Merged into Growth
+  GROWTH = 'GROWTH',    // AI + Stats (Evolution)
+  CYBER_KNIGHT = 'CYBER_KNIGHT',  // Gamification hub
   FOCUS_MODE = 'FOCUS_MODE', // Full screen focus
   TASKS = 'TASKS',
   HABITS = 'HABITS',

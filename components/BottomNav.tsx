@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { LayoutDashboard, TrendingUp, Compass } from 'lucide-react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { LayoutDashboard, BrainCircuit, Gamepad2 } from 'lucide-react-native';
 import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,9 +13,9 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
   const insets = useSafeAreaInsets();
   
   const navItems = [
-    { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Today' },
-    { view: ViewState.GROWTH, icon: TrendingUp, label: 'Growth' },
-    { view: ViewState.EXPLORE, icon: Compass, label: 'Explore' },
+    { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Aujourd\'hui' },
+    { view: ViewState.GROWTH, icon: BrainCircuit, label: 'Évolution' }, // IA & Analyse
+    { view: ViewState.CYBER_KNIGHT, icon: Gamepad2, label: 'Cyber Knight' }, // Gamification
   ];
 
   return (
@@ -39,7 +39,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
           >
             <View style={[styles.iconContainer, isActive && styles.activeIconContainer]}>
                 <Icon 
-                    size={26} 
+                    size={28} 
                     color={isActive ? '#FFFFFF' : '#555555'} 
                     strokeWidth={isActive ? 2.5 : 2}
                 />
@@ -77,8 +77,7 @@ const styles = StyleSheet.create({
       borderRadius: 12,
   },
   activeIconContainer: {
-      // Optional: Add subtle background for active state if desired
-      // backgroundColor: '#1C1C1E', 
+     // backgroundColor: '#1C1C1E', // Optional background for active state
   },
 });
 
