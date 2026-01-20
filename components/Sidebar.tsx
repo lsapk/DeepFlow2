@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
 import { UserProfile, ViewState } from '../types';
-import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, LogOut, BrainCircuit, Calendar } from 'lucide-react-native';
+import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Calendar } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SidebarProps {
@@ -10,13 +10,12 @@ interface SidebarProps {
   user: UserProfile | null;
   setView: (view: ViewState) => void;
   currentView: ViewState;
-  onLogout: () => void;
+  onLogout: () => void; // Gardé pour compatibilité props, mais non utilisé dans le rendu
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, currentView, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, currentView }) => {
   const insets = useSafeAreaInsets();
 
-  // Ordre demandé : taches, habitudes, objectifs, focus, journal, reflexion, calendrier, croissance et IA
   const menuItems = [
     { icon: LayoutDashboard, label: 'Tableau de bord', view: ViewState.TODAY },
     { icon: CheckSquare, label: 'Tâches', view: ViewState.TASKS },
@@ -37,20 +36,11 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
         <View style={styles.overlay}>
-            {/* Backdrop clickable */}
-            <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
-            
-            {/* Drawer (Right Side Animation implied by layout, but standard is left. 
-                Keeping structure but user asked for Menu Button on Top Right, usually implies Right Drawer or just button location.
-                Keeping Drawer on Left for standard UX, but button triggers it.) 
-            */}
+            {/* Drawer à Gauche */}
             <View style={[styles.drawer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
                 
+                {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                         <X size={26} color="#FFF" />
-                     </TouchableOpacity>
-                     
                      {user && (
                         <View style={styles.userInfo}>
                              <Image 
@@ -63,6 +53,9 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
                              </View>
                         </View>
                      )}
+                     <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                         <X size={24} color="#888" />
+                     </TouchableOpacity>
                 </View>
 
                 <View style={styles.divider} />
@@ -87,16 +80,15 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
                         })}
                     </View>
                 </ScrollView>
-
-                <View style={styles.divider} />
-
-                <View style={styles.footer}>
-                     <TouchableOpacity style={styles.footerItem} onPress={onLogout}>
-                         <LogOut size={20} color="#EF4444" />
-                         <Text style={[styles.menuText, { color: '#EF4444' }]}>Déconnexion</Text>
-                     </TouchableOpacity>
+                
+                {/* Footer retiré comme demandé (Logout uniquement dans le profil) */}
+                <View style={styles.footerInfo}>
+                    <Text style={styles.versionText}>DeepFlow v1.0.2</Text>
                 </View>
             </View>
+
+            {/* Backdrop à Droite */}
+            <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
         </View>
     </Modal>
   );
@@ -105,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
 const styles = StyleSheet.create({
   overlay: {
       flex: 1,
-      flexDirection: 'row',
+      flexDirection: 'row', // Assure que le drawer est à gauche
   },
   backdrop: {
       flex: 1,
@@ -113,36 +105,41 @@ const styles = StyleSheet.create({
   },
   drawer: {
       width: '80%', 
-      maxWidth: 320,
-      backgroundColor: '#111',
+      maxWidth: 300,
+      backgroundColor: '#090909',
       height: '100%',
       borderRightWidth: 1,
       borderRightColor: '#262626',
       display: 'flex',
       flexDirection: 'column',
+      shadowColor: "#000",
+      shadowOffset: { width: 2, height: 0 },
+      shadowOpacity: 0.5,
+      shadowRadius: 10,
+      elevation: 10,
   },
   header: {
       paddingHorizontal: 20,
       paddingBottom: 20,
       paddingTop: 10,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
   },
   closeBtn: {
-      alignSelf: 'flex-end',
-      padding: 8,
-      marginBottom: 10,
-      backgroundColor: '#222',
-      borderRadius: 20,
+      padding: 4,
   },
   userInfo: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+      flex: 1,
   },
   avatar: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      borderWidth: 2,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
       borderColor: '#333',
   },
   userText: {
@@ -151,16 +148,16 @@ const styles = StyleSheet.create({
   userName: {
       color: '#FFF',
       fontWeight: '700',
-      fontSize: 18,
+      fontSize: 16,
       marginBottom: 2,
   },
   userEmail: {
-      color: '#888',
-      fontSize: 12,
+      color: '#666',
+      fontSize: 11,
   },
   divider: {
       height: 1,
-      backgroundColor: '#262626',
+      backgroundColor: '#1C1C1E',
       width: '100%',
   },
   menuScroll: {
@@ -168,7 +165,7 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
       padding: 16,
-      gap: 4,
+      gap: 6,
   },
   menuItem: {
       flexDirection: 'row',
@@ -182,16 +179,14 @@ const styles = StyleSheet.create({
       backgroundColor: '#FFF',
   },
   iconBox: {
-      width: 32,
-      height: 32,
+      width: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 8,
   },
   iconBoxActive: {
   },
   menuText: {
-      color: '#CCC',
+      color: '#999',
       fontSize: 15,
       fontWeight: '500',
   },
@@ -199,19 +194,13 @@ const styles = StyleSheet.create({
       color: '#000',
       fontWeight: '700',
   },
-  footer: {
-      padding: 16,
-      backgroundColor: '#000',
-  },
-  footerItem: {
-      flexDirection: 'row',
+  footerInfo: {
+      padding: 20,
       alignItems: 'center',
-      padding: 16,
-      gap: 12,
-      backgroundColor: '#1A0505',
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: '#331111',
+  },
+  versionText: {
+      color: '#333',
+      fontSize: 10,
   }
 });
 

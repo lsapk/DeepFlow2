@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
-import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Tag } from 'lucide-react-native';
+import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Tag, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { addXp, REWARDS } from '../services/gamification';
 
 interface JournalProps {
   userId: string;
+  openMenu?: () => void;
 }
 
-const Journal: React.FC<JournalProps> = ({ userId }) => {
+const Journal: React.FC<JournalProps> = ({ userId, openMenu }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   
@@ -42,7 +43,7 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
           title,
           content,
           mood,
-          tags: tagsArray, // Suppose the backend can handle this or it's a JSONB field
+          tags: tagsArray,
           created_at: new Date().toISOString()
       });
 
@@ -64,6 +65,16 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
       }
   };
 
+  const getCardMoodIcon = (m: string) => {
+      switch(m) {
+          case 'happy': return <Smile size={18} color="#4ADE80" />;
+          case 'sad': return <Frown size={18} color="#F87171" />;
+          case 'energetic': return <Zap size={18} color="#FACC15" />;
+          case 'tired': return <Coffee size={18} color="#A8A29E" />;
+          default: return <Meh size={18} color="#9CA3AF" />;
+      }
+  };
+
   const getMoodIcon = (m: string, size = 20, active = true) => {
       const color = active ? (m === mood ? '#FFF' : '#666') : '#FFF';
       switch(m) {
@@ -75,20 +86,17 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
       }
   };
 
-  const getCardMoodIcon = (m: string) => {
-      switch(m) {
-          case 'happy': return <Smile size={18} color="#4ADE80" />;
-          case 'sad': return <Frown size={18} color="#F87171" />;
-          case 'energetic': return <Zap size={18} color="#FACC15" />;
-          case 'tired': return <Coffee size={18} color="#A8A29E" />;
-          default: return <Meh size={18} color="#9CA3AF" />;
-      }
-  };
-
   return (
     <View style={styles.container}>
         <View style={styles.header}>
-            <Text style={styles.largeTitle}>Journal</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+                {openMenu && (
+                    <TouchableOpacity style={styles.menuBtn} onPress={openMenu}>
+                        <Menu size={24} color="#FFF" />
+                    </TouchableOpacity>
+                )}
+                <Text style={styles.largeTitle}>Journal</Text>
+            </View>
             <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addButton}>
                 <Plus size={24} color="#000" />
             </TouchableOpacity>
@@ -108,7 +116,6 @@ const Journal: React.FC<JournalProps> = ({ userId }) => {
                     </View>
                     <Text style={styles.cardTitle}>{entry.title}</Text>
                     <Text style={styles.cardContent} numberOfLines={3}>{entry.content}</Text>
-                    {/* Display tags if available (assuming data structure) */}
                 </View>
             ))}
         </ScrollView>
@@ -191,6 +198,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12, 
     marginBottom: 10,
+  },
+  menuBtn: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
   },
   largeTitle: {
     fontSize: 32,

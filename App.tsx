@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, StatusBar, View, ActivityIndicator, Modal, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView, StatusBar, View, ActivityIndicator, Modal, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -17,7 +17,7 @@ import ReflectionPage from './pages/Reflection';
 import CalendarPage from './pages/CalendarPage';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabase';
-import { Trophy } from 'lucide-react-native';
+import { Trophy, Bell } from 'lucide-react-native';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.AUTH);
@@ -35,9 +35,50 @@ const App: React.FC = () => {
   const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Notifications Logic State
+  const [lastCheck, setLastCheck] = useState(Date.now());
+
   // Level Up State
   const [showLevelUp, setShowLevelUp] = useState(false);
   const prevLevelRef = useRef<number | null>(null);
+
+  // --- NOTIFICATION SYSTEM (In-App) ---
+  useEffect(() => {
+      // Vérification périodique des notifications (toutes les minutes)
+      const interval = setInterval(() => {
+          checkNotifications();
+      }, 60000);
+      return () => clearInterval(interval);
+  }, [tasks, habits]);
+
+  const checkNotifications = async () => {
+      const now = new Date();
+      
+      // 1. Check Focus Sessions (Simulated via Supabase or local state if active)
+      // Note: Focus page manages its own timer, but we can check if a session ended recently in DB
+      const { data: recentFocus } = await supabase.from('focus_sessions')
+        .select('*')
+        .eq('user_id', user?.id)
+        .gte('completed_at', new Date(now.getTime() - 60000).toISOString())
+        .limit(1);
+        
+      if (recentFocus && recentFocus.length > 0) {
+          // Notification already handled by Focus page completion alert, but global backup:
+          // console.log("Focus terminé détecté globalement");
+      }
+
+      // 2. Check Tasks Due Soon (within next hour)
+      tasks.forEach(task => {
+          if (!task.completed && task.due_date) {
+              const due = new Date(task.due_date);
+              const diff = due.getTime() - now.getTime();
+              // If due in less than 30 mins and positive
+              if (diff > 0 && diff < 30 * 60 * 1000) {
+                  Alert.alert("Rappel Tâche", `La tâche "${task.title}" arrive à échéance bientôt !`);
+              }
+          }
+      });
+  };
 
   // --- INITIALIZATION ---
   useEffect(() => {
@@ -288,7 +329,7 @@ const App: React.FC = () => {
       case ViewState.FOCUS_MODE:
         return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} />;
       case ViewState.JOURNAL:
-        return <Journal userId={user.id} />;
+        return <Journal userId={user.id} openMenu={() => setSidebarVisible(true)} />;
       default:
         return (
             <Dashboard 
