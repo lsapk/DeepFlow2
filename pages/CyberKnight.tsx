@@ -12,6 +12,7 @@ interface CyberKnightProps {
   quests: Quest[];
   openMenu: () => void;
   openProfile: () => void;
+  isDarkMode?: boolean;
 }
 
 // Config Boutique (Items statiques pour l'instant, transaction réelle)
@@ -21,14 +22,14 @@ const SHOP_ITEMS = [
     { id: 'mystery_box', title: 'Coffre Mystère', desc: 'Récompense aléatoire', price: 1000, icon: Gift, color: '#FACC15' }
 ];
 
-// Config Achievements (Définitions statiques, déblocage réel)
+// Config Achievements
 const ACHIEVEMENTS_DEF = [
     { id: 'novice', title: 'Novice', desc: 'Atteignez le niveau 2.', icon: Trophy },
     { id: 'quest_master', title: 'Mercenaire', desc: 'Complétez 10 quêtes.', icon: Shield },
     { id: 'rich', title: 'Riche', desc: 'Cumulez 500 crédits.', icon: ShoppingBag },
 ];
 
-const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMenu, openProfile }) => {
+const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMenu, openProfile, isDarkMode = true }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'STATUS' | 'SHOP' | 'ACHIEVEMENTS'>('STATUS');
   const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
@@ -37,6 +38,16 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   const xpRequired = getXpForNextLevel(player.level);
   const xpProgress = (player.experience_points / xpRequired) * 100;
   
+  const colors = {
+      bg: isDarkMode ? '#000000' : '#F2F2F7',
+      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      text: isDarkMode ? '#FFFFFF' : '#000000',
+      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      accent: '#C4B5FD',
+      button: '#007AFF'
+  };
+
   useEffect(() => {
       fetchUnlockedAchievements();
   }, [user.id]);
@@ -57,13 +68,11 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       Alert.alert("Confirmer", `Acheter ${item.title} pour ${item.price} crédits ?`, [
           { text: "Annuler", style: "cancel" },
           { text: "Acheter", onPress: async () => {
-              // 1. Deduct credits
               const { error } = await supabase.from('player_profiles')
                 .update({ credits: player.credits - item.price })
                 .eq('user_id', user.id);
               
               if (!error) {
-                  // 2. Add item to active_powerups table
                   await supabase.from('active_powerups').insert({
                       user_id: user.id,
                       powerup_type: item.id,
@@ -80,40 +89,40 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       <>
         {/* AVATAR HERO SECTION */}
         <View style={styles.heroSection}>
-            <View style={styles.avatarGlow}>
-                <View style={styles.avatarContainer}>
+            <View style={[styles.avatarGlow, { backgroundColor: isDarkMode ? 'rgba(196, 181, 253, 0.1)' : 'rgba(196, 181, 253, 0.3)', borderColor: colors.accent }]}>
+                <View style={[styles.avatarContainer, {backgroundColor: colors.accent}]}>
                      <Gamepad2 size={60} color="#000" />
                 </View>
             </View>
-            <Text style={styles.heroRank}>{player.avatar_type.toUpperCase().replace('_', ' ')}</Text>
-            <View style={styles.heroLevelBadge}>
-                <Text style={styles.heroLevelText}>NIVEAU {player.level}</Text>
+            <Text style={[styles.heroRank, {color: colors.text}]}>{player.avatar_type.toUpperCase().replace('_', ' ')}</Text>
+            <View style={[styles.heroLevelBadge, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}]}>
+                <Text style={[styles.heroLevelText, {color: colors.text}]}>NIVEAU {player.level}</Text>
             </View>
         </View>
 
         {/* STATS GRID */}
         <View style={styles.statsGrid}>
-             <View style={styles.statBox}>
+             <View style={[styles.statBox, {backgroundColor: colors.cardBg, borderColor: colors.border}]}>
                  <Text style={styles.statLabel}>XP TOTAL</Text>
                  <Text style={[styles.statValue, { color: '#C4B5FD' }]}>{player.experience_points}</Text>
              </View>
-             <View style={styles.statBox}>
+             <View style={[styles.statBox, {backgroundColor: colors.cardBg, borderColor: colors.border}]}>
                  <Text style={styles.statLabel}>CRÉDITS</Text>
                  <Text style={[styles.statValue, { color: '#FACC15' }]}>{player.credits}</Text>
              </View>
-             <View style={styles.statBox}>
+             <View style={[styles.statBox, {backgroundColor: colors.cardBg, borderColor: colors.border}]}>
                  <Text style={styles.statLabel}>QUÊTES</Text>
                  <Text style={[styles.statValue, { color: '#4ADE80' }]}>{player.total_quests_completed || 0}</Text>
              </View>
         </View>
 
         {/* PROGRESSION BAR */}
-        <View style={styles.progressCard}>
+        <View style={[styles.progressCard, {backgroundColor: colors.cardBg, borderColor: colors.border}]}>
             <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8}}>
-                <Text style={styles.progressLabel}>Vers Niv. {player.level + 1}</Text>
+                <Text style={[styles.progressLabel, {color: colors.text}]}>Vers Niv. {player.level + 1}</Text>
                 <Text style={styles.progressPercent}>{Math.min(100, Math.round(xpProgress))}%</Text>
             </View>
-            <View style={styles.xpBarBg}>
+            <View style={[styles.xpBarBg, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}]}>
                 <View style={[styles.xpBarFill, { width: `${Math.min(100, xpProgress)}%` }]} />
             </View>
             <Text style={styles.progressSub}>{Math.max(0, xpRequired - player.experience_points)} XP requis</Text>
@@ -121,17 +130,17 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
 
         <Text style={styles.sectionLabel}>Quêtes Disponibles</Text>
         {quests.length === 0 ? (
-             <View style={styles.emptyContainer}>
+             <View style={[styles.emptyContainer, {backgroundColor: colors.cardBg}]}>
                  <Text style={styles.emptyText}>Aucune quête disponible. Revenez demain !</Text>
              </View>
         ) : (
             quests.map(quest => (
-                <View key={quest.id} style={styles.questCard}>
-                    <View style={styles.questIcon}>
-                        <Target size={20} color="#FFF" />
+                <View key={quest.id} style={[styles.questCard, {backgroundColor: colors.cardBg, borderColor: colors.border}]}>
+                    <View style={[styles.questIcon, {backgroundColor: isDarkMode ? '#333' : '#F2F2F7'}]}>
+                        <Target size={20} color={colors.text} />
                     </View>
                     <View style={{flex: 1}}>
-                        <Text style={styles.questTitle}>{quest.title}</Text>
+                        <Text style={[styles.questTitle, {color: colors.text}]}>{quest.title}</Text>
                         <Text style={styles.questDesc} numberOfLines={1}>{quest.description}</Text>
                         <View style={{flexDirection: 'row', gap: 10, marginTop: 4}}>
                             <Text style={styles.questReward}>+{quest.reward_xp} XP</Text>
@@ -148,15 +157,15 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   const renderShop = () => (
       <View style={{ gap: 16 }}>
           {SHOP_ITEMS.map((item) => (
-              <View key={item.id} style={styles.shopItem}>
+              <View key={item.id} style={[styles.shopItem, {backgroundColor: colors.cardBg, borderColor: colors.border}]}>
                 <View style={[styles.shopIcon, { backgroundColor: `${item.color}33` }]}>
                     <item.icon size={24} color={item.color} />
                 </View>
                 <View style={{flex: 1}}>
-                    <Text style={styles.shopTitle}>{item.title}</Text>
+                    <Text style={[styles.shopTitle, {color: colors.text}]}>{item.title}</Text>
                     <Text style={styles.shopDesc}>{item.desc}</Text>
                 </View>
-                <TouchableOpacity style={styles.buyBtn} onPress={() => handleBuy(item)}>
+                <TouchableOpacity style={[styles.buyBtn, {backgroundColor: isDarkMode ? '#333' : '#F2F2F7'}]} onPress={() => handleBuy(item)}>
                     <Text style={styles.buyText}>{item.price} 🪙</Text>
                 </TouchableOpacity>
             </View>
@@ -169,10 +178,10 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
           {ACHIEVEMENTS_DEF.map((ach) => {
               const isUnlocked = unlockedAchievements.has(ach.id);
               return (
-                <View key={ach.id} style={[styles.achieveCard, !isUnlocked && styles.achieveLocked]}>
+                <View key={ach.id} style={[styles.achieveCard, {backgroundColor: colors.cardBg, borderColor: colors.border}, !isUnlocked && styles.achieveLocked]}>
                     <ach.icon size={24} color={isUnlocked ? "#FACC15" : "#666"} />
                     <View style={{flex: 1}}>
-                        <Text style={[styles.achieveTitle, !isUnlocked && { color: '#888' }]}>{ach.title}</Text>
+                        <Text style={[styles.achieveTitle, {color: colors.text}, !isUnlocked && { color: '#888' }]}>{ach.title}</Text>
                         <Text style={styles.achieveDesc}>{ach.desc}</Text>
                     </View>
                     {isUnlocked && <CheckCircle size={20} color="#4ADE80" />}
@@ -183,14 +192,17 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       {/* UNIFORM HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-            <Menu size={24} color="#FFF" />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Cyber Knight</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+             {openMenu && (
+                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                      <Menu size={24} color={colors.button} />
+                  </TouchableOpacity>
+             )}
+            <Text style={[styles.largeTitle, {color: colors.text}]}>Cyber Knight</Text>
+        </View>
 
         <TouchableOpacity onPress={openProfile}>
             <Image 
@@ -201,14 +213,14 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       </View>
       
       {/* TABS */}
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, {borderBottomColor: colors.border}]}>
           {(['STATUS', 'SHOP', 'ACHIEVEMENTS'] as const).map(tab => (
               <TouchableOpacity 
                 key={tab} 
-                style={[styles.tab, activeTab === tab && styles.activeTab]}
+                style={[styles.tab, activeTab === tab && {borderBottomColor: colors.accent}]}
                 onPress={() => setActiveTab(tab)}
               >
-                  <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                  <Text style={[styles.tabText, activeTab === tab && {color: colors.text}]}>
                       {tab === 'STATUS' ? 'QG' : tab === 'SHOP' ? 'BOUTIQUE' : 'SUCCÈS'}
                   </Text>
               </TouchableOpacity>
@@ -227,14 +239,14 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12, 
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginTop: 10,
     marginBottom: 10,
   },
   iconBtn: {
@@ -243,10 +255,10 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
   },
-  headerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#FFF',
+  largeTitle: {
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: 0.35,
   },
   avatar: {
     width: 36,
@@ -254,30 +266,23 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#333',
-    backgroundColor: '#171717',
   },
   tabContainer: {
       flexDirection: 'row',
       paddingHorizontal: 20,
       marginBottom: 20,
       borderBottomWidth: 1,
-      borderBottomColor: '#262626',
   },
   tab: {
       paddingVertical: 12,
       marginRight: 24,
-  },
-  activeTab: {
       borderBottomWidth: 2,
-      borderBottomColor: '#C4B5FD',
+      borderBottomColor: 'transparent',
   },
   tabText: {
-      color: '#666',
+      color: '#8E8E93',
       fontWeight: '700',
       fontSize: 12,
-  },
-  activeTabText: {
-      color: '#FFF',
   },
   scrollContent: {
       paddingBottom: 120,
@@ -294,36 +299,30 @@ const styles = StyleSheet.create({
       width: 120,
       height: 120,
       borderRadius: 60,
-      backgroundColor: 'rgba(196, 181, 253, 0.1)',
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: 'rgba(196, 181, 253, 0.3)',
   },
   avatarContainer: {
       width: 90,
       height: 90,
       borderRadius: 45,
-      backgroundColor: '#C4B5FD',
       alignItems: 'center',
       justifyContent: 'center',
   },
   heroRank: {
       fontSize: 24,
       fontWeight: '700',
-      color: '#FFF',
       marginBottom: 8,
       letterSpacing: 1,
   },
   heroLevelBadge: {
-      backgroundColor: '#333',
       paddingHorizontal: 16,
       paddingVertical: 6,
       borderRadius: 20,
   },
   heroLevelText: {
-      color: '#FFF',
       fontWeight: '700',
       fontSize: 12,
   },
@@ -336,15 +335,13 @@ const styles = StyleSheet.create({
   },
   statBox: {
       flex: 1,
-      backgroundColor: '#171717',
       padding: 16,
       borderRadius: 16,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#262626',
   },
   statLabel: {
-      color: '#666',
+      color: '#8E8E93',
       fontSize: 10,
       fontWeight: '700',
       marginBottom: 4,
@@ -356,24 +353,20 @@ const styles = StyleSheet.create({
 
   // PROGRESS
   progressCard: {
-      backgroundColor: '#171717',
       padding: 20,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: '#262626',
       marginBottom: 30,
   },
   progressLabel: {
-      color: '#FFF',
       fontWeight: '600',
       fontSize: 14,
   },
   progressPercent: {
-      color: '#888',
+      color: '#8E8E93',
   },
   xpBarBg: {
       height: 10,
-      backgroundColor: '#333',
       borderRadius: 5,
       overflow: 'hidden',
       marginBottom: 8,
@@ -383,14 +376,14 @@ const styles = StyleSheet.create({
       backgroundColor: '#C4B5FD',
   },
   progressSub: {
-      color: '#666',
+      color: '#8E8E93',
       fontSize: 12,
       textAlign: 'right',
   },
 
   sectionLabel: {
-      color: '#666',
-      fontSize: 13,
+      color: '#8E8E93',
+      fontSize: 12,
       fontWeight: '600',
       marginBottom: 12,
       textTransform: 'uppercase',
@@ -400,29 +393,25 @@ const styles = StyleSheet.create({
   questCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#171717',
       padding: 16,
-      borderRadius: 12,
+      borderRadius: 16,
       marginBottom: 10,
       borderWidth: 1,
-      borderColor: '#262626',
   },
   questIcon: {
       width: 40,
       height: 40,
       borderRadius: 12,
-      backgroundColor: '#333',
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 12,
   },
   questTitle: {
-      color: '#FFF',
       fontSize: 15,
       fontWeight: '600',
   },
   questDesc: {
-      color: '#888',
+      color: '#8E8E93',
       fontSize: 12,
   },
   questReward: {
@@ -441,11 +430,10 @@ const styles = StyleSheet.create({
   emptyContainer: {
       padding: 20,
       alignItems: 'center',
-      backgroundColor: '#171717',
       borderRadius: 12,
   },
   emptyText: {
-      color: '#666',
+      color: '#8E8E93',
       fontStyle: 'italic',
   },
 
@@ -453,12 +441,10 @@ const styles = StyleSheet.create({
   shopItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#171717',
       padding: 16,
       borderRadius: 16,
       gap: 16,
       borderWidth: 1,
-      borderColor: '#262626',
   },
   shopIcon: {
       width: 48,
@@ -468,17 +454,15 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
   },
   shopTitle: {
-      color: '#FFF',
       fontWeight: '600',
       fontSize: 16,
   },
   shopDesc: {
-      color: '#888',
+      color: '#8E8E93',
       fontSize: 12,
       marginTop: 4,
   },
   buyBtn: {
-      backgroundColor: '#333',
       paddingVertical: 8,
       paddingHorizontal: 12,
       borderRadius: 8,
@@ -493,22 +477,18 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       gap: 16,
-      backgroundColor: '#171717',
       padding: 16,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: '#262626',
   },
   achieveLocked: {
       opacity: 0.5,
-      borderColor: '#333',
   },
   achieveTitle: {
-      color: '#FFF',
       fontWeight: '600',
   },
   achieveDesc: {
-      color: '#666',
+      color: '#8E8E93',
       fontSize: 12,
   }
 });

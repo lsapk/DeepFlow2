@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Switch, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { PlayerProfile, UserProfile, Task } from '../types';
-import { Send, Menu, TrendingUp, Clock, BarChart2, PieChart, Activity, Mic, Zap } from 'lucide-react-native';
+import { Send, Menu, TrendingUp, Clock, BarChart2, Activity, Mic } from 'lucide-react-native';
 import { generateActionableCoaching } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
@@ -24,11 +24,13 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
   
   const colors = {
       bg: isDarkMode ? '#000' : '#F2F2F7',
-      card: isDarkMode ? '#171717' : '#FFF',
+      card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       text: isDarkMode ? '#FFF' : '#000',
-      subText: isDarkMode ? '#CCC' : '#666',
-      border: isDarkMode ? '#262626' : '#E5E5EA',
-      inputBg: isDarkMode ? '#000' : '#F2F2F7'
+      subText: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      inputBg: isDarkMode ? '#000' : '#F2F2F7',
+      accent: '#C4B5FD',
+      button: '#007AFF'
   };
 
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ANALYTICS' | 'AI_COACH'>('OVERVIEW');
@@ -45,7 +47,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
   const [totalFocusTime, setTotalFocusTime] = useState(0);
   const [bestDay, setBestDay] = useState('N/A');
   const [taskCompletionRate, setTaskCompletionRate] = useState(0);
-  const [tasksByPriority, setTasksByPriority] = useState({ high: 0, medium: 0, low: 0 });
 
   useEffect(() => {
       fetchRealFocusStats();
@@ -56,17 +57,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
       const total = tasks.length;
       if (total === 0) {
           setTaskCompletionRate(0);
-          setTasksByPriority({ high: 0, medium: 0, low: 0 });
           return;
       }
       const completed = tasks.filter(t => t.completed).length;
       setTaskCompletionRate(Math.round((completed / total) * 100));
-
-      setTasksByPriority({
-          high: tasks.filter(t => t.priority === 'high' && !t.completed).length,
-          medium: tasks.filter(t => t.priority === 'medium' && !t.completed).length,
-          low: tasks.filter(t => t.priority === 'low' && !t.completed).length,
-      });
   };
 
   const fetchRealFocusStats = async () => {
@@ -280,7 +274,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
                     onChangeText={setChatInput}
                     onSubmitEditing={sendMessage}
                 />
-                <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
+                <TouchableOpacity style={[styles.sendBtn, {backgroundColor: colors.button}]} onPress={sendMessage}>
                     <Send size={20} color="#FFF" />
                 </TouchableOpacity>
             </View>
@@ -291,10 +285,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-            <Menu size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+             {openMenu && (
+                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                      <Menu size={24} color={colors.button} />
+                  </TouchableOpacity>
+             )}
+            <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
+        </View>
         <TouchableOpacity onPress={openProfile}>
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
@@ -305,7 +303,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
 
       <View style={[styles.tabBar, {borderColor: colors.border}]}>
           {(['OVERVIEW', 'ANALYTICS', 'AI_COACH'] as const).map(tab => (
-              <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[styles.tabItem, activeTab === tab && styles.tabActive]}>
+              <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[styles.tabItem, activeTab === tab && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
                   <Text style={[styles.tabText, activeTab === tab && {color: colors.text}]}>{tab}</Text>
               </TouchableOpacity>
           ))}
@@ -334,6 +332,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12, 
+    marginTop: 10,
+    marginBottom: 10,
   },
   iconBtn: {
       width: 40,
@@ -342,8 +342,9 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
   },
   headerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: 0.35,
   },
   avatar: {
     width: 36,
@@ -362,12 +363,8 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       paddingVertical: 14,
   },
-  tabActive: {
-      borderBottomWidth: 2,
-      borderBottomColor: '#C4B5FD',
-  },
   tabText: {
-      color: '#666',
+      color: '#8E8E93',
       fontWeight: '600',
       fontSize: 12,
   },
@@ -520,7 +517,6 @@ const styles = StyleSheet.create({
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#007AFF',
       alignItems: 'center',
       justifyContent: 'center',
   }

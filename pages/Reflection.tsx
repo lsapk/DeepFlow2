@@ -22,10 +22,12 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
 
   const colors = {
       bg: isDarkMode ? '#000' : '#F2F2F7',
-      card: isDarkMode ? '#171717' : '#FFF',
+      card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       text: isDarkMode ? '#FFF' : '#000',
-      subText: isDarkMode ? '#888' : '#666',
-      border: isDarkMode ? '#262626' : '#DDD'
+      subText: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#DDD',
+      accent: '#C4B5FD',
+      button: '#007AFF'
   };
 
   useEffect(() => {
@@ -79,16 +81,16 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
   return (
     <View style={[styles.container, {backgroundColor: colors.bg}]}>
       <View style={styles.header}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
             {openMenu && (
-                 <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
-                      <Menu size={24} color={colors.text} />
+                 <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                      <Menu size={24} color={colors.button} />
                  </TouchableOpacity>
             )}
             <Text style={[styles.largeTitle, {color: colors.text}]}>Réflexion</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openNewSession}>
-            <Plus size={24} color="#000" />
+            <Plus size={24} color={colors.button} />
         </TouchableOpacity>
       </View>
 
@@ -97,17 +99,17 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
               <View style={styles.emptyState}>
                   <BrainCircuit size={60} color={colors.subText} style={{marginBottom: 20}} />
                   <Text style={[styles.emptyText, {color: colors.subText}]}>Prenez un moment pour vous.</Text>
-                  <TouchableOpacity style={styles.ctaBtn} onPress={openNewSession}>
+                  <TouchableOpacity style={[styles.ctaBtn, {backgroundColor: colors.accent}]} onPress={openNewSession}>
                       <Text style={styles.ctaText}>Commencer</Text>
                   </TouchableOpacity>
               </View>
           ) : (
               reflections.map((ref) => (
-                  <View key={ref.id} style={[styles.card, {backgroundColor: colors.card, borderColor: colors.border}]}>
+                  <View key={ref.id} style={[styles.card, {backgroundColor: colors.card}]}>
                       <View style={styles.cardHeader}>
-                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                              <Sparkles size={16} color="#C4B5FD" />
-                              <Text style={styles.date}>{new Date(ref.created_at).toLocaleDateString()}</Text>
+                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                              <Sparkles size={14} color={colors.accent} fill={colors.accent} />
+                              <Text style={styles.date}>{new Date(ref.created_at).toLocaleDateString('fr-FR')}</Text>
                           </View>
                       </View>
                       <Text style={[styles.questionText, {color: colors.text}]}>{ref.question}</Text>
@@ -120,43 +122,42 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
 
       {/* MODAL */}
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
-          <View style={[styles.modalOverlay, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7'}]}>
-              <View style={styles.modalContent}>
+          <View style={[styles.modalOverlay, {backgroundColor: colors.bg}]}>
+              <View style={[styles.modalContent, {backgroundColor: colors.card}]}>
                   <View style={styles.modalHeader}>
                       <Text style={[styles.modalTitle, {color: colors.text}]}>Introspection</Text>
                       <TouchableOpacity onPress={() => setModalVisible(false)}>
-                          <X size={24} color={colors.text} />
+                           <Text style={{color: colors.button, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
                       </TouchableOpacity>
                   </View>
 
                   <ScrollView showsVerticalScrollIndicator={false}>
-                      <View style={styles.aiBox}>
+                      <View style={[styles.aiBox, {backgroundColor: 'rgba(196, 181, 253, 0.15)'}]}>
                           <View style={styles.aiLabel}>
-                              <Sparkles size={16} color="#000" />
-                              <Text style={styles.aiLabelText}>Question générée par IA</Text>
+                              <Sparkles size={14} color={colors.accent} />
+                              <Text style={[styles.aiLabelText, {color: colors.accent}]}>Question générée par IA</Text>
                           </View>
-                          <Text style={styles.generatedQuestion}>
+                          <Text style={[styles.generatedQuestion, {color: colors.text}]}>
                               {loadingQ ? "Génération en cours..." : question}
                           </Text>
                           <TouchableOpacity style={styles.regenBtn} onPress={getNewQuestion} disabled={loadingQ}>
-                              <RefreshCw size={14} color="#000" style={{marginRight: 6}} />
-                              <Text style={styles.regenText}>Autre question</Text>
+                              <RefreshCw size={14} color={colors.text} style={{marginRight: 6}} />
+                              <Text style={[styles.regenText, {color: colors.text}]}>Autre question</Text>
                           </TouchableOpacity>
                       </View>
 
                       <Text style={styles.label}>VOTRE RÉPONSE</Text>
                       <TextInput 
-                          style={[styles.input, {backgroundColor: colors.card, color: colors.text, borderColor: colors.border}]}
+                          style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]}
                           multiline
                           textAlignVertical="top"
                           placeholder="Écrivez librement..."
-                          placeholderTextColor="#888"
+                          placeholderTextColor={colors.subText}
                           value={answer}
                           onChangeText={setAnswer}
                       />
 
-                      <TouchableOpacity style={styles.saveBtn} onPress={saveReflection}>
-                          <Save size={20} color="#000" />
+                      <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.button}]} onPress={saveReflection}>
                           <Text style={styles.saveBtnText}>Enregistrer (+20 XP)</Text>
                       </TouchableOpacity>
                   </ScrollView>
@@ -176,30 +177,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginTop: 10,
     marginBottom: 10,
   },
-  menuButton: {
+  iconBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   largeTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
+    letterSpacing: 0.35,
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 20,
       paddingBottom: 100,
       gap: 16,
   },
@@ -212,7 +214,6 @@ const styles = StyleSheet.create({
       marginBottom: 20,
   },
   ctaBtn: {
-      backgroundColor: '#C4B5FD',
       paddingHorizontal: 24,
       paddingVertical: 12,
       borderRadius: 20,
@@ -223,31 +224,30 @@ const styles = StyleSheet.create({
   },
   card: {
       borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
+      padding: 20,
   },
   cardHeader: {
       marginBottom: 12,
   },
   date: {
-      color: '#888',
+      color: '#8E8E93',
       fontSize: 12,
       fontWeight: '600',
+      textTransform: 'uppercase',
   },
   questionText: {
-      fontSize: 18,
+      fontSize: 19,
       fontWeight: '700',
-      lineHeight: 24,
-      fontStyle: 'italic',
-      marginBottom: 4,
+      lineHeight: 26,
+      marginBottom: 8,
   },
   divider: {
       height: 1,
       marginVertical: 12,
   },
   answerText: {
-      fontSize: 15,
-      lineHeight: 22,
+      fontSize: 16,
+      lineHeight: 24,
   },
   modalOverlay: {
       flex: 1,
@@ -255,6 +255,9 @@ const styles = StyleSheet.create({
   modalContent: {
       flex: 1,
       padding: 20,
+      marginTop: 60,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
   },
   modalHeader: {
       flexDirection: 'row',
@@ -263,11 +266,10 @@ const styles = StyleSheet.create({
       marginBottom: 20,
   },
   modalTitle: {
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: '700',
   },
   aiBox: {
-      backgroundColor: '#C4B5FD',
       borderRadius: 16,
       padding: 16,
       marginBottom: 30,
@@ -279,34 +281,31 @@ const styles = StyleSheet.create({
       marginBottom: 8,
   },
   aiLabelText: {
-      color: '#000',
       fontWeight: '700',
       fontSize: 12,
       textTransform: 'uppercase',
   },
   generatedQuestion: {
-      color: '#000',
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: '700',
-      lineHeight: 28,
+      lineHeight: 30,
       marginBottom: 16,
   },
   regenBtn: {
       alignSelf: 'flex-start',
       paddingVertical: 8,
       paddingHorizontal: 12,
-      backgroundColor: 'rgba(0,0,0,0.1)',
+      backgroundColor: 'rgba(255,255,255,0.1)',
       borderRadius: 8,
       flexDirection: 'row',
       alignItems: 'center',
   },
   regenText: {
       fontSize: 13,
-      color: '#000',
       fontWeight: '600',
   },
   label: {
-      color: '#888',
+      color: '#8E8E93',
       fontSize: 12,
       fontWeight: '600',
       marginBottom: 10,
@@ -315,24 +314,21 @@ const styles = StyleSheet.create({
   input: {
       borderRadius: 12,
       padding: 16,
-      fontSize: 16,
+      fontSize: 17,
       minHeight: 200,
-      borderWidth: 1,
       marginBottom: 30,
   },
   saveBtn: {
-      backgroundColor: '#FFF',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       padding: 16,
       borderRadius: 12,
-      gap: 10,
   },
   saveBtnText: {
-      color: '#000',
+      color: '#FFF',
       fontWeight: '700',
-      fontSize: 16,
+      fontSize: 17,
   }
 });
 

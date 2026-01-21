@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save, Minus, Menu } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save, Minus, Menu, Target } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 
 if (Platform.OS === 'android') {
@@ -18,9 +18,10 @@ interface GoalsProps {
   userId: string;
   refreshGoals: () => void;
   openMenu?: () => void;
+  isDarkMode?: boolean;
 }
 
-const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, userId, refreshGoals, openMenu }) => {
+const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, userId, refreshGoals, openMenu, isDarkMode = true }) => {
   const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   
@@ -33,6 +34,18 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
   const [formDesc, setFormDesc] = useState('');
   const [formDate, setFormDate] = useState('');
   const [formProgress, setFormProgress] = useState(0);
+
+  const colors = {
+      bg: isDarkMode ? '#000000' : '#F2F2F7',
+      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      text: isDarkMode ? '#FFFFFF' : '#000000',
+      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      accent: '#007AFF',
+      orange: '#FF9500',
+      danger: '#FF3B30',
+      success: '#34C759'
+  };
 
   const openCreateModal = () => {
     setFormTitle('');
@@ -91,30 +104,29 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
   const completedGoals = goals.filter(t => t.completed);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
               {openMenu && (
-                  <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
-                      <Menu size={24} color="#FFF" />
+                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                      <Menu size={24} color={colors.accent} />
                   </TouchableOpacity>
               )}
-              <Text style={styles.largeTitle}>Objectifs</Text>
+              <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
           </View>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-                <TouchableOpacity onPress={() => setShowCompleted(!showCompleted)} style={styles.toggleCompletedBtn}>
-                    <Text style={styles.toggleText}>{showCompleted ? 'Masquer' : 'Terminés'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-                        <Plus size={24} color="#000" />
-                </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
+                <Plus size={24} color={colors.accent} />
+          </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.listGroup}>
+        <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>EN COURS</Text>
+        </View>
+
+        <View style={[styles.listGroup, { backgroundColor: colors.cardBg }]}>
             {activeGoals.length === 0 && (
-                <Text style={styles.emptyText}>Aucun objectif en cours.</Text>
+                <Text style={[styles.emptyText, { color: colors.textSub }]}>Aucun objectif actif.</Text>
             )}
             {activeGoals.map((goal, index) => (
                 <View key={goal.id}>
@@ -126,31 +138,36 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                         onLongPress={() => openEditModal(goal)}
                         userId={userId}
                         refreshGoals={refreshGoals}
+                        colors={colors}
                     />
-                    {index < activeGoals.length - 1 && <View style={styles.separator} />}
+                    {index < activeGoals.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
                 </View>
             ))}
         </View>
 
+        <TouchableOpacity onPress={() => setShowCompleted(!showCompleted)} style={styles.toggleCompletedBtn}>
+            <Text style={[styles.toggleText, { color: colors.accent }]}>
+                {showCompleted ? 'Masquer les terminés' : `Afficher les terminés (${completedGoals.length})`}
+            </Text>
+        </TouchableOpacity>
+
         {showCompleted && completedGoals.length > 0 && (
-             <View style={styles.completedGroup}>
-                <Text style={styles.groupHeader}>Terminés</Text>
-                <View style={styles.listGroup}>
-                    {completedGoals.map((goal, index) => (
-                        <View key={goal.id}>
-                             <GoalItem 
-                                goal={goal} 
-                                isExpanded={expandedGoalIds.has(goal.id)}
-                                onToggle={() => toggleGoal(goal.id)} 
-                                onToggleExpand={() => toggleExpand(goal.id)}
-                                onLongPress={() => openEditModal(goal)}
-                                userId={userId}
-                                refreshGoals={refreshGoals}
-                            />
-                            {index < completedGoals.length - 1 && <View style={styles.separator} />}
-                        </View>
-                    ))}
-                </View>
+            <View style={[styles.listGroup, { backgroundColor: colors.cardBg, marginTop: 10 }]}>
+                {completedGoals.map((goal, index) => (
+                    <View key={goal.id}>
+                            <GoalItem 
+                            goal={goal} 
+                            isExpanded={expandedGoalIds.has(goal.id)}
+                            onToggle={() => toggleGoal(goal.id)} 
+                            onToggleExpand={() => toggleExpand(goal.id)}
+                            onLongPress={() => openEditModal(goal)}
+                            userId={userId}
+                            refreshGoals={refreshGoals}
+                            colors={colors}
+                        />
+                        {index < completedGoals.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
+                    </View>
+                ))}
             </View>
         )}
       </ScrollView>
@@ -159,95 +176,90 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
       <Modal
         visible={createModalVisible || editModalVisible}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => { setCreateModalVisible(false); setEditModalVisible(false); }}
       >
           <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
+              <View style={[styles.modalContent, { backgroundColor: colors.cardBg }]}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>{createModalVisible ? 'Nouvel Objectif' : 'Modifier'}</Text>
+                      <Text style={[styles.modalTitle, { color: colors.text }]}>{createModalVisible ? 'Nouvel Objectif' : 'Modifier'}</Text>
                       <TouchableOpacity onPress={() => { setCreateModalVisible(false); setEditModalVisible(false); }}>
-                          <X size={24} color="#FFF" />
+                          <Text style={{color: colors.accent, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
                       </TouchableOpacity>
                   </View>
 
-                  <Text style={styles.modalLabel}>Titre</Text>
-                  <TextInput 
-                      style={styles.modalInput} 
-                      value={formTitle} 
-                      onChangeText={setFormTitle} 
-                      color="#FFF"
-                  />
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    <Text style={styles.inputLabel}>TITRE</Text>
+                    <TextInput 
+                        style={[styles.modalInput, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text }]} 
+                        value={formTitle} 
+                        onChangeText={setFormTitle} 
+                        placeholder="Ex: Courir un marathon"
+                        placeholderTextColor={colors.textSub}
+                    />
 
-                  {editModalVisible && (
-                      <>
-                        <Text style={styles.modalLabel}>Progression ({formProgress}%)</Text>
-                        <View style={styles.progressControl}>
-                            <TouchableOpacity onPress={() => changeProgress(-10)} style={styles.progressBtn}>
-                                <Minus size={20} color="#FFF" />
-                            </TouchableOpacity>
-                            <View style={styles.progressBarBg}>
-                                <View style={[styles.progressBarFill, { width: `${formProgress}%` }]} />
+                    {editModalVisible && (
+                        <>
+                            <Text style={styles.inputLabel}>PROGRESSION ({formProgress}%)</Text>
+                            <View style={styles.progressControl}>
+                                <TouchableOpacity onPress={() => changeProgress(-10)} style={[styles.progressBtn, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}]}>
+                                    <Minus size={20} color={colors.text} />
+                                </TouchableOpacity>
+                                <View style={[styles.progressBarBg, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}]}>
+                                    <View style={[styles.progressBarFill, { width: `${formProgress}%`, backgroundColor: colors.accent }]} />
+                                </View>
+                                <TouchableOpacity onPress={() => changeProgress(10)} style={[styles.progressBtn, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}]}>
+                                    <Plus size={20} color={colors.text} />
+                                </TouchableOpacity>
                             </View>
-                            <TouchableOpacity onPress={() => changeProgress(10)} style={styles.progressBtn}>
-                                <Plus size={20} color="#FFF" />
-                            </TouchableOpacity>
-                        </View>
-                      </>
-                  )}
+                        </>
+                    )}
 
-                  <Text style={styles.modalLabel}>Description</Text>
-                   <View style={styles.inputWithIcon}>
-                         <AlignLeft size={18} color="#666" style={{marginRight: 10}} />
-                         <TextInput 
-                            style={[styles.modalInput, {flex: 1, height: 'auto', minHeight: 40, borderWidth: 0, marginBottom: 0}]} 
-                            value={formDesc} 
-                            onChangeText={setFormDesc} 
-                            placeholder="Détails..."
-                            placeholderTextColor="#666"
-                            multiline
-                            color="#FFF"
-                        />
-                    </View>
+                    <Text style={styles.inputLabel}>DESCRIPTION</Text>
+                    <TextInput 
+                        style={[styles.modalInput, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 80 }]} 
+                        value={formDesc} 
+                        onChangeText={setFormDesc} 
+                        placeholder="Détails..."
+                        placeholderTextColor={colors.textSub}
+                        multiline
+                    />
 
-                    <Text style={styles.modalLabel}>Date Cible (YYYY-MM-DD)</Text>
-                    <View style={styles.inputWithIcon}>
-                        <Calendar size={18} color="#666" style={{marginRight: 10}} />
+                    <Text style={styles.inputLabel}>DATE CIBLE (YYYY-MM-DD)</Text>
+                    <View style={[styles.inputWithIcon, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
+                        <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
                         <TextInput 
-                            style={[styles.modalInput, { borderWidth: 0, marginBottom: 0 }]} 
+                            style={{ flex: 1, fontSize: 17, color: colors.text, height: 50 }} 
                             value={formDate} 
                             onChangeText={setFormDate} 
                             placeholder="ex: 2024-12-31"
-                            placeholderTextColor="#666"
-                            color="#FFF"
+                            placeholderTextColor={colors.textSub}
                         />
                     </View>
 
-
-                  <TouchableOpacity style={styles.saveBtn} onPress={createModalVisible ? handleAdd : handleUpdateGoal}>
-                        <Save size={20} color="black" />
-                        <Text style={styles.saveBtnText}>Enregistrer</Text>
-                  </TouchableOpacity>
-
-                  {editModalVisible && (
-                    <TouchableOpacity 
-                        style={styles.deleteActionBtn} 
-                        onPress={() => {
-                            if (selectedGoal) {
-                                Alert.alert("Supprimer", "Êtes-vous sûr ?", [
-                                    { text: "Annuler", style: "cancel"},
-                                    { text: "Supprimer", style: 'destructive', onPress: () => {
-                                        deleteGoal(selectedGoal.id);
-                                        setEditModalVisible(false);
-                                    }}
-                                ])
-                            }
-                        }}
-                    >
-                        <Trash2 size={20} color="#FF3B30" />
-                        <Text style={styles.deleteText}>Supprimer</Text>
+                    <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]} onPress={createModalVisible ? handleAdd : handleUpdateGoal}>
+                            <Text style={styles.saveBtnText}>Enregistrer</Text>
                     </TouchableOpacity>
-                  )}
+
+                    {editModalVisible && (
+                        <TouchableOpacity 
+                            style={styles.deleteActionBtn} 
+                            onPress={() => {
+                                if (selectedGoal) {
+                                    Alert.alert("Supprimer", "Êtes-vous sûr ?", [
+                                        { text: "Annuler", style: "cancel"},
+                                        { text: "Supprimer", style: 'destructive', onPress: () => {
+                                            deleteGoal(selectedGoal.id);
+                                            setEditModalVisible(false);
+                                        }}
+                                    ])
+                                }
+                            }}
+                        >
+                            <Text style={styles.deleteText}>Supprimer l'objectif</Text>
+                        </TouchableOpacity>
+                    )}
+                  </ScrollView>
               </View>
           </View>
       </Modal>
@@ -264,9 +276,10 @@ interface GoalItemProps {
     onLongPress: () => void;
     userId: string;
     refreshGoals: () => void;
+    colors: any;
 }
 
-const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshGoals }) => {
+const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshGoals, colors }) => {
     const [newSubGoalTitle, setNewSubGoalTitle] = useState('');
     
     const addSubGoal = async () => {
@@ -294,7 +307,7 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
     }
 
     return (
-        <View style={styles.taskItemContainer}>
+        <View>
             <TouchableOpacity 
                 style={styles.taskItem} 
                 onPress={onToggleExpand}
@@ -305,62 +318,63 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
                     onPress={onToggle}
                     style={[
                         styles.checkbox,
-                        goal.completed && { backgroundColor: '#FF9500', borderColor: '#FF9500' }
+                        { borderColor: colors.textSub },
+                        goal.completed && { backgroundColor: colors.orange, borderColor: colors.orange }
                     ]}
                 >
                     {goal.completed && <Check size={14} color="white" strokeWidth={4} />}
                 </TouchableOpacity>
                 
                 <View style={styles.taskContent}>
-                    <Text style={[styles.taskTitle, goal.completed && styles.taskTitleCompleted]}>
+                    <Text style={[styles.taskTitle, { color: colors.text }, goal.completed && styles.taskTitleCompleted]}>
                         {goal.title}
                     </Text>
                     {/* Progress Bar Mini */}
                     {!goal.completed && (goal.progress || 0) > 0 && (
-                        <View style={styles.miniProgressBg}>
-                            <View style={[styles.miniProgressFill, { width: `${goal.progress}%` }]} />
+                        <View style={[styles.miniProgressBg, { backgroundColor: colors.border }]}>
+                            <View style={[styles.miniProgressFill, { width: `${goal.progress}%`, backgroundColor: colors.accent }]} />
                         </View>
                     )}
                     {goal.target_date && (
-                         <Text style={styles.dateText}>🎯 {new Date(goal.target_date).toLocaleDateString()}</Text>
+                         <Text style={[styles.dateText, { color: colors.textSub }]}>🎯 {new Date(goal.target_date).toLocaleDateString()}</Text>
                     )}
                 </View>
 
                 <View style={styles.rightActions}>
-                     {isExpanded ? <ChevronUp size={20} color="#666" /> : <ChevronDown size={20} color="#666" />}
+                     {isExpanded ? <ChevronUp size={20} color={colors.textSub} /> : <ChevronDown size={20} color={colors.textSub} />}
                 </View>
             </TouchableOpacity>
 
             {/* EXPANDED SECTION */}
             {isExpanded && (
-                <View style={styles.expandedSection}>
-                    {goal.description && <Text style={styles.descText}>{goal.description}</Text>}
+                <View style={[styles.expandedSection, { borderTopColor: colors.border }]}>
+                    {goal.description && <Text style={[styles.descText, { color: colors.textSub }]}>{goal.description}</Text>}
 
                     {goal.subobjectives?.map(subObjective => (
-                        <View key={subObjective.id} style={styles.subtaskRow}>
-                            <TouchableOpacity onPress={() => toggleSubGoal(subObjective)} style={styles.subtaskCheckbox}>
-                                {subObjective.completed && <View style={styles.subtaskChecked} />}
+                        <View key={subObjective.id} style={[styles.subtaskRow, { borderBottomColor: colors.border }]}>
+                            <TouchableOpacity onPress={() => toggleSubGoal(subObjective)} style={[styles.subtaskCheckbox, { borderColor: colors.textSub }]}>
+                                {subObjective.completed && <View style={[styles.subtaskChecked, { backgroundColor: colors.text }]} />}
                             </TouchableOpacity>
-                            <Text style={[styles.subtaskTitle, subObjective.completed && styles.subtaskTitleCompleted]}>
+                            <Text style={[styles.subtaskTitle, { color: colors.text }, subObjective.completed && styles.subtaskTitleCompleted]}>
                                 {subObjective.title}
                             </Text>
                             <TouchableOpacity onPress={() => deleteSubGoal(subObjective.id)} style={{marginLeft: 'auto'}}>
-                                <X size={14} color="#666" />
+                                <X size={14} color={colors.textSub} />
                             </TouchableOpacity>
                         </View>
                     ))}
                     
                     <View style={styles.addSubtaskRow}>
                         <TextInput
-                            style={styles.subtaskInput}
+                            style={[styles.subtaskInput, { color: colors.text }]}
                             placeholder="Ajouter une étape..."
-                            placeholderTextColor="#666"
+                            placeholderTextColor={colors.textSub}
                             value={newSubGoalTitle}
                             onChangeText={setNewSubGoalTitle}
                             onSubmitEditing={addSubGoal}
                         />
                         <TouchableOpacity onPress={addSubGoal} disabled={!newSubGoalTitle.trim()}>
-                            <Plus size={20} color={newSubGoalTitle.trim() ? "#007AFF" : "#666"} />
+                            <Plus size={20} color={newSubGoalTitle.trim() ? colors.accent : colors.textSub} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -372,11 +386,10 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     paddingTop: 20,
   },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     marginBottom: 16,
     marginTop: 10,
     flexDirection: 'row',
@@ -384,77 +397,69 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   largeTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
-    color: '#FFF',
+    letterSpacing: 0.35,
   },
-  menuButton: {
+  iconBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  toggleCompletedBtn: {
-      padding: 8,
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toggleText: {
-      color: '#007AFF',
-      fontSize: 15,
-  },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 150,
   },
+  sectionHeader: {
+      marginBottom: 8,
+      marginLeft: 16,
+  },
+  sectionTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#8E8E93',
+  },
   listGroup: {
-    backgroundColor: '#171717',
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#262626',
   },
-  completedGroup: {
-    marginTop: 32,
+  toggleCompletedBtn: {
+      padding: 16,
+      alignItems: 'center',
   },
-  groupHeader: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFF',
-    marginBottom: 8,
-    marginLeft: 4,
+  toggleText: {
+      fontSize: 15,
+      fontWeight: '500',
   },
   emptyText: {
-    padding: 16,
-    color: '#666',
+    padding: 20,
+    textAlign: 'center',
     fontStyle: 'italic',
-  },
-  taskItemContainer: {
-      backgroundColor: '#171717',
   },
   taskItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    minHeight: 60,
   },
   separator: {
     height: 1,
-    backgroundColor: '#262626',
-    marginLeft: 16, 
+    marginLeft: 56, 
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#444',
-    marginRight: 12,
+    marginRight: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -463,15 +468,14 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     fontSize: 17,
-    color: '#FFF',
+    fontWeight: '500',
   },
   taskTitleCompleted: {
-    color: '#666',
+    opacity: 0.5,
     textDecorationLine: 'line-through',
   },
   dateText: {
-      fontSize: 11,
-      color: '#FF9500',
+      fontSize: 12,
       marginTop: 2,
   },
   rightActions: {
@@ -480,71 +484,65 @@ const styles = StyleSheet.create({
       gap: 12,
   },
   expandedSection: {
-      paddingLeft: 52,
+      paddingLeft: 56,
       paddingRight: 16,
       paddingBottom: 16,
+      borderTopWidth: 1,
   },
   descText: {
-      color: '#888',
-      fontSize: 13,
+      fontSize: 14,
       marginBottom: 12,
       fontStyle: 'italic',
+      marginTop: 8,
   },
   subtaskRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 12,
+      paddingVertical: 10,
+      borderBottomWidth: 0.5,
   },
   subtaskCheckbox: {
       width: 18,
       height: 18,
       borderRadius: 6,
       borderWidth: 1.5,
-      borderColor: '#444',
-      marginRight: 10,
+      marginRight: 12,
       alignItems: 'center',
       justifyContent: 'center',
   },
   subtaskChecked: {
       width: 10,
       height: 10,
-      backgroundColor: '#FF9500',
       borderRadius: 2,
   },
   subtaskTitle: {
       fontSize: 15,
-      color: '#DDD',
       flex: 1,
   },
   subtaskTitleCompleted: {
-      color: '#666',
+      opacity: 0.5,
       textDecorationLine: 'line-through',
   },
   addSubtaskRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      borderTopWidth: 1,
-      borderTopColor: '#262626',
-      paddingTop: 8,
+      marginTop: 12,
   },
   subtaskInput: {
       flex: 1,
-      fontSize: 14,
-      color: '#FFF',
+      fontSize: 15,
       marginRight: 8,
   },
   
   // Progress
   miniProgressBg: {
       height: 4,
-      backgroundColor: '#333',
       borderRadius: 2,
       marginTop: 6,
       width: '60%',
   },
   miniProgressFill: {
       height: '100%',
-      backgroundColor: '#007AFF',
       borderRadius: 2,
   },
   progressControl: {
@@ -556,104 +554,83 @@ const styles = StyleSheet.create({
   progressBtn: {
       width: 32,
       height: 32,
-      borderRadius: 16,
-      backgroundColor: '#333',
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
   },
   progressBarBg: {
       flex: 1,
-      height: 10,
-      backgroundColor: '#333',
-      borderRadius: 5,
+      height: 8,
+      borderRadius: 4,
       overflow: 'hidden',
   },
   progressBarFill: {
       height: '100%',
-      backgroundColor: '#007AFF',
   },
 
   // Modal
   modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      justifyContent: 'center',
-      alignItems: 'center',
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-      width: '85%',
-      backgroundColor: '#171717',
-      borderRadius: 16,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
       padding: 20,
-      borderWidth: 1,
-      borderColor: '#333',
+      paddingBottom: 40,
+      maxHeight: '90%',
   },
   modalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 20,
+      marginBottom: 24,
   },
   modalTitle: {
       fontSize: 20,
       fontWeight: '700',
-      color: '#FFF',
   },
   modalInput: {
-      backgroundColor: '#000',
-      padding: 12,
-      borderRadius: 8,
-      fontSize: 16,
+      padding: 14,
+      borderRadius: 12,
+      fontSize: 17,
       marginBottom: 20,
-      color: '#FFF',
-      borderWidth: 1,
-      borderColor: '#333',
   },
   inputWithIcon: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#000',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#333',
-      paddingHorizontal: 12,
+      borderRadius: 12,
+      paddingHorizontal: 14,
       marginBottom: 20,
   },
-  modalLabel: {
+  inputLabel: {
       fontSize: 12,
       fontWeight: '600',
-      color: '#888',
-      marginBottom: 6,
+      color: '#8E8E93',
+      marginBottom: 8,
       textTransform: 'uppercase',
   },
   deleteActionBtn: {
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      padding: 12,
-      backgroundColor: 'rgba(255,59,48,0.1)',
-      borderRadius: 8,
-      marginBottom: 10,
-      gap: 8,
       marginTop: 20,
+      padding: 10,
   },
   deleteText: {
       color: '#FF3B30',
       fontWeight: '600',
+      fontSize: 17,
   },
   saveBtn: {
-      backgroundColor: '#FFF',
-      padding: 14,
-      borderRadius: 12,
+      padding: 16,
+      borderRadius: 14,
       alignItems: 'center',
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 8,
+      marginTop: 10,
   },
   saveBtnText: {
-      color: 'black',
-      fontWeight: '600',
-      fontSize: 16,
+      color: '#FFF',
+      fontWeight: '700',
+      fontSize: 17,
   }
 });
 

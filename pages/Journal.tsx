@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
-import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Tag, Menu } from 'lucide-react-native';
+import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Menu, Calendar } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { addXp, REWARDS } from '../services/gamification';
 
 interface JournalProps {
   userId: string;
   openMenu?: () => void;
+  isDarkMode?: boolean;
 }
 
-const Journal: React.FC<JournalProps> = ({ userId, openMenu }) => {
+const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   
@@ -19,6 +20,17 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu }) => {
   const [content, setContent] = useState('');
   const [mood, setMood] = useState<JournalEntry['mood']>('neutral');
   const [tagsInput, setTagsInput] = useState('');
+  const [dateInput, setDateInput] = useState(''); // YYYY-MM-DDTHH:mm
+
+  const colors = {
+      bg: isDarkMode ? '#000' : '#F2F2F7',
+      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      text: isDarkMode ? '#FFF' : '#000',
+      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      accent: '#007AFF',
+      orange: '#FF9500',
+  };
 
   useEffect(() => {
       fetchEntries();
@@ -33,10 +45,27 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu }) => {
       if (data) setEntries(data);
   };
 
+  const openModal = () => {
+      const now = new Date();
+      // Format local simplified for input placeholder
+      const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+      setDateInput(localIso);
+      setModalVisible(true);
+  };
+
   const handleSave = async () => {
       if (!title.trim() || !content.trim()) return;
 
       const tagsArray = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+      
+      let finalDate = new Date().toISOString();
+      if (dateInput) {
+          try {
+              finalDate = new Date(dateInput).toISOString();
+          } catch (e) {
+              console.warn("Invalid date, using now");
+          }
+      }
 
       const { error } = await supabase.from('journal_entries').insert({
           user_id: userId,
@@ -44,7 +73,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu }) => {
           content,
           mood,
           tags: tagsArray,
-          created_at: new Date().toISOString()
+          created_at: finalDate
       });
 
       if (!error) {
@@ -65,117 +94,128 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu }) => {
       }
   };
 
-  const getCardMoodIcon = (m: string) => {
-      switch(m) {
-          case 'happy': return <Smile size={18} color="#4ADE80" />;
-          case 'sad': return <Frown size={18} color="#F87171" />;
-          case 'energetic': return <Zap size={18} color="#FACC15" />;
-          case 'tired': return <Coffee size={18} color="#A8A29E" />;
-          default: return <Meh size={18} color="#9CA3AF" />;
-      }
-  };
-
   const getMoodIcon = (m: string, size = 20, active = true) => {
-      const color = active ? (m === mood ? '#FFF' : '#666') : '#FFF';
+      const color = active ? (m === mood ? '#FFF' : colors.textSub) : colors.textSub;
+      // Active state bg is handled by container, this is icon color
       switch(m) {
-          case 'happy': return <Smile size={size} color={active && m === mood ? '#4ADE80' : color} />;
-          case 'sad': return <Frown size={size} color={active && m === mood ? '#F87171' : color} />;
-          case 'energetic': return <Zap size={size} color={active && m === mood ? '#FACC15' : color} />;
-          case 'tired': return <Coffee size={size} color={active && m === mood ? '#A8A29E' : color} />;
-          default: return <Meh size={size} color={active && m === mood ? '#9CA3AF' : color} />;
+          case 'happy': return <Smile size={size} color={active && m === mood ? '#000' : '#4ADE80'} />;
+          case 'sad': return <Frown size={size} color={active && m === mood ? '#000' : '#F87171'} />;
+          case 'energetic': return <Zap size={size} color={active && m === mood ? '#000' : '#FACC15'} />;
+          case 'tired': return <Coffee size={size} color={active && m === mood ? '#000' : '#A8A29E'} />;
+          default: return <Meh size={size} color={active && m === mood ? '#000' : '#9CA3AF'} />;
       }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.header}>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
                 {openMenu && (
-                    <TouchableOpacity style={styles.menuBtn} onPress={openMenu}>
-                        <Menu size={24} color="#FFF" />
+                    <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                        <Menu size={24} color={colors.accent} />
                     </TouchableOpacity>
                 )}
-                <Text style={styles.largeTitle}>Journal</Text>
+                <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
             </View>
-            <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addButton}>
-                <Plus size={24} color="#000" />
+            <TouchableOpacity onPress={openModal} style={styles.addButton}>
+                <Plus size={24} color={colors.accent} />
             </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {entries.length === 0 && (
-                <Text style={styles.emptyText}>Aucune entrée. Écrivez vos pensées.</Text>
+                <Text style={[styles.emptyText, { color: colors.textSub }]}>Aucune entrée. Écrivez vos pensées.</Text>
             )}
-            {entries.map(entry => (
-                <View key={entry.id} style={styles.card}>
-                    <View style={styles.cardHeader}>
-                        <Text style={styles.date}>
-                            {new Date(entry.created_at).toLocaleDateString()} • {new Date(entry.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </Text>
-                        {getCardMoodIcon(entry.mood)}
+            {entries.map(entry => {
+                const dateObj = new Date(entry.created_at);
+                return (
+                    <View key={entry.id} style={[styles.card, { backgroundColor: colors.cardBg }]}>
+                        <View style={styles.cardHeader}>
+                            <View>
+                                <Text style={styles.dayNum}>{dateObj.getDate()}</Text>
+                                <Text style={styles.monthStr}>{dateObj.toLocaleDateString('fr-FR', {month: 'short'}).toUpperCase()}</Text>
+                            </View>
+                            <View style={styles.moodBadge}>
+                                {getMoodIcon(entry.mood, 20, false)}
+                            </View>
+                        </View>
+                        <View style={styles.cardBody}>
+                            <Text style={[styles.cardTitle, { color: colors.text }]}>{entry.title}</Text>
+                            <Text style={[styles.timeStr, { color: colors.textSub }]}>
+                                {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </Text>
+                            <Text style={[styles.cardContent, { color: colors.textSub }]} numberOfLines={3}>{entry.content}</Text>
+                        </View>
                     </View>
-                    <Text style={styles.cardTitle}>{entry.title}</Text>
-                    <Text style={styles.cardContent} numberOfLines={3}>{entry.content}</Text>
-                </View>
-            ))}
+                );
+            })}
         </ScrollView>
 
         <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
+            <View style={[styles.modalOverlay, { backgroundColor: colors.bg }]}>
+                <View style={[styles.modalContent, { backgroundColor: colors.cardBg }]}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Nouvelle Entrée</Text>
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle Entrée</Text>
                         <TouchableOpacity onPress={() => setModalVisible(false)}>
-                            <X size={24} color="#FFF" />
+                             <Text style={{color: colors.accent, fontSize: 17, fontWeight: '600'}}>Annuler</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView>
-                        <Text style={styles.label}>Humeur</Text>
-                        <View style={styles.moodRow}>
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        <Text style={styles.label}>HUMEUR</Text>
+                        <View style={[styles.moodRow, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
                             {['happy', 'energetic', 'neutral', 'tired', 'sad'].map(m => (
                                 <TouchableOpacity 
                                     key={m} 
                                     onPress={() => setMood(m as any)}
-                                    style={[styles.moodBtn, mood === m && styles.moodBtnActive]}
+                                    style={[styles.moodBtn, mood === m && { backgroundColor: colors.text }]}
                                 >
-                                    {getMoodIcon(m, 24)}
+                                    {getMoodIcon(m, 24, true)}
                                 </TouchableOpacity>
                             ))}
                         </View>
 
-                        <Text style={styles.label}>Titre</Text>
+                        <Text style={styles.label}>TITRE</Text>
                         <TextInput 
-                            style={styles.input} 
+                            style={[styles.input, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text }]} 
                             placeholder="Titre..." 
-                            placeholderTextColor="#666"
+                            placeholderTextColor={colors.textSub}
                             value={title}
                             onChangeText={setTitle}
                         />
+
+                        <Text style={styles.label}>DATE & HEURE (YYYY-MM-DDTHH:MM)</Text>
+                        <View style={[styles.inputWithIcon, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
+                             <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
+                             <TextInput 
+                                style={{ flex: 1, fontSize: 17, color: colors.text, height: 50 }} 
+                                value={dateInput} 
+                                onChangeText={setDateInput}
+                            />
+                        </View>
                         
-                        <Text style={styles.label}>Tags (séparés par virgule)</Text>
+                        <Text style={styles.label}>TAGS</Text>
                         <TextInput 
-                            style={styles.input} 
-                            placeholder="ex: travail, idée, stress..." 
-                            placeholderTextColor="#666"
+                            style={[styles.input, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text }]} 
+                            placeholder="ex: travail, idée..." 
+                            placeholderTextColor={colors.textSub}
                             value={tagsInput}
                             onChangeText={setTagsInput}
                         />
 
-                        <Text style={styles.label}>Contenu</Text>
+                        <Text style={styles.label}>CONTENU</Text>
                         <TextInput 
-                            style={[styles.input, styles.textArea]} 
+                            style={[styles.input, styles.textArea, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text }]} 
                             placeholder="Écrivez ici..." 
-                            placeholderTextColor="#666"
+                            placeholderTextColor={colors.textSub}
                             value={content}
                             onChangeText={setContent}
                             multiline
                             textAlignVertical="top"
                         />
 
-                        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                            <Save size={20} color="black" />
-                            <Text style={styles.saveBtnText}>Sauvegarder (+20 XP)</Text>
+                        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.accent }]} onPress={handleSave}>
+                            <Text style={styles.saveBtnText}>Enregistrer</Text>
                         </TouchableOpacity>
                     </ScrollView>
                 </View>
@@ -188,84 +228,99 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12, 
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginTop: 10, 
     marginBottom: 10,
   },
-  menuBtn: {
+  iconBtn: {
       width: 40,
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
   },
   largeTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
-    color: '#FFF',
+    letterSpacing: 0.35,
   },
   addButton: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#FFF',
       alignItems: 'center',
       justifyContent: 'center',
   },
   scrollContent: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 20,
       paddingBottom: 100,
       gap: 16,
   },
   emptyText: {
-      color: '#666',
       fontStyle: 'italic',
       textAlign: 'center',
       marginTop: 20,
   },
   card: {
-      backgroundColor: '#171717',
-      borderRadius: 16,
+      borderRadius: 20,
       padding: 16,
-      borderWidth: 1,
-      borderColor: '#262626',
+      flexDirection: 'row',
+      gap: 16,
   },
   cardHeader: {
-      flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 8,
+      width: 50,
+      borderRightWidth: 1,
+      borderRightColor: '#333',
+      paddingRight: 16,
   },
-  date: {
-      color: '#666',
+  dayNum: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: '#8E8E93',
+  },
+  monthStr: {
       fontSize: 12,
       fontWeight: '600',
+      color: '#8E8E93',
+  },
+  moodBadge: {
+      marginTop: 10,
+  },
+  cardBody: {
+      flex: 1,
   },
   cardTitle: {
-      color: '#FFF',
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: '600',
-      marginBottom: 6,
+      marginBottom: 2,
+  },
+  timeStr: {
+      fontSize: 12,
+      marginBottom: 8,
   },
   cardContent: {
-      color: '#CCC',
-      fontSize: 14,
+      fontSize: 15,
       lineHeight: 20,
   },
   
   // Modal
   modalOverlay: {
       flex: 1,
-      backgroundColor: '#000',
   },
   modalContent: {
       flex: 1,
       padding: 20,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      marginTop: 60,
   },
   modalHeader: {
       flexDirection: 'row',
@@ -274,57 +329,58 @@ const styles = StyleSheet.create({
       marginBottom: 30,
   },
   modalTitle: {
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: '700',
-      color: '#FFF',
   },
   label: {
-      color: '#888',
+      color: '#8E8E93',
       fontSize: 12,
       fontWeight: '600',
-      marginBottom: 10,
+      marginBottom: 8,
       textTransform: 'uppercase',
   },
   moodRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginBottom: 24,
-      backgroundColor: '#171717',
-      padding: 10,
+      padding: 8,
       borderRadius: 12,
   },
   moodBtn: {
       padding: 10,
-      borderRadius: 8,
-  },
-  moodBtnActive: {
-      backgroundColor: '#333',
+      borderRadius: 10,
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
   },
   input: {
-      backgroundColor: '#171717',
       borderRadius: 12,
-      padding: 16,
-      fontSize: 16,
-      color: '#FFF',
+      padding: 14,
+      fontSize: 17,
       marginBottom: 24,
-      borderWidth: 1,
-      borderColor: '#262626',
+  },
+  inputWithIcon: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      marginBottom: 24,
   },
   textArea: {
       minHeight: 150,
   },
   saveBtn: {
-      backgroundColor: '#FFF',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       padding: 16,
       borderRadius: 12,
-      gap: 8,
+      marginBottom: 40,
   },
   saveBtnText: {
-      color: 'black',
-      fontSize: 16,
+      color: '#FFF',
+      fontSize: 17,
       fontWeight: '700',
   }
 });
