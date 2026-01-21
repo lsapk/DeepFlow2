@@ -1,12 +1,13 @@
 import { supabase } from './supabase';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 // Configuration API Key
+// Note: Idéalement utilisez process.env.API_KEY. Pour le dev, on garde votre clé de secours si nécessaire.
 const API_KEY = process.env.API_KEY || "AIzaSyBRsXHPOaFQVcOH9rCKx39uH8Bsu462uGo";
 
-let genAI: GoogleGenerativeAI | null = null;
+let ai: GoogleGenAI | null = null;
 if (API_KEY) {
-    genAI = new GoogleGenerativeAI(API_KEY);
+    ai = new GoogleGenAI({ apiKey: API_KEY });
 } else {
     console.warn("Gemini API Key is missing.");
 }
@@ -50,13 +51,11 @@ export const generateActionableCoaching = async (
   userContext: any,
   isCreationMode: boolean
 ): Promise<{ text: string, action?: any }> => {
-  if (!genAI) return { text: "Clé API manquante." };
+  if (!ai) return { text: "Clé API manquante." };
 
   await logAiUsage('chat');
   
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
     let prompt = `
       Tu es DeepFlow, un coach de productivité.
       
@@ -86,8 +85,12 @@ export const generateActionableCoaching = async (
         `;
     }
 
-    const result = await model.generateContent(prompt + "\n\nMessage utilisateur: " + userMessage);
-    const responseText = await result.response.text();
+    const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt + "\n\nMessage utilisateur: " + userMessage
+    });
+    
+    const responseText = response.text || "";
 
     // Nettoyage pour parser le JSON si le modèle met des ```json ... ```
     const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -115,14 +118,15 @@ export const generateCoaching = async (msg: string, ctx: any) => {
 }
 
 export const generateReflectionQuestion = async (): Promise<string> => {
-  if (!genAI) return "Clé API manquante.";
+  if (!ai) return "Clé API manquante.";
 
   await logAiUsage('analysis');
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent("Génère une seule question de développement personnel profonde et originale en Français. Juste la question.");
-    const response = await result.response;
-    return response.text().trim();
+    const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: "Génère une seule question de développement personnel profonde et originale en Français. Juste la question."
+    });
+    return response.text?.trim() || "De quoi êtes-vous le plus reconnaissant aujourd'hui ?";
   } catch (error) {
     return "De quoi êtes-vous le plus reconnaissant aujourd'hui ?";
   }
