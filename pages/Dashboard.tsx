@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
-import { Check, Flame, Plus, Play, Menu, ArrowRight, Zap } from 'lucide-react-native';
+import { Check, Flame, Plus, Play, Menu, ArrowRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface DashboardProps {
@@ -23,11 +23,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   
   const colors = {
       bg: isDarkMode ? '#000000' : '#F2F2F7',
-      cardBg: isDarkMode ? '#171717' : '#FFFFFF',
+      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       text: isDarkMode ? '#FFFFFF' : '#000000',
-      textSub: isDarkMode ? '#888' : '#666',
-      border: isDarkMode ? '#262626' : '#E5E5EA',
-      iconBtn: isDarkMode ? '#171717' : '#FFF',
+      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      accent: '#007AFF',
+      success: '#34C759',
+      danger: '#FF3B30',
+      orange: '#FF9500',
   };
 
   const isSameDay = (d1: Date, d2: Date) => {
@@ -53,7 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
   const activeTasks = tasks.filter(t => !t.completed && t.priority === 'high').slice(0, 5); 
 
-  // --- SCORE DE PRODUCTIVITÉ ---
+  // Score Calcul
   const completedTasksCount = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length || 1;
   const completionRate = completedTasksCount / totalTasks;
@@ -67,21 +70,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   if (productivityScore < 10) productivityScore = 15; 
 
   const getScoreColor = (score: number) => {
-      if (score >= 80) return '#4ADE80';
+      if (score >= 80) return colors.success;
       if (score >= 60) return '#C4B5FD';
-      if (score >= 40) return '#FACC15';
-      return '#F87171';
+      if (score >= 40) return colors.orange;
+      return colors.danger;
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDarkMode ? 'transparent' : '#FFF' }]} onPress={openMenu}>
-            <Menu size={24} color={colors.text} />
+        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+            <Menu size={24} color={colors.accent} />
         </TouchableOpacity>
-
-        <Text style={[styles.headerTitle, { color: colors.text }]}>DeepFlow</Text>
+        
+        <View>
+            <Text style={[styles.dateText, {color: colors.textSub}]}>
+                {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
+            </Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Aujourd'hui</Text>
+        </View>
 
         <TouchableOpacity onPress={openProfile}>
             <Image 
@@ -93,35 +101,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* PRODUCTIVITY SCORE CARD */}
-        <View style={[styles.scoreCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        {/* PRODUCTIVITY CARD */}
+        <View style={[styles.scoreCard, { backgroundColor: colors.cardBg }]}>
             <View>
-                <Text style={styles.scoreLabel}>Score de Productivité</Text>
+                <Text style={[styles.scoreLabel, {color: colors.textSub}]}>PRODUCTIVITÉ</Text>
                 <Text style={[styles.scoreLevel, { color: colors.text }]}>
                     {productivityScore >= 80 ? 'Excellent' : productivityScore >= 60 ? 'Bon' : 'Moyen'}
                 </Text>
             </View>
-            <View style={[styles.scoreCircle, { borderColor: isDarkMode ? '#333' : '#EEE' }]}>
+            <View style={[styles.scoreCircle, { borderColor: isDarkMode ? '#333' : '#F2F2F7' }]}>
                 <Text style={[styles.scoreValue, { color: getScoreColor(productivityScore) }]}>{productivityScore}</Text>
             </View>
         </View>
 
-        <View style={styles.welcomeSection}>
-            <Text style={[styles.greeting, { color: colors.text }]}>Bonjour {user.display_name?.split(' ')[0]}</Text>
-            <Text style={styles.subGreeting}>Prêt à conquérir la journée, Cyber Knight ?</Text>
-        </View>
-
-        {/* Habits Section */}
+        {/* HABITS SECTION */}
         <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Habitudes du jour</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Habitudes</Text>
                 <TouchableOpacity onPress={() => setView(ViewState.HABITS)}>
-                    <ArrowRight size={20} color="#666" />
+                    <Text style={[styles.seeAllText, {color: colors.accent}]}>Tout voir</Text>
                 </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScroll}>
                 {sortedHabits.length === 0 && (
-                    <Text style={{color: '#666', fontStyle: 'italic', padding: 10}}>Rien de prévu aujourd'hui.</Text>
+                    <Text style={{color: colors.textSub, fontStyle: 'italic', paddingLeft: 20}}>Rien de prévu.</Text>
                 )}
                 {sortedHabits.map(habit => {
                     const isDone = habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), today);
@@ -130,21 +133,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                             key={habit.id} 
                             style={[
                                 styles.habitCard, 
-                                { backgroundColor: colors.cardBg, borderColor: colors.border },
-                                isDone && { opacity: 0.5, backgroundColor: isDarkMode ? '#222' : '#F0F0F0' }
+                                { backgroundColor: colors.cardBg },
+                                isDone && { opacity: 0.6 }
                             ]} 
                             onPress={() => toggleHabit(habit.id)}
                             activeOpacity={0.7}
                         >
                             <View style={styles.habitTop}>
                                 {isDone ? (
-                                    <View style={styles.checkCircle}>
-                                        <Check size={14} color="#000" strokeWidth={3} />
+                                    <View style={[styles.checkCircle, {backgroundColor: colors.success}]}>
+                                        <Check size={14} color="#FFF" strokeWidth={3} />
                                     </View>
                                 ) : (
-                                    <Flame size={20} color={isDarkMode ? "#666" : "#FF9500"} />
+                                    <View style={[styles.iconCircle, {backgroundColor: isDarkMode ? '#333' : '#F2F2F7'}]}>
+                                        <Flame size={18} color={colors.orange} />
+                                    </View>
                                 )}
-                                <Text style={styles.habitStreak}>{habit.streak}</Text>
+                                <Text style={[styles.habitStreak, {color: colors.textSub}]}>{habit.streak}</Text>
                             </View>
                             <Text style={[styles.habitTitle, { color: colors.text }, isDone && styles.textMuted]} numberOfLines={2}>{habit.title}</Text>
                         </TouchableOpacity>
@@ -156,40 +161,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </ScrollView>
         </View>
 
-        {/* Tasks Section */}
+        {/* TASKS SECTION */}
         <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Urgences (High)</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Tâches Urgentes</Text>
                 <TouchableOpacity onPress={() => setView(ViewState.TASKS)}>
-                    <ArrowRight size={20} color="#666" />
+                    <Text style={[styles.seeAllText, {color: colors.accent}]}>Tout voir</Text>
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.taskList}>
+            <View style={[styles.taskList, { backgroundColor: colors.cardBg }]}>
                 {activeTasks.length === 0 ? (
-                    <View style={[styles.emptyState, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                        <Text style={styles.emptyText}>Aucune tâche haute priorité.</Text>
+                    <View style={styles.emptyState}>
+                        <Text style={[styles.emptyText, {color: colors.textSub}]}>Aucune urgence.</Text>
                     </View>
                 ) : (
-                    activeTasks.map((task) => (
+                    activeTasks.map((task, index) => (
                         <TouchableOpacity 
                             key={task.id} 
-                            style={[styles.taskRow, { backgroundColor: colors.cardBg, borderColor: colors.border }]} 
+                            style={[styles.taskRow, index < activeTasks.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} 
                             onPress={() => toggleTask(task.id)}
                             activeOpacity={0.7}
                         >
-                            <View style={[
-                                styles.checkbox, 
-                                task.completed && styles.checkboxDone,
-                                styles.checkboxHigh
-                            ]}>
-                                {task.completed && <Check size={12} color="#000" strokeWidth={3} />}
+                            <View style={[styles.checkbox, { borderColor: colors.textSub }, task.completed && { backgroundColor: colors.success, borderColor: colors.success }]}>
+                                {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
                             </View>
                             <View style={{flex: 1}}>
                                 <Text style={[styles.taskText, { color: colors.text }, task.completed && styles.taskTextDone]} numberOfLines={1}>
                                     {task.title}
                                 </Text>
-                                {task.linked_goal_id && <View style={styles.linkedDot} />}
+                                {task.linked_goal_id && <View style={[styles.linkedDot, {backgroundColor: colors.orange}]} />}
                             </View>
                         </TouchableOpacity>
                     ))
@@ -199,7 +200,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
       </ScrollView>
 
-      {/* Floating Focus Button */}
+      {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={openFocus} activeOpacity={0.8}>
           <Play size={24} color="#FFF" fill="#FFF" style={{marginLeft: 4}} />
       </TouchableOpacity>
@@ -215,8 +216,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12, 
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     marginBottom: 10,
   },
   iconBtn: {
@@ -224,194 +225,179 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 20,
+  },
+  dateText: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 2,
   },
   headerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
+      fontSize: 28,
+      fontWeight: '700',
+      letterSpacing: 0.35,
   },
   avatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#333',
-    backgroundColor: '#171717',
+    backgroundColor: '#333',
   },
   scrollContent: {
     paddingBottom: 130, 
-    paddingTop: 10,
   },
   scoreCard: {
       marginHorizontal: 20,
-      marginBottom: 24,
-      borderRadius: 16,
+      marginBottom: 30,
+      borderRadius: 20,
       padding: 20,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 5,
   },
   scoreLabel: {
-      color: '#888',
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '600',
-      textTransform: 'uppercase',
+      letterSpacing: 1,
       marginBottom: 4,
   },
   scoreLevel: {
-      fontSize: 24,
+      fontSize: 22,
       fontWeight: '700',
   },
   scoreCircle: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
       borderWidth: 4,
       alignItems: 'center',
       justifyContent: 'center',
   },
   scoreValue: {
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '700',
-  },
-
-  welcomeSection: {
-      paddingHorizontal: 20,
-      marginBottom: 30,
-  },
-  greeting: {
-      fontSize: 32,
-      fontWeight: '700',
-      letterSpacing: -0.5,
-  },
-  subGreeting: {
-      color: '#888',
-      fontSize: 14,
-      marginTop: 4,
   },
   sectionContainer: {
-      marginBottom: 32,
+      marginBottom: 30,
   },
   sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 20,
-      marginBottom: 16,
+      marginBottom: 14,
   },
   sectionTitle: {
-      fontSize: 18,
-      fontWeight: '600',
+      fontSize: 20,
+      fontWeight: '700',
   },
-  
-  // Habits
+  seeAllText: {
+      fontSize: 15,
+      fontWeight: '500',
+  },
   habitScroll: {
       paddingHorizontal: 20,
       gap: 12,
   },
   habitCard: {
-      width: 110,
-      height: 110,
+      width: 120,
+      height: 120,
       borderRadius: 20,
       padding: 14,
       justifyContent: 'space-between',
-      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
   },
   habitTop: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'flex-start',
   },
   habitStreak: {
       fontSize: 13,
-      color: '#888',
       fontWeight: '600',
+      marginTop: 4,
   },
   checkCircle: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: '#FFF',
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  iconCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
   },
   habitTitle: {
-      fontSize: 13,
+      fontSize: 15,
       fontWeight: '600',
-      lineHeight: 18,
+      lineHeight: 20,
   },
   textMuted: {
       textDecorationLine: 'line-through',
   },
   addHabitCard: {
-      width: 50,
-      height: 110,
+      width: 60,
+      height: 120,
       borderRadius: 20,
       borderWidth: 1,
       borderStyle: 'dashed',
       alignItems: 'center',
       justifyContent: 'center',
   },
-
-  // Tasks
   taskList: {
       marginHorizontal: 20,
+      borderRadius: 20,
+      overflow: 'hidden',
   },
   taskRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 16,
       paddingHorizontal: 16,
-      borderRadius: 16,
-      marginBottom: 8,
-      borderWidth: 1,
   },
   checkbox: {
-      width: 20,
-      height: 20,
-      borderRadius: 6,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       borderWidth: 1.5,
-      borderColor: '#444',
       marginRight: 14,
       alignItems: 'center',
       justifyContent: 'center',
   },
-  checkboxDone: {
-      backgroundColor: '#FFF',
-      borderColor: '#FFF',
-  },
-  checkboxHigh: {
-      borderColor: '#EF4444', 
-  },
   taskText: {
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: '500',
       flex: 1,
   },
   taskTextDone: {
-      color: '#555',
+      color: '#8E8E93',
       textDecorationLine: 'line-through',
   },
   linkedDot: {
       width: 6,
       height: 6,
       borderRadius: 3,
-      backgroundColor: '#FF9500',
-      marginTop: 4,
+      marginTop: 6,
   },
   emptyState: {
       padding: 20,
       alignItems: 'center',
-      borderRadius: 16,
-      borderWidth: 1,
   },
   emptyText: {
-      color: '#555',
       fontStyle: 'italic',
   },
-
-  // FAB
   fab: {
       position: 'absolute',
       bottom: 110, 
@@ -419,13 +405,13 @@ const styles = StyleSheet.create({
       width: 60,
       height: 60,
       borderRadius: 30,
-      backgroundColor: '#000',
+      backgroundColor: '#007AFF', // Apple Blue
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#000',
+      shadowColor: '#007AFF',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
+      shadowOpacity: 0.4,
+      shadowRadius: 10,
       elevation: 8,
       zIndex: 100,
   }

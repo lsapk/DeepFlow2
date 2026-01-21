@@ -11,11 +11,12 @@ interface HabitsProps {
   userId: string;
   refreshHabits: () => void;
   openMenu?: () => void;
+  isDarkMode?: boolean;
 }
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']; // Dimanche to Samedi
 
-const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, refreshHabits, openMenu }) => {
+const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, refreshHabits, openMenu, isDarkMode = true }) => {
   const [showArchived, setShowArchived] = useState(false);
   const [showAllDays, setShowAllDays] = useState(false); 
   const [modalVisible, setModalVisible] = useState(false);
@@ -29,6 +30,17 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const [target, setTarget] = useState('1');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [linkedGoalId, setLinkedGoalId] = useState<string | null>(null);
+
+  const colors = {
+      bg: isDarkMode ? '#000000' : '#F2F2F7',
+      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      text: isDarkMode ? '#FFFFFF' : '#000000',
+      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      accent: '#007AFF',
+      orange: '#FF9500',
+      success: '#34C759'
+  };
 
   const openCreateModal = () => {
       setEditingHabit(null);
@@ -123,43 +135,43 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
              {openMenu && (
                   <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                      <Menu size={24} color="#FFF" />
+                      <Menu size={24} color={colors.accent} />
                   </TouchableOpacity>
              )}
              <View>
-                 <Text style={styles.largeTitle}>Habitudes</Text>
-                 <Text style={styles.subtitle}>{showAllDays ? 'Toutes les habitudes' : 'Aujourd\'hui'}</Text>
+                 <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
+                 <Text style={[styles.subtitle, {color: colors.textSub}]}>{showAllDays ? 'Toutes les habitudes' : 'Aujourd\'hui'}</Text>
              </View>
         </View>
         <View style={styles.headerButtons}>
             <TouchableOpacity 
-                style={[styles.iconBtn, showAllDays && styles.iconBtnActive]} 
+                style={[styles.iconBtn, {backgroundColor: colors.cardBg}, showAllDays && {backgroundColor: colors.border}]} 
                 onPress={() => setShowAllDays(!showAllDays)}
             >
-                <Filter size={20} color={showAllDays ? "white" : "#FFF"} />
+                <Filter size={20} color={colors.text} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-                style={[styles.iconBtn, showArchived && styles.iconBtnActive]} 
+                style={[styles.iconBtn, {backgroundColor: colors.cardBg}, showArchived && {backgroundColor: colors.border}]} 
                 onPress={() => setShowArchived(!showArchived)}
             >
-                <Archive size={20} color={showArchived ? "white" : "#FFF"} />
+                <Archive size={20} color={colors.text} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-                <Plus size={24} color="black" />
+                <Plus size={24} color={colors.accent} />
             </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {displayedHabits.length === 0 && (
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyText, {color: colors.textSub}]}>
                 {showArchived ? "Aucune archive." : (showAllDays ? "Aucune habitude crée." : "Rien de prévu aujourd'hui.")}
             </Text>
         )}
@@ -170,27 +182,27 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
             return (
                 <TouchableOpacity 
                     key={habit.id} 
-                    style={[styles.card, !isScheduledToday && styles.cardDimmed]}
+                    style={[styles.card, {backgroundColor: colors.cardBg}, !isScheduledToday && {opacity: 0.5}]}
                     onLongPress={() => openEditModal(habit)}
                     activeOpacity={0.8}
                 >
                     <View style={styles.cardHeader}>
                         <View style={styles.headerLeft}>
-                            <View style={[styles.iconContainer, { backgroundColor: isCompletedToday ? '#34C759' : '#333' }]}>
-                                <Flame size={16} color={isCompletedToday ? "white" : "#666"} fill={isCompletedToday ? "white" : "#666"} />
+                            <View style={[styles.iconContainer, { backgroundColor: isCompletedToday ? colors.success : (isDarkMode ? '#333' : '#F2F2F7') }]}>
+                                <Flame size={16} color={isCompletedToday ? "white" : colors.orange} fill={isCompletedToday ? "white" : colors.orange} />
                             </View>
                             <Text style={styles.categoryLabel}>{habit.category?.toUpperCase() || 'GENERAL'}</Text>
                         </View>
                         <Text style={styles.streakCount}>{habit.streak} jrs</Text>
                     </View>
 
-                    <Text style={styles.habitTitle}>{habit.title}</Text>
-                    {habit.description && <Text style={styles.habitDesc} numberOfLines={1}>{habit.description}</Text>}
+                    <Text style={[styles.habitTitle, {color: colors.text}]}>{habit.title}</Text>
+                    {habit.description && <Text style={[styles.habitDesc, {color: colors.textSub}]} numberOfLines={1}>{habit.description}</Text>}
 
-                    <View style={styles.cardFooter}>
+                    <View style={[styles.cardFooter, {borderTopColor: colors.border}]}>
                         <View style={styles.freqBadge}>
-                             <RefreshCw size={12} color="#666" style={{marginRight: 4}} />
-                             <Text style={styles.frequencyText}>{habit.frequency}</Text>
+                             <RefreshCw size={12} color={colors.textSub} style={{marginRight: 4}} />
+                             <Text style={[styles.frequencyText, {color: colors.textSub}]}>{habit.frequency}</Text>
                         </View>
                         
                         {!showArchived && (
@@ -198,11 +210,10 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                                 onPress={() => incrementHabit(habit.id)}
                                 style={[
                                     styles.actionButton, 
-                                    isCompletedToday ? styles.actionButtonCompleted : styles.actionButtonDefault,
-                                    !isScheduledToday && { opacity: 0.5 }
+                                    isCompletedToday ? {backgroundColor: colors.success} : {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'},
                                 ]}
                             >
-                                <Text style={[styles.actionButtonText, isCompletedToday && { color: '#000' }]}>
+                                <Text style={[styles.actionButtonText, isCompletedToday ? { color: '#FFF' } : { color: colors.text }]}>
                                     {isCompletedToday ? 'Fait' : 'Valider'}
                                 </Text>
                             </TouchableOpacity>
@@ -213,62 +224,61 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
         })}
       </ScrollView>
 
-      {/* CREATE / EDIT MODAL (Identique) */}
+      {/* CREATE / EDIT MODAL */}
       <Modal visible={modalVisible} transparent={true} animationType="slide" onRequestClose={() => setModalVisible(false)}>
           <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
+              <View style={[styles.modalContent, {backgroundColor: colors.cardBg}]}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>{editingHabit ? 'Modifier' : 'Nouvelle Habitude'}</Text>
+                      <Text style={[styles.modalTitle, {color: colors.text}]}>{editingHabit ? 'Modifier' : 'Nouvelle Habitude'}</Text>
                       <TouchableOpacity onPress={() => setModalVisible(false)}>
-                          <X size={24} color="#FFF" />
+                          <Text style={{color: colors.accent, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
                       </TouchableOpacity>
                   </View>
 
                   <ScrollView showsVerticalScrollIndicator={false}>
-                      <Text style={styles.inputLabel}>Titre</Text>
-                      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Ex: Méditation" placeholderTextColor="#666" />
+                      <Text style={styles.inputLabel}>TITRE</Text>
+                      <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={title} onChangeText={setTitle} placeholder="Ex: Méditation" placeholderTextColor={colors.textSub} />
                       
-                      <Text style={styles.inputLabel}>Description</Text>
-                      <TextInput style={[styles.input, { minHeight: 60 }]} value={description} onChangeText={setDescription} placeholder="Détails optionnels..." placeholderTextColor="#666" multiline />
+                      <Text style={styles.inputLabel}>DESCRIPTION</Text>
+                      <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 60}]} value={description} onChangeText={setDescription} placeholder="Détails optionnels..." placeholderTextColor={colors.textSub} multiline />
 
                       <View style={styles.rowInputs}>
                           <View style={{flex: 1, marginRight: 8}}>
-                                <Text style={styles.inputLabel}>Catégorie</Text>
-                                <TextInput style={styles.input} value={category} onChangeText={setCategory} placeholder="Santé" placeholderTextColor="#666" />
+                                <Text style={styles.inputLabel}>CATÉGORIE</Text>
+                                <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={category} onChangeText={setCategory} placeholder="Santé" placeholderTextColor={colors.textSub} />
                           </View>
                           <View style={{flex: 1, marginLeft: 8}}>
-                                <Text style={styles.inputLabel}>Cible / jour</Text>
-                                <TextInput style={styles.input} value={target} onChangeText={setTarget} keyboardType="numeric" placeholderTextColor="#666" />
+                                <Text style={styles.inputLabel}>CIBLE / JOUR</Text>
+                                <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={target} onChangeText={setTarget} keyboardType="numeric" placeholderTextColor={colors.textSub} />
                           </View>
                       </View>
 
-                      <Text style={styles.inputLabel}>Jours (Vide = Tous les jours)</Text>
+                      <Text style={styles.inputLabel}>JOURS</Text>
                       <View style={styles.daysContainer}>
                           {DAYS.map((d, index) => (
-                              <TouchableOpacity key={index} onPress={() => toggleDay(index)} style={[styles.dayCircle, selectedDays.includes(index) && styles.dayCircleActive]}>
-                                  <Text style={[styles.dayText, selectedDays.includes(index) && styles.dayTextActive]}>{d}</Text>
+                              <TouchableOpacity key={index} onPress={() => toggleDay(index)} style={[styles.dayCircle, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}, selectedDays.includes(index) && {backgroundColor: colors.text}]}>
+                                  <Text style={[styles.dayText, {color: colors.textSub}, selectedDays.includes(index) && {color: isDarkMode ? '#000' : '#FFF'}]}>{d}</Text>
                               </TouchableOpacity>
                           ))}
                       </View>
 
-                      <Text style={styles.inputLabel}>Lier à un objectif</Text>
+                      <Text style={styles.inputLabel}>OBJECTIF LIÉ</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.goalsContainer}>
-                          <TouchableOpacity style={[styles.goalChip, !linkedGoalId && styles.goalChipActive]} onPress={() => setLinkedGoalId(null)}>
-                               <Text style={[styles.goalChipText, !linkedGoalId && styles.goalChipTextActive]}>Aucun</Text>
+                          <TouchableOpacity style={[styles.goalChip, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}, !linkedGoalId && {backgroundColor: colors.text}]} onPress={() => setLinkedGoalId(null)}>
+                               <Text style={[styles.goalChipText, !linkedGoalId && {color: isDarkMode ? '#000' : '#FFF'}]}>Aucun</Text>
                            </TouchableOpacity>
                            {goals.map(g => (
-                               <TouchableOpacity key={g.id} style={[styles.goalChip, linkedGoalId === g.id && styles.goalChipActive]} onPress={() => setLinkedGoalId(g.id)}>
-                                   <Target size={14} color={linkedGoalId === g.id ? "#000" : "#666"} />
-                                   <Text style={[styles.goalChipText, linkedGoalId === g.id && styles.goalChipTextActive]}>{g.title}</Text>
+                               <TouchableOpacity key={g.id} style={[styles.goalChip, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}, linkedGoalId === g.id && {backgroundColor: colors.text}]} onPress={() => setLinkedGoalId(g.id)}>
+                                   <Text style={[styles.goalChipText, linkedGoalId === g.id && {color: isDarkMode ? '#000' : '#FFF'}]}>{g.title}</Text>
                                </TouchableOpacity>
                            ))}
                       </ScrollView>
 
                       {editingHabit && (
                           <View style={styles.editActions}>
-                                <TouchableOpacity style={styles.archiveBtn} onPress={() => handleArchive(editingHabit)}>
-                                    <Archive size={18} color="#FFF" />
-                                    <Text style={{color: '#FFF', fontWeight: '600'}}>{editingHabit.is_archived ? "Désarchiver" : "Archiver"}</Text>
+                                <TouchableOpacity style={[styles.archiveBtn, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}]} onPress={() => handleArchive(editingHabit)}>
+                                    <Archive size={18} color={colors.text} />
+                                    <Text style={{color: colors.text, fontWeight: '600'}}>{editingHabit.is_archived ? "Désarchiver" : "Archiver"}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(editingHabit.id)}>
                                     <Trash2 size={18} color="#FF3B30" />
@@ -277,8 +287,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                           </View>
                       )}
 
-                      <TouchableOpacity style={styles.saveMainBtn} onPress={handleSave}>
-                          <Save size={20} color="black" />
+                      <TouchableOpacity style={[styles.saveMainBtn, {backgroundColor: colors.accent}]} onPress={handleSave}>
                           <Text style={styles.saveMainBtnText}>Enregistrer</Text>
                       </TouchableOpacity>
                   </ScrollView>
@@ -292,25 +301,23 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     marginBottom: 16,
     marginTop: 10,
   },
   largeTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
-    color: '#FFF',
+    letterSpacing: 0.35,
   },
   subtitle: {
-      color: '#888',
-      fontSize: 14,
+      fontSize: 15,
   },
   headerButtons: {
       flexDirection: 'row',
@@ -320,41 +327,29 @@ const styles = StyleSheet.create({
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#171717',
       alignItems: 'center',
       justifyContent: 'center',
-  },
-  iconBtnActive: {
-      backgroundColor: '#333',
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 100,
     gap: 16,
   },
   emptyText: {
       textAlign: 'center',
-      color: '#666',
       marginTop: 20,
       fontStyle: 'italic',
   },
   card: {
-    backgroundColor: '#171717',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#262626',
-  },
-  cardDimmed: {
-      opacity: 0.6,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -368,31 +363,29 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   categoryLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: '#8E8E93',
     letterSpacing: 0.5,
   },
   streakCount: {
     fontSize: 13,
-    color: '#666',
+    color: '#8E8E93',
   },
   habitTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#FFF',
     marginBottom: 4,
   },
   habitDesc: {
-    fontSize: 13,
-    color: '#888',
+    fontSize: 14,
     marginBottom: 16,
   },
   cardFooter: {
@@ -400,7 +393,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#262626',
     paddingTop: 16,
   },
   freqBadge: {
@@ -409,7 +401,6 @@ const styles = StyleSheet.create({
   },
   frequencyText: {
     fontSize: 14,
-    color: '#666',
     textTransform: 'capitalize',
   },
   actionButton: {
@@ -417,28 +408,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-  },
-  actionButtonDefault: {
-    backgroundColor: '#FFF',
-  },
-  actionButtonCompleted: {
-    backgroundColor: '#34C759',
+    borderRadius: 18,
   },
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000',
   },
   
-  // MODAL styles same as previous
+  // MODAL
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-      backgroundColor: '#171717',
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       padding: 20,
@@ -453,24 +436,19 @@ const styles = StyleSheet.create({
   modalTitle: {
       fontSize: 20,
       fontWeight: '700',
-      color: '#FFF',
   },
   inputLabel: {
       fontSize: 12,
-      color: '#666',
+      color: '#8E8E93',
       fontWeight: '600',
-      marginBottom: 6,
+      marginBottom: 8,
       textTransform: 'uppercase',
   },
   input: {
-      backgroundColor: '#000',
-      borderRadius: 10,
+      borderRadius: 12,
       padding: 14,
-      fontSize: 16,
-      marginBottom: 16,
-      color: '#FFF',
-      borderWidth: 1,
-      borderColor: '#333',
+      fontSize: 17,
+      marginBottom: 20,
   },
   rowInputs: {
       flexDirection: 'row',
@@ -478,56 +456,38 @@ const styles = StyleSheet.create({
   daysContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 20,
+      marginBottom: 24,
   },
   dayCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: '#333',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
   },
-  dayCircleActive: {
-      backgroundColor: '#007AFF',
-  },
   dayText: {
-      color: '#888',
       fontWeight: '600',
-  },
-  dayTextActive: {
-      color: '#FFF',
+      fontSize: 15,
   },
   goalsContainer: {
       flexDirection: 'row',
-      marginBottom: 20,
+      marginBottom: 24,
   },
   goalChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
       borderRadius: 20,
-      backgroundColor: '#333',
-      marginRight: 8,
-  },
-  goalChipActive: {
-      backgroundColor: '#FFF',
+      marginRight: 10,
   },
   goalChipText: {
-      color: '#BBB',
-      fontSize: 13,
-  },
-  goalChipTextActive: {
-      color: '#000',
+      fontSize: 14,
       fontWeight: '600',
+      color: '#8E8E93',
   },
   editActions: {
       flexDirection: 'row',
       gap: 12,
-      marginBottom: 20,
-      marginTop: 10,
+      marginBottom: 24,
   },
   archiveBtn: {
       flex: 1,
@@ -535,9 +495,8 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      backgroundColor: '#333',
-      padding: 12,
-      borderRadius: 10,
+      padding: 14,
+      borderRadius: 12,
   },
   deleteBtn: {
       flex: 1,
@@ -546,24 +505,21 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       gap: 6,
       backgroundColor: 'rgba(255, 59, 48, 0.1)',
-      padding: 12,
-      borderRadius: 10,
+      padding: 14,
+      borderRadius: 12,
   },
   saveMainBtn: {
       flexDirection: 'row',
-      backgroundColor: '#FFF',
       padding: 16,
-      borderRadius: 12,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
-      marginTop: 10,
       marginBottom: 40,
   },
   saveMainBtnText: {
-      color: 'black',
+      color: '#FFF',
       fontWeight: '700',
-      fontSize: 16,
+      fontSize: 17,
   }
 });
 

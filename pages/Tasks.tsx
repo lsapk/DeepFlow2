@@ -19,9 +19,10 @@ interface TasksProps {
   userId: string;
   refreshTasks: () => void;
   openMenu?: () => void; 
+  isDarkMode?: boolean;
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, userId, refreshTasks, openMenu }) => {
+const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -32,6 +33,17 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   const [formPriority, setFormPriority] = useState<Task['priority']>('medium');
   const [formGoalId, setFormGoalId] = useState<string | null>(null);
   const [formDate, setFormDate] = useState('');
+
+  const colors = {
+      bg: isDarkMode ? '#000000' : '#F2F2F7',
+      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      text: isDarkMode ? '#FFFFFF' : '#000000',
+      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      accent: '#007AFF',
+      danger: '#FF3B30',
+      success: '#34C759'
+  };
 
   const openCreateModal = () => {
       setFormTitle('');
@@ -99,25 +111,25 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   const completedTasks = tasks.filter(t => t.completed);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
               {openMenu && (
                   <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
-                      <Menu size={24} color="#FFF" />
+                      <Menu size={24} color={colors.accent} />
                   </TouchableOpacity>
               )}
-              <Text style={styles.largeTitle}>Tâches</Text>
+              <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-                <Plus size={24} color="#000" />
+                <Plus size={24} color={colors.accent} />
           </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.listGroup}>
+        <View style={[styles.listGroup, {backgroundColor: colors.cardBg}]}>
             {activeTasks.length === 0 && (
-                <Text style={styles.emptyText}>Rien à faire.</Text>
+                <Text style={[styles.emptyText, {color: colors.textSub}]}>Rien à faire.</Text>
             )}
             {activeTasks.map((task, index) => (
                 <View key={task.id}>
@@ -129,16 +141,17 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                         onLongPress={() => openEditModal(task)}
                         userId={userId}
                         refreshTasks={refreshTasks}
+                        colors={colors}
                     />
-                    {index < activeTasks.length - 1 && <View style={styles.separator} />}
+                    {index < activeTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
                 </View>
             ))}
         </View>
 
         {completedTasks.length > 0 && (
              <View style={styles.completedGroup}>
-                <Text style={styles.groupHeader}>Terminées</Text>
-                <View style={styles.listGroup}>
+                <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES</Text>
+                <View style={[styles.listGroup, {backgroundColor: colors.cardBg}]}>
                     {completedTasks.map((task, index) => (
                         <View key={task.id}>
                              <TaskItem 
@@ -149,8 +162,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                                 onLongPress={() => openEditModal(task)}
                                 userId={userId}
                                 refreshTasks={refreshTasks}
+                                colors={colors}
                             />
-                            {index < completedTasks.length - 1 && <View style={styles.separator} />}
+                            {index < completedTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
                         </View>
                     ))}
                 </View>
@@ -162,92 +176,90 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       <Modal
         visible={createModalVisible || editModalVisible}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => {
             setCreateModalVisible(false);
             setEditModalVisible(false);
         }}
       >
           <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
+              <View style={[styles.modalContent, {backgroundColor: colors.cardBg}]}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>{createModalVisible ? 'Nouvelle Tâche' : 'Modifier'}</Text>
+                      <Text style={[styles.modalTitle, {color: colors.text}]}>{createModalVisible ? 'Nouvelle Tâche' : 'Modifier'}</Text>
                       <TouchableOpacity onPress={() => { setCreateModalVisible(false); setEditModalVisible(false); }}>
-                          <X size={24} color="#FFF" />
+                          <Text style={{color: colors.accent, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
                       </TouchableOpacity>
                   </View>
 
-                  <ScrollView>
-                    <Text style={styles.label}>Titre</Text>
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    <Text style={styles.label}>TITRE</Text>
                     <TextInput 
-                        style={styles.modalInput} 
+                        style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} 
                         value={formTitle} 
                         onChangeText={setFormTitle} 
-                        color="#FFF"
+                        placeholder="Ex: Payer loyer"
+                        placeholderTextColor={colors.textSub}
                     />
 
-                    <Text style={styles.label}>Date d'échéance (YYYY-MM-DD)</Text>
-                    <View style={styles.inputWithIcon}>
-                        <Calendar size={18} color="#666" style={{marginRight: 10}} />
-                        <TextInput 
-                            style={[styles.modalInput, {flex: 1, height: 'auto', marginBottom: 0, borderWidth: 0}]} 
-                            value={formDate} 
-                            onChangeText={setFormDate} 
-                            placeholder="ex: 2024-12-31"
-                            placeholderTextColor="#666"
-                            color="#FFF"
-                        />
-                    </View>
-
-                    <Text style={styles.label}>Priorité</Text>
+                    <Text style={styles.label}>PRIORITÉ</Text>
                     <View style={styles.priorityRow}>
                          {(['low', 'medium', 'high'] as const).map(p => (
                              <TouchableOpacity 
                                 key={p}
-                                style={[styles.priorityPill, formPriority === p && styles.priorityPillActive]}
+                                style={[
+                                    styles.priorityPill, 
+                                    {backgroundColor: isDarkMode ? '#333' : '#EEE'},
+                                    formPriority === p && {backgroundColor: colors.text}
+                                ]}
                                 onPress={() => setFormPriority(p)}
                              >
-                                 <Text style={{color: formPriority === p ? '#000' : '#888', fontWeight: '600', textTransform: 'capitalize'}}>{p}</Text>
+                                 <Text style={{color: formPriority === p ? (isDarkMode ? '#000' : '#FFF') : colors.textSub, fontWeight: '600', textTransform: 'capitalize'}}>{p}</Text>
                              </TouchableOpacity>
                          ))}
                     </View>
 
-                    <Text style={styles.label}>Description</Text>
-                    <View style={styles.inputWithIcon}>
-                         <AlignLeft size={18} color="#666" style={{marginRight: 10}} />
-                         <TextInput 
-                            style={[styles.modalInput, {flex: 1, height: 'auto', minHeight: 60, marginBottom: 0, borderWidth: 0}]} 
-                            value={formDesc} 
-                            onChangeText={setFormDesc} 
-                            placeholder="Détails de la tâche..."
-                            placeholderTextColor="#666"
-                            multiline
-                            color="#FFF"
+                    <Text style={styles.label}>DESCRIPTION</Text>
+                    <TextInput 
+                        style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 80, paddingTop: 10}]} 
+                        value={formDesc} 
+                        onChangeText={setFormDesc} 
+                        placeholder="Détails de la tâche..."
+                        placeholderTextColor={colors.textSub}
+                        multiline
+                    />
+
+                    <Text style={styles.label}>DATE (YYYY-MM-DD)</Text>
+                    <View style={[styles.inputWithIcon, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7'}]}>
+                        <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
+                        <TextInput 
+                            style={[styles.transparentInput, {color: colors.text}]} 
+                            value={formDate} 
+                            onChangeText={setFormDate} 
+                            placeholder="ex: 2024-12-31"
+                            placeholderTextColor={colors.textSub}
                         />
                     </View>
 
-                    <Text style={styles.label}>Lier à un objectif</Text>
+                    <Text style={styles.label}>OBJECTIF LIÉ</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.goalsContainer}>
                         <TouchableOpacity 
-                                style={[styles.goalChip, !formGoalId && styles.goalChipActive]}
+                                style={[styles.goalChip, {backgroundColor: isDarkMode ? '#333' : '#EEE'}, !formGoalId && {backgroundColor: colors.text}]}
                                 onPress={() => setFormGoalId(null)}
                            >
-                               <Text style={[styles.goalChipText, !formGoalId && styles.goalChipTextActive]}>Aucun</Text>
+                               <Text style={[styles.goalChipText, !formGoalId && {color: isDarkMode ? '#000' : '#FFF'}]}>Aucun</Text>
                            </TouchableOpacity>
                            {goals.map(g => (
                                <TouchableOpacity 
                                     key={g.id} 
-                                    style={[styles.goalChip, formGoalId === g.id && styles.goalChipActive]}
+                                    style={[styles.goalChip, {backgroundColor: isDarkMode ? '#333' : '#EEE'}, formGoalId === g.id && {backgroundColor: colors.text}]}
                                     onPress={() => setFormGoalId(g.id)}
                                >
-                                   <Target size={14} color={formGoalId === g.id ? "#000" : "#666"} />
-                                   <Text style={[styles.goalChipText, formGoalId === g.id && styles.goalChipTextActive]}>{g.title}</Text>
+                                   <Text style={[styles.goalChipText, formGoalId === g.id && {color: isDarkMode ? '#000' : '#FFF'}]}>{g.title}</Text>
                                </TouchableOpacity>
                            ))}
                     </ScrollView>
 
-                    <TouchableOpacity style={styles.saveBtn} onPress={createModalVisible ? handleAdd : handleUpdateTask}>
-                        <Save size={20} color="black" />
+                    <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={createModalVisible ? handleAdd : handleUpdateTask}>
                         <Text style={styles.saveBtnText}>Enregistrer</Text>
                     </TouchableOpacity>
 
@@ -266,8 +278,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                                 }
                             }}
                         >
-                            <Trash2 size={20} color="#FF3B30" />
-                            <Text style={styles.deleteText}>Supprimer</Text>
+                            <Text style={styles.deleteText}>Supprimer la tâche</Text>
                         </TouchableOpacity>
                     )}
                   </ScrollView>
@@ -287,9 +298,10 @@ interface TaskItemProps {
     onLongPress: () => void;
     userId: string;
     refreshTasks: () => void;
+    colors: any;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshTasks }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshTasks, colors }) => {
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
     const addSubtask = async () => {
@@ -317,7 +329,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
     };
 
     return (
-        <View style={styles.taskItemContainer}>
+        <View>
             <TouchableOpacity 
                 style={styles.taskItem} 
                 onPress={onToggleExpand}
@@ -328,61 +340,61 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                     onPress={onToggle}
                     style={[
                         styles.checkbox,
-                        task.completed && { backgroundColor: '#FFF', borderColor: '#FFF' }
+                        { borderColor: colors.textSub },
+                        task.completed && { backgroundColor: colors.success, borderColor: colors.success }
                     ]}
                 >
-                    {task.completed && <Check size={14} color="black" strokeWidth={4} />}
+                    {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
                 </TouchableOpacity>
                 
                 <View style={styles.taskContent}>
-                    <Text style={[styles.taskTitle, task.completed && styles.taskTitleCompleted]}>
+                    <Text style={[styles.taskTitle, {color: colors.text}, task.completed && styles.taskTitleCompleted]}>
                         {task.title}
                     </Text>
-                    {task.due_date && <Text style={styles.dateText}>📅 {new Date(task.due_date).toLocaleDateString()}</Text>}
+                    {task.due_date && <Text style={[styles.dateText, {color: colors.textSub}]}>{new Date(task.due_date).toLocaleDateString()}</Text>}
                     
-                    {task.linked_goal_id && <View style={styles.linkedDot} />}
                     {task.subtasks && task.subtasks.length > 0 && (
-                        <Text style={styles.subtaskCount}>
+                        <Text style={[styles.subtaskCount, {color: colors.textSub}]}>
                             {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
                         </Text>
                     )}
                 </View>
 
                 <TouchableOpacity onPress={onToggleExpand} style={styles.expandBtn}>
-                     {isExpanded ? <ChevronUp size={16} color="#666" /> : <ChevronDown size={16} color="#666" />}
+                     {isExpanded ? <ChevronUp size={20} color={colors.textSub} /> : <ChevronDown size={20} color={colors.textSub} />}
                 </TouchableOpacity>
             </TouchableOpacity>
 
             {isExpanded && (
-                <View style={styles.subtaskList}>
+                <View style={[styles.subtaskList, {backgroundColor: colors.cardBg, borderTopColor: colors.border}]}>
                     {task.description && (
-                        <Text style={styles.taskDescPreview}>{task.description}</Text>
+                        <Text style={[styles.taskDescPreview, {color: colors.textSub}]}>{task.description}</Text>
                     )}
                     
                     {task.subtasks?.map(sub => (
-                        <View key={sub.id} style={styles.subtaskRow}>
-                            <TouchableOpacity onPress={() => toggleSubtask(sub)} style={styles.subCheck}>
-                                {sub.completed && <View style={styles.subCheckInner} />}
+                        <View key={sub.id} style={[styles.subtaskRow, {borderBottomColor: colors.border}]}>
+                            <TouchableOpacity onPress={() => toggleSubtask(sub)} style={[styles.subCheck, {borderColor: colors.textSub}]}>
+                                {sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}
                             </TouchableOpacity>
-                            <Text style={[styles.subtaskText, sub.completed && styles.subtaskTextDone]}>
+                            <Text style={[styles.subtaskText, {color: colors.text}, sub.completed && styles.subtaskTextDone]}>
                                 {sub.title}
                             </Text>
                             <TouchableOpacity onPress={() => deleteSubtask(sub.id)}>
-                                <X size={14} color="#666" />
+                                <X size={14} color={colors.textSub} />
                             </TouchableOpacity>
                         </View>
                     ))}
                     <View style={styles.addSubtaskRow}>
                         <TextInput 
-                            style={styles.subInput} 
+                            style={[styles.subInput, {color: colors.text}]} 
                             placeholder="Ajouter sous-tâche..." 
-                            placeholderTextColor="#666"
+                            placeholderTextColor={colors.textSub}
                             value={newSubtaskTitle}
                             onChangeText={setNewSubtaskTitle}
                             onSubmitEditing={addSubtask}
                         />
                         <TouchableOpacity onPress={addSubtask}>
-                            <Plus size={18} color="#007AFF" />
+                            <Plus size={20} color={colors.accent} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -394,27 +406,24 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     paddingTop: 20,
   },
   header: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    marginBottom: 20,
     marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
   largeTitle: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
-    color: '#FFF',
+    letterSpacing: 0.35,
   },
   addButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -425,51 +434,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 150,
   },
   listGroup: {
-    backgroundColor: '#171717',
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#262626',
   },
   completedGroup: {
-    marginTop: 32,
+    marginTop: 30,
   },
   groupHeader: {
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#FFF',
     marginBottom: 8,
-    marginLeft: 4,
+    marginLeft: 16,
+    textTransform: 'uppercase',
   },
   emptyText: {
-    padding: 16,
-    color: '#666',
+    padding: 20,
+    textAlign: 'center',
     fontStyle: 'italic',
-  },
-  taskItemContainer: {
-      backgroundColor: '#171717',
   },
   taskItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    minHeight: 60,
   },
   separator: {
     height: 1,
-    backgroundColor: '#262626',
-    marginLeft: 16, 
+    marginLeft: 56, 
   },
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#444',
-    marginRight: 14,
+    marginRight: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -477,140 +479,122 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   taskTitle: {
-    fontSize: 16,
-    color: '#FFF',
+    fontSize: 17,
     fontWeight: '500',
   },
   dateText: {
-      fontSize: 11,
-      color: '#007AFF',
+      fontSize: 12,
       marginTop: 2,
   },
   taskTitleCompleted: {
-    color: '#666',
+    opacity: 0.5,
     textDecorationLine: 'line-through',
   },
-  linkedDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: '#FF9500',
-      marginTop: 4,
-  },
   subtaskCount: {
-      fontSize: 11,
-      color: '#666',
+      fontSize: 12,
       marginTop: 2,
   },
   expandBtn: {
       padding: 8,
   },
   subtaskList: {
-      backgroundColor: '#121212',
       paddingHorizontal: 16,
       paddingBottom: 16,
       borderTopWidth: 1,
-      borderTopColor: '#262626',
   },
   taskDescPreview: {
-      fontSize: 13,
-      color: '#888',
-      marginBottom: 10,
-      fontStyle: 'italic',
+      fontSize: 14,
+      marginBottom: 12,
+      marginTop: 8,
+      marginLeft: 40, 
   },
   subtaskRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 10,
+      paddingVertical: 12,
+      marginLeft: 40,
       borderBottomWidth: 0.5,
-      borderBottomColor: '#222',
   },
   subCheck: {
-      width: 16,
-      height: 16,
-      borderRadius: 4,
-      borderWidth: 1,
-      borderColor: '#555',
-      marginRight: 10,
+      width: 18,
+      height: 18,
+      borderRadius: 6,
+      borderWidth: 1.5,
+      marginRight: 12,
       alignItems: 'center',
       justifyContent: 'center',
   },
   subCheckInner: {
       width: 10,
       height: 10,
-      backgroundColor: '#007AFF',
       borderRadius: 2,
   },
   subtaskText: {
-      color: '#DDD',
-      fontSize: 14,
+      fontSize: 15,
       flex: 1,
   },
   subtaskTextDone: {
-      color: '#555',
+      opacity: 0.5,
       textDecorationLine: 'line-through',
   },
   addSubtaskRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 10,
+      marginTop: 12,
+      marginLeft: 40,
   },
   subInput: {
       flex: 1,
-      color: '#FFF',
-      fontSize: 14,
+      fontSize: 15,
       marginRight: 10,
   },
+  
+  // MODAL
   modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      justifyContent: 'center',
-      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
   },
   modalContent: {
-      width: '85%',
-      backgroundColor: '#171717',
-      borderRadius: 16,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
       padding: 20,
-      borderWidth: 1,
-      borderColor: '#333',
+      paddingBottom: 40,
+      maxHeight: '90%',
   },
   modalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 20,
+      marginBottom: 24,
   },
   modalTitle: {
       fontSize: 20,
       fontWeight: '700',
-      color: '#FFF',
   },
   label: {
       fontSize: 12,
-      color: '#888',
-      marginBottom: 6,
-      marginTop: 12,
-      textTransform: 'uppercase',
+      color: '#8E8E93',
+      marginBottom: 8,
+      marginTop: 16,
+      fontWeight: '600',
+      letterSpacing: 0.5,
   },
   modalInput: {
-      backgroundColor: '#000',
-      padding: 12,
-      borderRadius: 8,
-      fontSize: 16,
-      color: '#FFF',
-      borderWidth: 1,
-      borderColor: '#333',
-      marginBottom: 16,
+      padding: 14,
+      borderRadius: 12,
+      fontSize: 17,
   },
   inputWithIcon: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#000',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#333',
-      paddingHorizontal: 12,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+  },
+  transparentInput: {
+      flex: 1,
+      height: 50,
+      fontSize: 17,
   },
   priorityRow: {
       flexDirection: 'row',
@@ -618,66 +602,45 @@ const styles = StyleSheet.create({
   },
   priorityPill: {
       paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: '#333',
-  },
-  priorityPillActive: {
-      backgroundColor: '#FFF',
+      paddingVertical: 10,
+      borderRadius: 10,
+      flex: 1,
+      alignItems: 'center',
   },
   goalsContainer: {
       flexDirection: 'row',
   },
   goalChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
       borderRadius: 20,
-      backgroundColor: '#333',
-      marginRight: 8,
-  },
-  goalChipActive: {
-      backgroundColor: '#FFF',
+      marginRight: 10,
   },
   goalChipText: {
-      color: '#BBB',
-      fontSize: 13,
-  },
-  goalChipTextActive: {
-      color: '#000',
+      fontSize: 14,
       fontWeight: '600',
+      color: '#8E8E93',
   },
   deleteActionBtn: {
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      padding: 12,
-      backgroundColor: 'rgba(255,59,48,0.1)',
-      borderRadius: 8,
+      padding: 16,
       marginTop: 20,
-      marginBottom: 10,
-      gap: 8,
   },
   deleteText: {
       color: '#FF3B30',
       fontWeight: '600',
+      fontSize: 17,
   },
   saveBtn: {
-      backgroundColor: '#FFF',
-      padding: 14,
-      borderRadius: 12,
+      padding: 16,
+      borderRadius: 14,
       alignItems: 'center',
-      marginTop: 20,
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 8,
+      marginTop: 30,
   },
   saveBtnText: {
-      color: 'black',
-      fontWeight: '600',
-      fontSize: 16,
+      color: '#FFF',
+      fontWeight: '700',
+      fontSize: 17,
   }
 });
 

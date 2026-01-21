@@ -290,39 +290,58 @@ const App: React.FC = () => {
 
   // --- TOGGLES WITH OPTIMISTIC UPDATES ---
   const toggleHabit = async (id: string) => {
-      // 1. Mise à jour Optimiste
+      const habit = habits.find(h => h.id === id);
+      if (!habit || !player || !user) return;
+
       const today = new Date().toISOString().split('T')[0];
       const nowIso = new Date().toISOString();
-      let shouldUpdateDb = false;
+      const isAlreadyDone = habit.last_completed_at && habit.last_completed_at.startsWith(today);
 
-      const updatedHabits = habits.map(h => {
+      // Optimistic Update
+      const newHabits = habits.map(h => {
           if (h.id === id) {
-              const isAlreadyDone = h.last_completed_at && h.last_completed_at.startsWith(today);
-              if (!isAlreadyDone) {
-                  shouldUpdateDb = true;
+              if (isAlreadyDone) {
+                  // Undo
+                  return { ...h, streak: Math.max(0, h.streak - 1), last_completed_at: null }; // UI trick: null makes it undone
+              } else {
+                  // Do
                   return { ...h, streak: h.streak + 1, last_completed_at: nowIso };
               }
           }
           return h;
       });
-      
-      if (shouldUpdateDb) {
-          setHabits(updatedHabits); // Update UI Immediately
+      setHabits(newHabits);
+
+      if (isAlreadyDone) {
+          // DELETE COMPLETION
+          await supabase.from('habit_completions')
+            .delete()
+            .eq('habit_id', id)
+            .eq('completed_date', today);
           
-          // 2. Database Update
-          const habit = habits.find(h => h.id === id);
-          if (habit && player && user) {
-              await supabase.from('habits').update({ streak: habit.streak + 1, last_completed_at: nowIso }).eq('id', id);
-              await supabase.from('habit_completions').insert({
-                  habit_id: id,
-                  user_id: user.id,
-                  completed_date: today
-              });
-              
-              const { addXp, REWARDS } = await import('./services/gamification');
-              await addXp(user.id, REWARDS.HABIT, player);
-          }
+          await supabase.from('habits')
+            .update({ streak: Math.max(0, habit.streak - 1), last_completed_at: null }) // We can't easily know previous last_completed_at without query, so null is safer visually or handle logic deeper
+            .eq('id', id);
+            
+          // On pourrait retirer de l'XP ici, mais c'est punitif. On laisse l'XP acquise.
+      } else {
+          // ADD COMPLETION
+          await supabase.from('habit_completions').insert({
+              habit_id: id,
+              user_id: user.id,
+              completed_date: today
+          });
+          
+          await supabase.from('habits')
+            .update({ streak: habit.streak + 1, last_completed_at: nowIso })
+            .eq('id', id);
+          
+          const { addXp, REWARDS } = await import('./services/gamification');
+          await addXp(user.id, REWARDS.HABIT, player);
       }
+      
+      // Refresh to ensure server sync state (especially for correct previous date if undone)
+      setTimeout(() => fetchHabits(user.id), 500); 
   };
 
   const toggleTask = async (id: string) => {
@@ -521,14 +540,14 @@ const styles = StyleSheet.create({
     },
     levelUpCard: {
         width: '80%',
-        backgroundColor: '#171717',
+        backgroundColor: '#1C1C1E',
         borderRadius: 24,
         padding: 30,
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#C4B5FD',
-        shadowColor: '#C4B5FD',
-        shadowOffset: {width: 0, height: 0},
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 10},
         shadowOpacity: 0.5,
         shadowRadius: 20,
     },
@@ -538,6 +557,7 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         marginBottom: 10,
         textAlign: 'center',
+        letterSpacing: 0.5,
     },
     levelUpSub: {
         color: '#DDD',
