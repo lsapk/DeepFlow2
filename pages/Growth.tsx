@@ -294,10 +294,9 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
             >
                 {messages.map((msg, index) => (
                     <View key={index} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : [styles.aiBubble, { backgroundColor: isDarkMode ? '#262626' : '#E5E5EA' }]]}>
-                        {/* FIX: Explicit color for AI text in Dark Mode */}
                         <Text style={[
-                            msg.role === 'user' ? styles.userText : styles.aiText, 
-                            msg.role === 'ai' && { color: isDarkMode ? '#FFF' : '#000' }
+                            styles.messageText, 
+                            { color: msg.role === 'user' ? '#FFF' : (isDarkMode ? '#FFF' : '#000') }
                         ]}>
                             {msg.text}
                         </Text>
@@ -383,6 +382,7 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 10, // BUTTONS ON TOP
   },
   headerTitle: {
       fontSize: 22,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       textAlign: 'center',
-      zIndex: -1,
+      // Removed zIndex: -1
   },
   avatar: {
     width: 36,
@@ -399,6 +399,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#333',
+    zIndex: 10, // BUTTONS ON TOP
   },
   tabBar: {
       flexDirection: 'row',
@@ -545,11 +546,7 @@ const styles = StyleSheet.create({
       alignSelf: 'flex-start',
       borderBottomLeftRadius: 4,
   },
-  userText: {
-      color: '#FFF',
-      fontSize: 15,
-  },
-  aiText: {
+  messageText: {
       fontSize: 15,
       lineHeight: 22,
   },

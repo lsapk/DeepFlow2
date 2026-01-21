@@ -420,19 +420,21 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     textAlign: 'center',
-    zIndex: -1,
+    // Removed zIndex: -1
   },
   addButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10, // BUTTONS ON TOP
   },
   menuButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10, // BUTTONS ON TOP
   },
   scrollContent: {
     paddingHorizontal: 20,

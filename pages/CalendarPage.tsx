@@ -376,6 +376,7 @@ const styles = StyleSheet.create({
         height: 40,
         alignItems: 'center',
         justifyContent: 'center',
+        zIndex: 10, // BUTTONS ON TOP
     },
     googleBtn: {
         width: 40,
@@ -384,6 +385,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderRadius: 20,
         backgroundColor: '#1C1C1E',
+        zIndex: 10, // BUTTONS ON TOP
     },
     headerTitle: {
         fontSize: 22,
@@ -393,7 +395,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         textAlign: 'center',
-        zIndex: -1,
+        // Removed zIndex: -1
     },
     monthNav: {
         flexDirection: 'row',

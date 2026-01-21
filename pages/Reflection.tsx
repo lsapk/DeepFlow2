@@ -258,6 +258,7 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10, // BUTTONS ON TOP
   },
   headerTitle: {
       fontSize: 22,
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       textAlign: 'center',
-      zIndex: -1,
+      // Removed zIndex: -1
   },
   toggleBtn: {
       flexDirection: 'row',
@@ -275,6 +276,7 @@ const styles = StyleSheet.create({
       paddingHorizontal: 12,
       borderRadius: 16,
       gap: 6,
+      zIndex: 10, // BUTTONS ON TOP
   },
   toggleText: {
       fontSize: 12,

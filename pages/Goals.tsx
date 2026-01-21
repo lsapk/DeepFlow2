@@ -400,13 +400,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     textAlign: 'center',
-    zIndex: -1,
+    // Removed zIndex: -1
   },
   iconBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10, // BUTTONS ON TOP
   },
   addButton: {
     width: 40,
@@ -414,6 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10, // BUTTONS ON TOP
   },
   scrollContent: {
     paddingHorizontal: 20,

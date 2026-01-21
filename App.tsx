@@ -461,7 +461,7 @@ const App: React.FC = () => {
       case ViewState.CALENDAR:
         return <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       case ViewState.FOCUS_MODE:
-        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} />;
+        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={() => setSidebarVisible(true)} />;
       case ViewState.JOURNAL:
         return <Journal userId={user.id} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       default:

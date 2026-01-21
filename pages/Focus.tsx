@@ -126,15 +126,22 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('focus_sessions')
         .select('*')
         .eq('user_id', user.id)
         .order('completed_at', { ascending: false })
         .limit(20);
+      
+      if (error) {
+          console.error("Error fetching history:", error);
+      }
         
       if (data) {
           setHistory(data);
+          // Only calculate total based on what we fetched? Or should be a separate aggregate query.
+          // For now, let's sum up loaded history as "recent total" or fetch all.
+          // Let's do a separate simple query for total if needed, or just sum current.
           const total = data.reduce((acc, curr) => acc + (curr.duration || 0), 0);
           setTotalTime(total);
       }
@@ -389,9 +396,14 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 40}}>
               {history.length === 0 && <Text style={{color: colors.subText, textAlign: 'center', marginTop: 20}}>Aucune session récente.</Text>}
               {history.map(session => {
-                  const d = session.completed_at ? new Date(session.completed_at) : new Date();
-                  const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                  const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                  let dateStr = 'Date inconnue';
+                  let timeStr = '';
+                  
+                  if (session.completed_at) {
+                      const d = new Date(session.completed_at);
+                      dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                      timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                  }
                   
                   return (
                       <View key={session.id} style={[styles.historyItem, { backgroundColor: colors.card }]}>
@@ -435,12 +447,8 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         {viewMode === 'RUNNING' && renderRunning()}
         {viewMode === 'MANUAL' && renderManual()}
         {viewMode === 'HISTORY' && renderHistory()}
-
-        {viewMode === 'CONFIG' && (
-             <TouchableOpacity style={styles.closeFloat} onPress={onExit}>
-                <X size={24} color="#8E8E93" />
-             </TouchableOpacity>
-        )}
+        
+        {/* Floating close removed as requested, keeping header close button logic in App.tsx or implicit back not needed if full view logic handles it */}
     </View>
   );
 };
@@ -460,6 +468,7 @@ const styles = StyleSheet.create({
   },
   menuBtn: {
       padding: 8,
+      zIndex: 10, // BUTTONS ON TOP
   },
   headerTitle: {
       fontSize: 20,
@@ -468,23 +477,18 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       textAlign: 'center',
-      zIndex: -1,
+      // Removed zIndex: -1 to ensure visibility
   },
   modeTabs: {
       flexDirection: 'row',
       borderRadius: 12,
       padding: 4,
+      zIndex: 10, // BUTTONS ON TOP
   },
   tab: {
       paddingVertical: 8,
       paddingHorizontal: 12,
       borderRadius: 8,
-  },
-  closeFloat: {
-      position: 'absolute',
-      bottom: 40,
-      alignSelf: 'center',
-      padding: 12,
   },
   title: {
       fontSize: 28,

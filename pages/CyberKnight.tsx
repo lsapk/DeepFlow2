@@ -251,6 +251,7 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 10, // BUTTONS ON TOP
   },
   largeTitle: {
       fontSize: 22,
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       textAlign: 'center',
-      zIndex: -1,
+      // Removed zIndex: -1
   },
   avatar: {
     width: 36,
@@ -267,6 +268,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#333',
+    zIndex: 10, // BUTTONS ON TOP
   },
   tabContainer: {
       flexDirection: 'row',
