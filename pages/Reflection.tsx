@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Reflection } from '../types';
-import { BrainCircuit, Sparkles, Send, X, Plus, Menu, Save, RefreshCw } from 'lucide-react-native';
+import { BookOpen, Sparkles, Send, History, RefreshCw, PenLine, Menu, Calendar } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { addXp, REWARDS } from '../services/gamification';
-import { generateReflectionQuestion } from '../services/ai';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ReflectionProps {
   userId: string;
@@ -12,158 +12,235 @@ interface ReflectionProps {
   isDarkMode?: boolean;
 }
 
+// 1. Base de données de questions (Extrait des 110+ questions)
+const REFLECTION_QUESTIONS = [
+    // Connaissance de soi
+    "Quelle est votre plus grande source de motivation dans la vie ?",
+    "Comment décririez-vous votre personnalité en quelques mots ?",
+    "Quelles sont les trois valeurs les plus importantes pour vous ?",
+    "Qu'est-ce qui vous draine le plus d'énergie au quotidien ?",
+    "Dans quelles situations vous sentez-vous le plus authentique ?",
+    
+    // Développement personnel
+    "Quelle version de vous-même voulez-vous devenir dans 5 ans ?",
+    "Quelle habitude transformerait le plus votre vie si vous la maîtrisiez ?",
+    "Quel est le plus grand obstacle qui vous empêche d'avancer aujourd'hui ?",
+    "Quelle compétence aimeriez-vous apprendre cette année ?",
+    "Si vous n'aviez pas peur d'échouer, que feriez-vous ?",
+
+    // Questions profondes
+    "Qui êtes-vous vraiment quand personne ne vous regarde ?",
+    "Quel événement de votre enfance a le plus façonné qui vous êtes aujourd'hui ?",
+    "Quelle est la leçon la plus difficile que vous ayez dû apprendre ?",
+    "Si vous pouviez envoyer un message à votre 'vous' d'il y a 10 ans, que diriez-vous ?",
+    "Qu'est-ce que vous ne pardonnez pas encore ?",
+
+    // Réflexions émotionnelles
+    "Quelle émotion avez-vous le plus de mal à exprimer et pourquoi ?",
+    "Quel masque portez-vous le plus souvent face aux autres ?",
+    "Quand avez-vous pleuré pour la dernière fois et pourquoi ?",
+    "De quoi êtes-vous le plus reconnaissant aujourd'hui ?",
+    "Quelle relation dans votre vie a besoin de plus d'attention ?"
+];
+
 const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMode = true }) => {
-  const [reflections, setReflections] = useState<Reflection[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [viewMode, setViewMode] = useState<'WRITE' | 'HISTORY'>('WRITE');
   
-  const [question, setQuestion] = useState('Chargement de la question...');
-  const [answer, setAnswer] = useState('');
-  const [loadingQ, setLoadingQ] = useState(false);
+  // State Data
+  const [reflections, setReflections] = useState<Reflection[]>([]);
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const colors = {
       bg: isDarkMode ? '#000' : '#F2F2F7',
       card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       text: isDarkMode ? '#FFF' : '#000',
       subText: isDarkMode ? '#8E8E93' : '#8E8E93',
-      border: isDarkMode ? '#2C2C2E' : '#DDD',
-      accent: '#C4B5FD',
-      button: '#007AFF'
+      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+      inputBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      accent: '#C4B5FD', // Violet soft
+      button: '#007AFF', // Apple Blue
+      questionBg: isDarkMode ? 'rgba(196, 181, 253, 0.1)' : '#F5F3FF'
   };
 
   useEffect(() => {
+      generateRandomQuestion();
       fetchReflections();
   }, [userId]);
 
+  const generateRandomQuestion = () => {
+      const randomIndex = Math.floor(Math.random() * REFLECTION_QUESTIONS.length);
+      setCurrentQuestion(REFLECTION_QUESTIONS[randomIndex]);
+  };
+
   const fetchReflections = async () => {
+      setLoading(true);
       const { data } = await supabase
         .from('reflections')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (data) setReflections(data);
+      setLoading(false);
   };
 
-  const getNewQuestion = async () => {
-      setLoadingQ(true);
-      const q = await generateReflectionQuestion();
-      setQuestion(q);
-      setLoadingQ(false);
-  };
+  const handleSave = async () => {
+      if (!answer.trim()) {
+          Alert.alert("Réponse vide", "Prenez le temps d'écrire quelques mots avant de sauvegarder.");
+          return;
+      }
 
-  const openNewSession = () => {
-      setModalVisible(true);
-      setAnswer('');
-      getNewQuestion();
-  };
-
-  const saveReflection = async () => {
-      if (!answer.trim()) return;
-
+      setSaving(true);
+      
+      // Sauvegarde DB
       const { error } = await supabase.from('reflections').insert({
           user_id: userId,
-          question: question,
-          answer: answer,
+          question: currentQuestion,
+          answer: answer.trim(),
           created_at: new Date().toISOString()
       });
 
       if (!error) {
-          // Add XP
+          // Gamification
           const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
           if (player) await addXp(userId, REWARDS.JOURNAL, player);
 
+          Alert.alert("Réflexion sauvegardée !", "Bravo pour ce moment d'introspection.");
+          setAnswer("");
           fetchReflections();
-          setModalVisible(false);
+          generateRandomQuestion(); // Nouvelle question pour la prochaine fois
       } else {
-          Alert.alert("Erreur", "Impossible de sauvegarder.");
+          Alert.alert("Erreur", "Impossible de sauvegarder votre réflexion.");
       }
+      setSaving(false);
   };
 
+  const renderWriteMode = () => (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}} keyboardVerticalOffset={100}>
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+              
+              {/* Question Card */}
+              <View style={[styles.questionCard, {backgroundColor: colors.questionBg, borderColor: colors.accent}]}>
+                  <View style={styles.questionHeader}>
+                      <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                          <Sparkles size={16} color={colors.accent} fill={colors.accent} />
+                          <Text style={[styles.questionLabel, {color: colors.accent}]}>QUESTION DU MOMENT</Text>
+                      </View>
+                      <TouchableOpacity onPress={generateRandomQuestion} style={styles.refreshBtn}>
+                          <RefreshCw size={16} color={colors.subText} />
+                      </TouchableOpacity>
+                  </View>
+                  <Text style={[styles.questionText, {color: colors.text}]}>{currentQuestion}</Text>
+              </View>
+
+              {/* Input Area */}
+              <View style={[styles.inputContainer, {backgroundColor: colors.inputBg}]}>
+                  <TextInput 
+                      style={[styles.textArea, {color: colors.text}]}
+                      multiline
+                      textAlignVertical="top"
+                      placeholder="Prenez le temps de réfléchir et écrivez votre réponse..."
+                      placeholderTextColor={colors.subText}
+                      value={answer}
+                      onChangeText={setAnswer}
+                  />
+              </View>
+
+              <TouchableOpacity 
+                  style={[styles.saveBtn, {backgroundColor: colors.button}, !answer.trim() && {opacity: 0.5}]} 
+                  onPress={handleSave}
+                  disabled={saving || !answer.trim()}
+              >
+                  {saving ? <ActivityIndicator color="#FFF" /> : <Send size={20} color="#FFF" style={{marginRight: 8}} />}
+                  <Text style={styles.saveBtnText}>{saving ? "Sauvegarde..." : "Sauvegarder la réflexion"}</Text>
+              </TouchableOpacity>
+
+          </ScrollView>
+      </KeyboardAvoidingView>
+  );
+
+  const renderHistoryMode = () => (
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.historyInfo}>
+              <Text style={[styles.historyCount, {color: colors.subText}]}>{reflections.length} réflexions enregistrées</Text>
+          </View>
+
+          {reflections.length === 0 ? (
+              <View style={styles.emptyState}>
+                  <History size={48} color={colors.subText} style={{marginBottom: 16}} />
+                  <Text style={[styles.emptyText, {color: colors.subText}]}>Votre historique est vide.</Text>
+                  <TouchableOpacity onPress={() => setViewMode('WRITE')} style={{marginTop: 20}}>
+                      <Text style={{color: colors.button, fontSize: 16, fontWeight: '600'}}>Commencer une réflexion</Text>
+                  </TouchableOpacity>
+              </View>
+          ) : (
+              reflections.map((item) => {
+                  const date = new Date(item.created_at);
+                  const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+                  
+                  return (
+                      <View key={item.id} style={[styles.historyCard, {backgroundColor: colors.card}]}>
+                          <View style={styles.historyHeader}>
+                              <Calendar size={14} color={colors.subText} style={{marginRight: 6}} />
+                              <Text style={[styles.historyDate, {color: colors.subText}]}>{formattedDate}</Text>
+                          </View>
+                          
+                          <View style={[styles.historyQuestionBox, {backgroundColor: isDarkMode ? '#2C2C2E' : '#F2F2F7'}]}>
+                              <Text style={[styles.historyQuestion, {color: colors.text}]}>{item.question}</Text>
+                          </View>
+                          
+                          <Text style={[styles.historyAnswer, {color: colors.subText}]}>{item.answer}</Text>
+                      </View>
+                  );
+              })
+          )}
+      </ScrollView>
+  );
+
   return (
-    <View style={[styles.container, {backgroundColor: colors.bg}]}>
+    <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: insets.top}]}>
+      {/* Header Styled Apple */}
       <View style={styles.header}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+        <View style={styles.headerLeft}>
             {openMenu && (
                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
                       <Menu size={24} color={colors.button} />
                  </TouchableOpacity>
             )}
-            <Text style={[styles.largeTitle, {color: colors.text}]}>Réflexion</Text>
+            <View style={{marginLeft: 4}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                    <BookOpen size={24} color={colors.text} />
+                    <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
+                </View>
+            </View>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={openNewSession}>
-            <Plus size={24} color={colors.button} />
+
+        {/* Toggle View Button */}
+        <TouchableOpacity 
+            style={[styles.toggleBtn, {backgroundColor: isDarkMode ? '#1C1C1E' : '#E5E5EA'}]}
+            onPress={() => setViewMode(viewMode === 'WRITE' ? 'HISTORY' : 'WRITE')}
+        >
+            {viewMode === 'WRITE' ? (
+                <>
+                    <History size={18} color={colors.text} />
+                    <Text style={[styles.toggleText, {color: colors.text}]}>Historique</Text>
+                </>
+            ) : (
+                <>
+                    <PenLine size={18} color={colors.text} />
+                    <Text style={[styles.toggleText, {color: colors.text}]}>Écrire</Text>
+                </>
+            )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {reflections.length === 0 ? (
-              <View style={styles.emptyState}>
-                  <BrainCircuit size={60} color={colors.subText} style={{marginBottom: 20}} />
-                  <Text style={[styles.emptyText, {color: colors.subText}]}>Prenez un moment pour vous.</Text>
-                  <TouchableOpacity style={[styles.ctaBtn, {backgroundColor: colors.accent}]} onPress={openNewSession}>
-                      <Text style={styles.ctaText}>Commencer</Text>
-                  </TouchableOpacity>
-              </View>
-          ) : (
-              reflections.map((ref) => (
-                  <View key={ref.id} style={[styles.card, {backgroundColor: colors.card}]}>
-                      <View style={styles.cardHeader}>
-                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-                              <Sparkles size={14} color={colors.accent} fill={colors.accent} />
-                              <Text style={styles.date}>{new Date(ref.created_at).toLocaleDateString('fr-FR')}</Text>
-                          </View>
-                      </View>
-                      <Text style={[styles.questionText, {color: colors.text}]}>{ref.question}</Text>
-                      <View style={[styles.divider, {backgroundColor: colors.border}]} />
-                      <Text style={[styles.answerText, {color: colors.subText}]}>{ref.answer}</Text>
-                  </View>
-              ))
-          )}
-      </ScrollView>
-
-      {/* MODAL */}
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
-          <View style={[styles.modalOverlay, {backgroundColor: colors.bg}]}>
-              <View style={[styles.modalContent, {backgroundColor: colors.card}]}>
-                  <View style={styles.modalHeader}>
-                      <Text style={[styles.modalTitle, {color: colors.text}]}>Introspection</Text>
-                      <TouchableOpacity onPress={() => setModalVisible(false)}>
-                           <Text style={{color: colors.button, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
-                      </TouchableOpacity>
-                  </View>
-
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                      <View style={[styles.aiBox, {backgroundColor: 'rgba(196, 181, 253, 0.15)'}]}>
-                          <View style={styles.aiLabel}>
-                              <Sparkles size={14} color={colors.accent} />
-                              <Text style={[styles.aiLabelText, {color: colors.accent}]}>Question générée par IA</Text>
-                          </View>
-                          <Text style={[styles.generatedQuestion, {color: colors.text}]}>
-                              {loadingQ ? "Génération en cours..." : question}
-                          </Text>
-                          <TouchableOpacity style={styles.regenBtn} onPress={getNewQuestion} disabled={loadingQ}>
-                              <RefreshCw size={14} color={colors.text} style={{marginRight: 6}} />
-                              <Text style={[styles.regenText, {color: colors.text}]}>Autre question</Text>
-                          </TouchableOpacity>
-                      </View>
-
-                      <Text style={styles.label}>VOTRE RÉPONSE</Text>
-                      <TextInput 
-                          style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]}
-                          multiline
-                          textAlignVertical="top"
-                          placeholder="Écrivez librement..."
-                          placeholderTextColor={colors.subText}
-                          value={answer}
-                          onChangeText={setAnswer}
-                      />
-
-                      <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.button}]} onPress={saveReflection}>
-                          <Text style={styles.saveBtnText}>Enregistrer (+20 XP)</Text>
-                      </TouchableOpacity>
-                  </ScrollView>
-              </View>
-          </View>
-      </Modal>
+      {/* Main Content */}
+      <View style={styles.contentContainer}>
+          {viewMode === 'WRITE' ? renderWriteMode() : renderHistoryMode()}
+      </View>
     </View>
   );
 };
@@ -171,164 +248,154 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginTop: 10,
-    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 10,
+  },
+  headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
   },
   iconBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 8,
   },
-  largeTitle: {
-    fontSize: 34,
+  headerTitle: {
+    fontSize: 28, // Large title style
     fontWeight: '700',
-    letterSpacing: 0.35,
+    letterSpacing: 0.3,
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+  toggleBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 20,
+      gap: 6,
+  },
+  toggleText: {
+      fontSize: 14,
+      fontWeight: '600',
+  },
+  contentContainer: {
+      flex: 1,
   },
   scrollContent: {
       paddingHorizontal: 20,
       paddingBottom: 100,
-      gap: 16,
   },
-  emptyState: {
-      marginTop: 100,
-      alignItems: 'center',
-  },
-  emptyText: {
-      fontSize: 16,
-      marginBottom: 20,
-  },
-  ctaBtn: {
-      paddingHorizontal: 24,
-      paddingVertical: 12,
+  
+  // Write Mode Styles
+  questionCard: {
+      padding: 20,
       borderRadius: 20,
+      marginBottom: 20,
+      borderWidth: 1,
+      marginTop: 10,
   },
-  ctaText: {
-      color: '#000',
-      fontWeight: '600',
-  },
-  card: {
-      borderRadius: 16,
-      padding: 20,
-  },
-  cardHeader: {
-      marginBottom: 12,
-  },
-  date: {
-      color: '#8E8E93',
-      fontSize: 12,
-      fontWeight: '600',
-      textTransform: 'uppercase',
-  },
-  questionText: {
-      fontSize: 19,
-      fontWeight: '700',
-      lineHeight: 26,
-      marginBottom: 8,
-  },
-  divider: {
-      height: 1,
-      marginVertical: 12,
-  },
-  answerText: {
-      fontSize: 16,
-      lineHeight: 24,
-  },
-  modalOverlay: {
-      flex: 1,
-  },
-  modalContent: {
-      flex: 1,
-      padding: 20,
-      marginTop: 60,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-  },
-  modalHeader: {
+  questionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 20,
+      marginBottom: 12,
   },
-  modalTitle: {
-      fontSize: 20,
+  questionLabel: {
+      fontSize: 11,
       fontWeight: '700',
+      letterSpacing: 1,
   },
-  aiBox: {
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 30,
+  refreshBtn: {
+      padding: 4,
   },
-  aiLabel: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 8,
-  },
-  aiLabelText: {
-      fontWeight: '700',
-      fontSize: 12,
-      textTransform: 'uppercase',
-  },
-  generatedQuestion: {
+  questionText: {
       fontSize: 22,
       fontWeight: '700',
       lineHeight: 30,
-      marginBottom: 16,
+      fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
-  regenBtn: {
-      alignSelf: 'flex-start',
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      backgroundColor: 'rgba(255,255,255,0.1)',
-      borderRadius: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-  },
-  regenText: {
-      fontSize: 13,
-      fontWeight: '600',
-  },
-  label: {
-      color: '#8E8E93',
-      fontSize: 12,
-      fontWeight: '600',
-      marginBottom: 10,
-      textTransform: 'uppercase',
-  },
-  input: {
-      borderRadius: 12,
+  inputContainer: {
+      borderRadius: 20,
       padding: 16,
-      fontSize: 17,
-      minHeight: 200,
+      minHeight: 250,
       marginBottom: 30,
+  },
+  textArea: {
+      fontSize: 17,
+      lineHeight: 24,
+      minHeight: 220,
   },
   saveBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 16,
-      borderRadius: 12,
+      paddingVertical: 16,
+      borderRadius: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
   },
   saveBtnText: {
       color: '#FFF',
-      fontWeight: '700',
       fontSize: 17,
+      fontWeight: '700',
+  },
+
+  // History Mode Styles
+  historyInfo: {
+      marginBottom: 16,
+      alignItems: 'center',
+  },
+  historyCount: {
+      fontSize: 13,
+      fontWeight: '600',
+  },
+  emptyState: {
+      alignItems: 'center',
+      marginTop: 60,
+      padding: 20,
+  },
+  emptyText: {
+      fontSize: 16,
+      fontStyle: 'italic',
+  },
+  historyCard: {
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 16,
+  },
+  historyHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+  },
+  historyDate: {
+      fontSize: 13,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+  },
+  historyQuestionBox: {
+      padding: 12,
+      borderRadius: 12,
+      marginBottom: 12,
+  },
+  historyQuestion: {
+      fontSize: 15,
+      fontWeight: '600',
+      lineHeight: 20,
+  },
+  historyAnswer: {
+      fontSize: 16,
+      lineHeight: 24,
   }
 });
 

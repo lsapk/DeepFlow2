@@ -28,9 +28,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
     // Configuration OAuth
     const [request, response, promptAsync] = Google.useAuthRequest({
-        androidClientId: '913448608067-asdhst6j70ucnkj147c7s8tuj12jgmg2.apps.googleusercontent.com',
-        iosClientId: '913448608067-asdhst6j70ucnkj147c7s8tuj12jgmg2.apps.googleusercontent.com',
-        webClientId: '913448608067-asdhst6j70ucnkj147c7s8tuj12jgmg2.apps.googleusercontent.com',
+        androidClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
+        iosClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
+        webClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
         scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
     });
 

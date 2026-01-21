@@ -15,14 +15,6 @@
     },
     "web": {
       "bundler": "metro"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "7890bc1a-2786-4898-9017-2f8f4d4572d3"
-      }
-    },
-    "plugins": [
-      "expo-web-browser"
-    ]
+    }
   }
 }
