@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, StatusBar, View, ActivityIndicator, Modal, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
+import { SafeAreaView, StatusBar, View, Modal, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
 import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal, Quest } from './types';
@@ -16,6 +17,7 @@ import Journal from './pages/Journal';
 import ReflectionPage from './pages/Reflection';
 import CalendarPage from './pages/CalendarPage';
 import Auth from './pages/Auth';
+import SkeletonDashboard from './components/SkeletonDashboard';
 import { supabase } from './services/supabase';
 import { Trophy, Bell } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
@@ -323,7 +325,6 @@ const App: React.FC = () => {
             .update({ streak: Math.max(0, habit.streak - 1), last_completed_at: null }) // We can't easily know previous last_completed_at without query, so null is safer visually or handle logic deeper
             .eq('id', id);
             
-          // On pourrait retirer de l'XP ici, mais c'est punitif. On laisse l'XP acquise.
       } else {
           // ADD COMPLETION
           await supabase.from('habit_completions').insert({
@@ -382,8 +383,8 @@ const App: React.FC = () => {
   // --- RENDER ---
   const renderView = () => {
     if (loading) return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }}>
-            <ActivityIndicator size="large" color={isDarkMode ? '#FFF' : '#000'} />
+        <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }}>
+            <SkeletonDashboard />
         </View>
     );
 
@@ -484,49 +485,51 @@ const App: React.FC = () => {
 
   return (
     <SafeAreaProvider>
-        <SafeAreaView style={[{ flex: 1 }, bgStyle]}>
-        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? "#000000" : "#F2F2F7"} />
-        <View style={{ flex: 1 }}>
-            {renderView()}
-            
-            <Sidebar 
-                visible={sidebarVisible} 
-                onClose={() => setSidebarVisible(false)}
-                user={user}
-                setView={setCurrentView}
-                currentView={currentView}
-                onLogout={handleLogout}
-            />
-
-            {user && player && (
-                <Profile 
-                    visible={profileVisible} 
-                    onClose={() => { setProfileVisible(false); fetchSettings(user.id); }} 
-                    user={user} player={player} logout={handleLogout} 
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaView style={[{ flex: 1 }, bgStyle]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? "#000000" : "#F2F2F7"} />
+            <View style={{ flex: 1 }}>
+                {renderView()}
+                
+                <Sidebar 
+                    visible={sidebarVisible} 
+                    onClose={() => setSidebarVisible(false)}
+                    user={user}
+                    setView={setCurrentView}
+                    currentView={currentView}
+                    onLogout={handleLogout}
                 />
-            )}
 
-            {session && user && !isFocusMode && (
-                <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
-            )}
+                {user && player && (
+                    <Profile 
+                        visible={profileVisible} 
+                        onClose={() => { setProfileVisible(false); fetchSettings(user.id); }} 
+                        user={user} player={player} logout={handleLogout} 
+                    />
+                )}
 
-            {/* LEVEL UP MODAL */}
-            <Modal visible={showLevelUp} transparent animationType="fade">
-                <View style={styles.levelUpOverlay}>
-                    <View style={styles.levelUpCard}>
-                        <Trophy size={60} color="#FACC15" style={{marginBottom: 20}} />
-                        <Text style={styles.levelUpTitle}>NIVEAU SUPÉRIEUR !</Text>
-                        <Text style={styles.levelUpSub}>
-                            Félicitations, vous avez atteint le niveau <Text style={{color: '#C4B5FD', fontWeight: 'bold'}}>{player?.level}</Text>.
-                        </Text>
-                        <TouchableOpacity style={styles.claimBtn} onPress={() => setShowLevelUp(false)}>
-                            <Text style={styles.claimBtnText}>CONTINUER</Text>
-                        </TouchableOpacity>
+                {session && user && !isFocusMode && (
+                    <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
+                )}
+
+                {/* LEVEL UP MODAL */}
+                <Modal visible={showLevelUp} transparent animationType="fade">
+                    <View style={styles.levelUpOverlay}>
+                        <View style={styles.levelUpCard}>
+                            <Trophy size={60} color="#FACC15" style={{marginBottom: 20}} />
+                            <Text style={styles.levelUpTitle}>NIVEAU SUPÉRIEUR !</Text>
+                            <Text style={styles.levelUpSub}>
+                                Félicitations, vous avez atteint le niveau <Text style={{color: '#C4B5FD', fontWeight: 'bold'}}>{player?.level}</Text>.
+                            </Text>
+                            <TouchableOpacity style={styles.claimBtn} onPress={() => setShowLevelUp(false)}>
+                                <Text style={styles.claimBtnText}>CONTINUER</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
-            </Modal>
-        </View>
-        </SafeAreaView>
+                </Modal>
+            </View>
+            </SafeAreaView>
+        </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 };

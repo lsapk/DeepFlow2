@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal, Alert } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
 import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, AlignLeft, Save, Target, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
+import * as Haptics from 'expo-haptics';
+import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 
 interface TasksProps {
   tasks: Task[];
@@ -73,7 +69,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   };
 
   const toggleExpand = (taskId: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    Haptics.selectionAsync();
+    // Reanimated layout prop handles the animation automatically
     const newSet = new Set(expandedTaskIds);
     if (newSet.has(taskId)) {
       newSet.delete(taskId);
@@ -83,7 +80,13 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
     setExpandedTaskIds(newSet);
   };
 
+  const onTaskToggle = (id: string) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toggleTask(id);
+  };
+
   const openEditModal = (task: Task) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setSelectedTask(task);
       setFormTitle(task.title);
       setFormDesc(task.description || '');
@@ -116,7 +119,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
           <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
               <Menu size={24} color={colors.accent} />
           </TouchableOpacity>
-          <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
+          <View style={styles.headerTitleContainer} pointerEvents="none">
+              <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
+          </View>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
                 <Plus size={24} color={colors.accent} />
           </TouchableOpacity>
@@ -128,11 +133,16 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                 <Text style={[styles.emptyText, {color: colors.textSub}]}>Rien à faire.</Text>
             )}
             {activeTasks.map((task, index) => (
-                <View key={task.id}>
+                <Animated.View 
+                    key={task.id} 
+                    layout={LinearTransition.springify()}
+                    entering={FadeIn}
+                    exiting={FadeOut}
+                >
                     <TaskItem 
                         task={task} 
                         isExpanded={expandedTaskIds.has(task.id)}
-                        onToggle={() => toggleTask(task.id)} 
+                        onToggle={() => onTaskToggle(task.id)} 
                         onToggleExpand={() => toggleExpand(task.id)}
                         onLongPress={() => openEditModal(task)}
                         userId={userId}
@@ -140,7 +150,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                         colors={colors}
                     />
                     {index < activeTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
-                </View>
+                </Animated.View>
             ))}
         </View>
 
@@ -149,11 +159,16 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                 <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES</Text>
                 <View style={[styles.listGroup, {backgroundColor: colors.cardBg}]}>
                     {completedTasks.map((task, index) => (
-                        <View key={task.id}>
+                        <Animated.View 
+                            key={task.id} 
+                            layout={LinearTransition.springify()}
+                            entering={FadeIn} 
+                            exiting={FadeOut}
+                        >
                              <TaskItem 
                                 task={task} 
                                 isExpanded={expandedTaskIds.has(task.id)}
-                                onToggle={() => toggleTask(task.id)} 
+                                onToggle={() => onTaskToggle(task.id)} 
                                 onToggleExpand={() => toggleExpand(task.id)}
                                 onLongPress={() => openEditModal(task)}
                                 userId={userId}
@@ -161,7 +176,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                                 colors={colors}
                             />
                             {index < completedTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
-                        </View>
+                        </Animated.View>
                     ))}
                 </View>
             </View>
@@ -207,7 +222,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                                     {backgroundColor: isDarkMode ? '#333' : '#EEE'},
                                     formPriority === p && {backgroundColor: colors.text}
                                 ]}
-                                onPress={() => setFormPriority(p)}
+                                onPress={() => { Haptics.selectionAsync(); setFormPriority(p); }}
                              >
                                  <Text style={{color: formPriority === p ? (isDarkMode ? '#000' : '#FFF') : colors.textSub, fontWeight: '600', textTransform: 'capitalize'}}>{p}</Text>
                              </TouchableOpacity>
@@ -248,7 +263,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                                <TouchableOpacity 
                                     key={g.id} 
                                     style={[styles.goalChip, {backgroundColor: isDarkMode ? '#333' : '#EEE'}, formGoalId === g.id && {backgroundColor: colors.text}]}
-                                    onPress={() => setFormGoalId(g.id)}
+                                    onPress={() => { Haptics.selectionAsync(); setFormGoalId(g.id); }}
                                >
                                    <Text style={[styles.goalChipText, formGoalId === g.id && {color: isDarkMode ? '#000' : '#FFF'}]}>{g.title}</Text>
                                </TouchableOpacity>
@@ -315,6 +330,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
     };
 
     const toggleSubtask = async (sub: Subtask) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         await supabase.from('subtasks').update({ completed: !sub.completed }).eq('id', sub.id);
         refreshTasks();
     };
@@ -416,11 +432,13 @@ const styles = StyleSheet.create({
   largeTitle: {
     fontSize: 22,
     fontWeight: '700',
-    position: 'absolute',
-    left: 0,
-    right: 0,
     textAlign: 'center',
-    // Removed zIndex: -1
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
   },
   addButton: {
     width: 40,

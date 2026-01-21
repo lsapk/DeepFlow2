@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { LayoutDashboard, BrainCircuit, Gamepad2, Calendar } from 'lucide-react-native';
 import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
 interface BottomNavProps {
   currentView: ViewState;
@@ -19,6 +20,13 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
     { view: ViewState.CYBER_KNIGHT, icon: Gamepad2, label: 'Cyber Knight' }, // Gamification
   ];
 
+  const handlePress = (view: ViewState) => {
+      if (currentView !== view) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setView(view);
+      }
+  };
+
   return (
     <View style={[
         styles.container, 
@@ -34,7 +42,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
         return (
           <TouchableOpacity
             key={item.view}
-            onPress={() => setView(item.view)}
+            onPress={() => handlePress(item.view)}
             style={styles.tab}
             activeOpacity={0.7}
           >

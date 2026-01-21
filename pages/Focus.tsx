@@ -7,12 +7,6 @@ import { Task, FocusSession } from '../types';
 import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
-
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.70, 280); 
 const STROKE_WIDTH = 12;
@@ -131,17 +125,13 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         .select('*')
         .eq('user_id', user.id)
         .order('completed_at', { ascending: false })
-        .limit(30); // More history
+        .limit(30);
         
       if (data) {
           setHistory(data);
-          // Calculate global total
-          const { data: allSessions } = await supabase
-            .from('focus_sessions')
-            .select('duration')
-            .eq('user_id', user.id);
-            
-          const total = allSessions?.reduce((acc, curr) => acc + (curr.duration || 0), 0) || 0;
+          // Simple client-side sum of loaded data for recent total
+          // Ideally use a .sum() aggregate in supabase or rpc
+          const total = data.reduce((acc, curr) => acc + (curr.duration || 0), 0);
           setTotalTime(total);
       }
   };
@@ -205,7 +195,15 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user && !isNaN(duration)) {
-          const completedAt = new Date(manualDate);
+          // Gérer le format de date manuel simple ou ISO
+          let completedAt;
+          try {
+              completedAt = new Date(manualDate);
+              if (isNaN(completedAt.getTime())) throw new Error();
+          } catch(e) {
+              completedAt = new Date();
+          }
+          
           const startedAt = new Date(completedAt.getTime() - duration * 60000);
 
           await supabase.from('focus_sessions').insert({
@@ -359,7 +357,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               keyboardType="numeric"
           />
 
-          <Text style={[styles.label, {color: colors.subText}]}>DATE (YYYY-MM-DDTHH:MM)</Text>
+          <Text style={[styles.label, {color: colors.subText}]}>DATE (YYYY-MM-DD)</Text>
           <TextInput 
               style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
               value={manualDate}
@@ -397,6 +395,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               {history.map(session => {
                   let dateStr = 'Date inconnue';
                   let timeStr = '';
+                  
                   if (session.completed_at) {
                       const d = new Date(session.completed_at);
                       dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -429,7 +428,9 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                 <Menu size={24} color={colors.text} />
             </TouchableOpacity>
             
-            <Text style={[styles.headerTitle, {color: colors.text}]} pointerEvents="none">Mode Focus</Text>
+            <View style={styles.headerTitleContainer} pointerEvents="none">
+                <Text style={[styles.headerTitle, {color: colors.text}]}>Mode Focus</Text>
+            </View>
 
              <View style={[styles.modeTabs, {backgroundColor: isDarkMode ? '#1C1C1E' : '#E5E5EA'}]}>
                  <TouchableOpacity onPress={() => changeView('CONFIG')} style={[styles.tab, (viewMode === 'CONFIG' || viewMode === 'MANUAL') && {backgroundColor: colors.card}]}>
@@ -445,6 +446,8 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         {viewMode === 'RUNNING' && renderRunning()}
         {viewMode === 'MANUAL' && renderManual()}
         {viewMode === 'HISTORY' && renderHistory()}
+        
+        {/* Floating cross removed */}
     </View>
   );
 };
@@ -464,22 +467,24 @@ const styles = StyleSheet.create({
   },
   menuBtn: {
       padding: 8,
-      zIndex: 10, 
+      zIndex: 50,
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
   },
   headerTitle: {
       fontSize: 20,
       fontWeight: '700',
-      position: 'absolute',
-      left: 0,
-      right: 0,
       textAlign: 'center',
-      // No negative zIndex to ensure visibility
   },
   modeTabs: {
       flexDirection: 'row',
       borderRadius: 12,
       padding: 4,
-      zIndex: 10, 
+      zIndex: 50,
   },
   tab: {
       paddingVertical: 8,

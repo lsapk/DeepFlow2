@@ -1,14 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
 import { Check, Flame, Plus, Play, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, Layout, LinearTransition } from 'react-native-reanimated';
+import { Image } from 'expo-image';
 
 interface DashboardProps {
   user: UserProfile;
@@ -63,8 +60,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   const activeTasks = tasks.filter(t => !t.completed && t.priority === 'high').slice(0, 5); 
 
   const handleToggleTask = (id: string) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toggleTask(id);
+  }
+
+  const handleToggleHabit = (id: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      toggleHabit(id);
   }
 
   // Score Calcul
@@ -88,10 +90,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
+    <Animated.View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => { Haptics.selectionAsync(); openMenu(); }}>
             <Menu size={24} color={colors.accent} />
         </TouchableOpacity>
         
@@ -106,6 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
                 style={styles.avatar} 
+                transition={500}
             />
         </TouchableOpacity>
       </View>
@@ -113,7 +116,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         {/* PRODUCTIVITY CARD */}
-        <View style={[styles.scoreCard, { backgroundColor: colors.cardBg }]}>
+        <Animated.View 
+            entering={FadeInDown.delay(100).springify()}
+            style={[styles.scoreCard, { backgroundColor: colors.cardBg }]}
+        >
             <View>
                 <Text style={[styles.scoreLabel, {color: colors.textSub}]}>PRODUCTIVITÉ</Text>
                 <Text style={[styles.scoreLevel, { color: colors.text }]}>
@@ -123,10 +129,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             <View style={[styles.scoreCircle, { borderColor: isDarkMode ? '#333' : '#F2F2F7' }]}>
                 <Text style={[styles.scoreValue, { color: getScoreColor(productivityScore) }]}>{productivityScore}</Text>
             </View>
-        </View>
+        </Animated.View>
 
         {/* HABITS SECTION */}
-        <View style={styles.sectionContainer}>
+        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Habitudes</Text>
                 <TouchableOpacity onPress={() => setView(ViewState.HABITS)}>
@@ -137,43 +143,47 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                 {sortedHabits.length === 0 && (
                     <Text style={{color: colors.textSub, fontStyle: 'italic', paddingLeft: 20}}>Rien de prévu.</Text>
                 )}
-                {sortedHabits.map(habit => {
+                {sortedHabits.map((habit, index) => {
                     const isDone = habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), today);
                     return (
-                        <TouchableOpacity 
-                            key={habit.id} 
-                            style={[
-                                styles.habitCard, 
-                                { backgroundColor: colors.cardBg },
-                                isDone && { opacity: 0.6 }
-                            ]} 
-                            onPress={() => toggleHabit(habit.id)}
-                            activeOpacity={0.7}
+                        <Animated.View 
+                            key={habit.id}
+                            layout={LinearTransition.springify()}
                         >
-                            <View style={styles.habitTop}>
-                                {isDone ? (
-                                    <View style={[styles.checkCircle, {backgroundColor: colors.success}]}>
-                                        <Check size={14} color="#FFF" strokeWidth={3} />
-                                    </View>
-                                ) : (
-                                    <View style={[styles.iconCircle, {backgroundColor: isDarkMode ? '#333' : '#F2F2F7'}]}>
-                                        <Flame size={18} color={colors.orange} />
-                                    </View>
-                                )}
-                                <Text style={[styles.habitStreak, {color: colors.textSub}]}>{habit.streak}</Text>
-                            </View>
-                            <Text style={[styles.habitTitle, { color: colors.text }, isDone && styles.textMuted]} numberOfLines={2}>{habit.title}</Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[
+                                    styles.habitCard, 
+                                    { backgroundColor: colors.cardBg },
+                                    isDone && { opacity: 0.6 }
+                                ]} 
+                                onPress={() => handleToggleHabit(habit.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.habitTop}>
+                                    {isDone ? (
+                                        <View style={[styles.checkCircle, {backgroundColor: colors.success}]}>
+                                            <Check size={14} color="#FFF" strokeWidth={3} />
+                                        </View>
+                                    ) : (
+                                        <View style={[styles.iconCircle, {backgroundColor: isDarkMode ? '#333' : '#F2F2F7'}]}>
+                                            <Flame size={18} color={colors.orange} />
+                                        </View>
+                                    )}
+                                    <Text style={[styles.habitStreak, {color: colors.textSub}]}>{habit.streak}</Text>
+                                </View>
+                                <Text style={[styles.habitTitle, { color: colors.text }, isDone && styles.textMuted]} numberOfLines={2}>{habit.title}</Text>
+                            </TouchableOpacity>
+                        </Animated.View>
                     )
                 })}
                 <TouchableOpacity style={[styles.addHabitCard, { borderColor: colors.border }]} onPress={() => setView(ViewState.HABITS)}>
                     <Plus size={24} color={colors.textSub} />
                 </TouchableOpacity>
             </ScrollView>
-        </View>
+        </Animated.View>
 
         {/* TASKS SECTION */}
-        <View style={styles.sectionContainer}>
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Tâches Urgentes</Text>
                 <TouchableOpacity onPress={() => setView(ViewState.TASKS)}>
@@ -188,34 +198,42 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                     </View>
                 ) : (
                     activeTasks.map((task, index) => (
-                        <TouchableOpacity 
-                            key={task.id} 
-                            style={[styles.taskRow, index < activeTasks.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} 
-                            onPress={() => handleToggleTask(task.id)}
-                            activeOpacity={0.7}
+                        <Animated.View 
+                            key={task.id}
+                            layout={LinearTransition.springify()}
                         >
-                            <View style={[styles.checkbox, { borderColor: colors.textSub }, task.completed && { backgroundColor: colors.success, borderColor: colors.success }]}>
-                                {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
-                            </View>
-                            <View style={{flex: 1}}>
-                                <Text style={[styles.taskText, { color: colors.text }, task.completed && styles.taskTextDone]} numberOfLines={1}>
-                                    {task.title}
-                                </Text>
-                                {task.linked_goal_id && <View style={[styles.linkedDot, {backgroundColor: colors.orange}]} />}
-                            </View>
-                        </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.taskRow, index < activeTasks.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} 
+                                onPress={() => handleToggleTask(task.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[styles.checkbox, { borderColor: colors.textSub }, task.completed && { backgroundColor: colors.success, borderColor: colors.success }]}>
+                                    {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
+                                </View>
+                                <View style={{flex: 1}}>
+                                    <Text style={[styles.taskText, { color: colors.text }, task.completed && styles.taskTextDone]} numberOfLines={1}>
+                                        {task.title}
+                                    </Text>
+                                    {task.linked_goal_id && <View style={[styles.linkedDot, {backgroundColor: colors.orange}]} />}
+                                </View>
+                            </TouchableOpacity>
+                        </Animated.View>
                     ))
                 )}
             </View>
-        </View>
+        </Animated.View>
 
       </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={openFocus} activeOpacity={0.8}>
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openFocus(); }} 
+        activeOpacity={0.8}
+      >
           <Play size={24} color="#FFF" fill="#FFF" style={{marginLeft: 4}} />
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -236,13 +254,14 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 50, // BUTTONS ON TOP
   },
   headerTitleContainer: {
       position: 'absolute',
       left: 0, 
       right: 0,
       alignItems: 'center',
-      // Removed zIndex: -1 to ensure visibility
+      // removed zIndex -1 to ensure visibility
   },
   dateText: {
       fontSize: 10,

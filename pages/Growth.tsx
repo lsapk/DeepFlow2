@@ -7,11 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
 import Svg, { Circle, G } from 'react-native-svg';
 
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
+// Supression du warning LayoutAnimation
+// if (Platform.OS === 'android') { ... } 
 
 interface GrowthProps {
   player: PlayerProfile;
@@ -334,8 +331,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
         <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
             <Menu size={24} color={colors.button} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, {color: colors.text}]} pointerEvents="none">Évolution</Text>
-        <TouchableOpacity onPress={openProfile}>
+        
+        <View style={styles.headerTitleContainer} pointerEvents="none">
+            <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
+        </View>
+
+        <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
                 style={styles.avatar} 
@@ -382,16 +383,18 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10, 
+      zIndex: 50,
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
   },
   headerTitle: {
       fontSize: 22,
       fontWeight: '700',
-      position: 'absolute',
-      left: 0,
-      right: 0,
       textAlign: 'center',
-      // No negative zIndex
   },
   avatar: {
     width: 36,
@@ -399,7 +402,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#333',
-    zIndex: 10,
   },
   tabBar: {
       flexDirection: 'row',

@@ -9,11 +9,8 @@ import { generateCoaching } from '../services/ai';
 
 WebBrowser.maybeCompleteAuthSession();
 
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
+// LayoutAnimation expérimental obsolète sur la nouvelle architecture
+// if (Platform.OS === 'android') { ... }
 
 interface CalendarPageProps {
     tasks: Task[];
@@ -223,7 +220,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 <TouchableOpacity onPress={openMenu} style={styles.iconBtn}>
                      <Menu size={24} color="#FFF" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Calendrier</Text>
+                <View style={styles.headerTitleContainer} pointerEvents="none">
+                    <Text style={styles.headerTitle}>Calendrier</Text>
+                </View>
                 <TouchableOpacity 
                     onPress={() => !googleToken ? promptAsync() : setGoogleToken(null)}
                     disabled={!request}
@@ -376,7 +375,7 @@ const styles = StyleSheet.create({
         height: 40,
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10, // BUTTONS ON TOP
+        zIndex: 50,
     },
     googleBtn: {
         width: 40,
@@ -385,17 +384,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderRadius: 20,
         backgroundColor: '#1C1C1E',
-        zIndex: 10, // BUTTONS ON TOP
+        zIndex: 50,
+    },
+    headerTitleContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        alignItems: 'center',
     },
     headerTitle: {
         fontSize: 22,
         fontWeight: '700',
         color: '#FFF',
-        position: 'absolute',
-        left: 0,
-        right: 0,
         textAlign: 'center',
-        // Removed zIndex: -1
     },
     monthNav: {
         flexDirection: 'row',

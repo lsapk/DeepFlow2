@@ -199,9 +199,11 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
             <Menu size={24} color={colors.button} />
         </TouchableOpacity>
         
-        <Text style={[styles.largeTitle, {color: colors.text}]}>Cyber Knight</Text>
+        <View style={styles.headerTitleContainer} pointerEvents="none">
+            <Text style={[styles.largeTitle, {color: colors.text}]}>Cyber Knight</Text>
+        </View>
 
-        <TouchableOpacity onPress={openProfile}>
+        <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
                 style={styles.avatar} 
@@ -251,16 +253,18 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 50,
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
   },
   largeTitle: {
       fontSize: 22,
       fontWeight: '700',
-      position: 'absolute',
-      left: 0,
-      right: 0,
       textAlign: 'center',
-      // Removed zIndex: -1
   },
   avatar: {
     width: 36,
@@ -268,7 +272,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#333',
-    zIndex: 10, // BUTTONS ON TOP
+    zIndex: 50,
   },
   tabContainer: {
       flexDirection: 'row',

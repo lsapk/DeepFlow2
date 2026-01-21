@@ -112,7 +112,9 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }
             <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
                 <Menu size={24} color={colors.accent} />
             </TouchableOpacity>
-            <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
+            <View style={styles.headerTitleContainer} pointerEvents="none">
+                <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
+            </View>
             <TouchableOpacity onPress={openModal} style={styles.addButton}>
                 <Plus size={24} color={colors.accent} />
             </TouchableOpacity>
@@ -241,16 +243,18 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 50, // BUTTONS ON TOP
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
   },
   largeTitle: {
     fontSize: 22,
     fontWeight: '700',
-    position: 'absolute',
-    left: 0,
-    right: 0,
     textAlign: 'center',
-    // Removed zIndex: -1
   },
   addButton: {
       width: 40,
@@ -258,7 +262,7 @@ const styles = StyleSheet.create({
       borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 50, // BUTTONS ON TOP
   },
   scrollContent: {
       paddingHorizontal: 20,

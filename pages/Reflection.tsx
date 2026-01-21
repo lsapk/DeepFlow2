@@ -211,7 +211,9 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
             <Menu size={24} color={colors.button} />
         </TouchableOpacity>
         
-        <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
+        <View style={styles.headerTitleContainer} pointerEvents="none">
+            <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
+        </View>
 
         {/* Toggle View Button */}
         <TouchableOpacity 
@@ -258,16 +260,18 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10, // BUTTONS ON TOP
+    zIndex: 50,
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
   },
   headerTitle: {
       fontSize: 22,
       fontWeight: '700',
-      position: 'absolute',
-      left: 0,
-      right: 0,
       textAlign: 'center',
-      // Removed zIndex: -1
   },
   toggleBtn: {
       flexDirection: 'row',
@@ -276,7 +280,7 @@ const styles = StyleSheet.create({
       paddingHorizontal: 12,
       borderRadius: 16,
       gap: 6,
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 50,
   },
   toggleText: {
       fontSize: 12,

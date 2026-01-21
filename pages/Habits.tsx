@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput,
 import { Habit, Goal } from '../types';
 import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
+import * as Haptics from 'expo-haptics';
 
 interface HabitsProps {
   habits: Habit[];
@@ -55,6 +56,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   };
 
   const openEditModal = (habit: Habit) => {
+      Haptics.selectionAsync();
       setEditingHabit(habit);
       setTitle(habit.title);
       setDescription(habit.description || '');
@@ -122,6 +124,11 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
           }}
       ]);
   };
+
+  const handleIncrement = (id: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      incrementHabit(id);
+  }
 
   const todayIndex = new Date().getDay();
 
@@ -198,7 +205,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                         
                         {!showArchived && (
                             <TouchableOpacity 
-                                onPress={() => incrementHabit(habit.id)}
+                                onPress={() => handleIncrement(habit.id)}
                                 style={[
                                     styles.actionButton, 
                                     isCompletedToday ? {backgroundColor: colors.success} : {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'},
@@ -308,7 +315,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       alignItems: 'center',
-      // No negative zIndex
+      zIndex: -1,
   },
   largeTitle: {
     fontSize: 22,
@@ -321,7 +328,7 @@ const styles = StyleSheet.create({
   headerButtons: {
       flexDirection: 'row',
       gap: 12,
-      zIndex: 10,
+      zIndex: 10, // BUTTONS ON TOP
   },
   iconBtn: {
       width: 40,
@@ -329,7 +336,7 @@ const styles = StyleSheet.create({
       borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10,
+      zIndex: 10, // BUTTONS ON TOP
   },
   addButton: {
     width: 40,
@@ -337,7 +344,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 10, // BUTTONS ON TOP
   },
   scrollContent: {
     paddingHorizontal: 20,

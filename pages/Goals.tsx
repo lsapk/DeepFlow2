@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platfo
 import { Goal, SubObjective } from '../types';
 import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save, Minus, Menu, Target } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
+import * as Haptics from 'expo-haptics';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -63,6 +64,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
   };
 
   const toggleExpand = (goalId: string) => {
+    Haptics.selectionAsync();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const newSet = new Set(expandedGoalIds);
     if (newSet.has(goalId)) {
@@ -74,6 +76,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
   };
 
   const openEditModal = (goal: Goal) => {
+      Haptics.selectionAsync();
       setSelectedGoal(goal);
       setFormTitle(goal.title);
       setFormDesc(goal.description || '');
@@ -97,8 +100,14 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
 
   const changeProgress = (delta: number) => {
       const newVal = Math.max(0, Math.min(100, formProgress + delta));
+      if (newVal !== formProgress) Haptics.selectionAsync();
       setFormProgress(newVal);
   };
+
+  const onToggleGoal = (id: string) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toggleGoal(id);
+  }
 
   const activeGoals = goals.filter(t => !t.completed);
   const completedGoals = goals.filter(t => t.completed);
@@ -109,7 +118,9 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
           <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
               <Menu size={24} color={colors.accent} />
           </TouchableOpacity>
-          <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
+          <View style={styles.headerTitleContainer} pointerEvents="none">
+              <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
+          </View>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
                 <Plus size={24} color={colors.accent} />
           </TouchableOpacity>
@@ -129,7 +140,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                     <GoalItem 
                         goal={goal} 
                         isExpanded={expandedGoalIds.has(goal.id)}
-                        onToggle={() => toggleGoal(goal.id)} 
+                        onToggle={() => onToggleGoal(goal.id)} 
                         onToggleExpand={() => toggleExpand(goal.id)}
                         onLongPress={() => openEditModal(goal)}
                         userId={userId}
@@ -154,7 +165,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                             <GoalItem 
                             goal={goal} 
                             isExpanded={expandedGoalIds.has(goal.id)}
-                            onToggle={() => toggleGoal(goal.id)} 
+                            onToggle={() => onToggleGoal(goal.id)} 
                             onToggleExpand={() => toggleExpand(goal.id)}
                             onLongPress={() => openEditModal(goal)}
                             userId={userId}
@@ -396,18 +407,20 @@ const styles = StyleSheet.create({
   largeTitle: {
     fontSize: 22,
     fontWeight: '700',
-    position: 'absolute',
-    left: 0,
-    right: 0,
     textAlign: 'center',
-    // Removed zIndex: -1
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
   },
   iconBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10, // BUTTONS ON TOP
+    zIndex: 50,
   },
   addButton: {
     width: 40,
@@ -415,7 +428,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10, // BUTTONS ON TOP
+    zIndex: 50,
   },
   scrollContent: {
     paddingHorizontal: 20,
