@@ -35,8 +35,8 @@ const App: React.FC = () => {
   const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Notifications Logic State
-  const [lastCheck, setLastCheck] = useState(Date.now());
+  // Focus specific prop logic
+  const [startFocusMinutes, setStartFocusMinutes] = useState<number | null>(null);
 
   // Level Up State
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -54,8 +54,6 @@ const App: React.FC = () => {
   const checkNotifications = async () => {
       const now = new Date();
       
-      // 1. Check Focus Sessions (Simulated via Supabase or local state if active)
-      // Note: Focus page manages its own timer, but we can check if a session ended recently in DB
       const { data: recentFocus } = await supabase.from('focus_sessions')
         .select('*')
         .eq('user_id', user?.id)
@@ -63,16 +61,13 @@ const App: React.FC = () => {
         .limit(1);
         
       if (recentFocus && recentFocus.length > 0) {
-          // Notification already handled by Focus page completion alert, but global backup:
-          // console.log("Focus terminé détecté globalement");
+          // Notification already handled by Focus page completion alert
       }
 
-      // 2. Check Tasks Due Soon (within next hour)
       tasks.forEach(task => {
           if (!task.completed && task.due_date) {
               const due = new Date(task.due_date);
               const diff = due.getTime() - now.getTime();
-              // If due in less than 30 mins and positive
               if (diff > 0 && diff < 30 * 60 * 1000) {
                   Alert.alert("Rappel Tâche", `La tâche "${task.title}" arrive à échéance bientôt !`);
               }
@@ -208,7 +203,50 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
   };
 
-  // --- ACTIONS ---
+  // --- ACTIONS (PASSED TO AI) ---
+  const aiAddTask = async (title: string, priority: string) => {
+      const max = tasks.length > 0 ? Math.max(...tasks.map(x=>x.sort_order)) : 0;
+      await supabase.from('tasks').insert({
+          user_id: user?.id,
+          title,
+          priority: priority as any,
+          completed: false,
+          sort_order: max + 1
+      });
+      fetchTasks(user!.id);
+  };
+
+  const aiAddHabit = async (title: string) => {
+      const max = habits.length > 0 ? Math.max(...habits.map(x=>x.sort_order || 0)) : 0;
+      await supabase.from('habits').insert({
+          user_id: user?.id,
+          title,
+          frequency: 'daily',
+          target: 1,
+          streak: 0,
+          sort_order: max + 1
+      });
+      fetchHabits(user!.id);
+  };
+
+  const aiAddGoal = async (title: string) => {
+      const max = goals.length > 0 ? Math.max(...goals.map(x=>x.sort_order)) : 0;
+      await supabase.from('goals').insert({
+          user_id: user?.id,
+          title,
+          completed: false,
+          sort_order: max + 1
+      });
+      fetchGoals(user!.id);
+  };
+
+  const aiStartFocus = (minutes: number) => {
+      // En production, on passerait 'minutes' via props au composant Focus
+      // Ici, on redirige simplement
+      setCurrentView(ViewState.FOCUS_MODE);
+  };
+
+  // --- EXISTING ACTIONS ---
   const toggleHabit = async (id: string) => {
       const habit = habits.find(h => h.id === id);
       if (!habit || !player || !user) return;
@@ -306,12 +344,7 @@ const App: React.FC = () => {
              <Goals 
                 goals={goals} 
                 toggleGoal={toggleGoal}
-                addGoal={async (title) => {
-                    const max = goals.length > 0 ? Math.max(...goals.map(x=>x.sort_order)) : 0;
-                    await supabase.from('goals').insert({
-                         user_id: user.id, title, completed: false, sort_order: max+1, progress: 0
-                    });
-                }}
+                addGoal={aiAddGoal}
                 deleteGoal={async (id) => await supabase.from('goals').delete().eq('id', id)}
                 userId={user.id}
                 refreshGoals={() => fetchGoals(user.id)}
@@ -319,7 +352,17 @@ const App: React.FC = () => {
              />
           );
       case ViewState.GROWTH:
-        return <Growth player={player} user={user} tasks={tasks} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} />;
+        return (
+            <Growth 
+                player={player} user={user} tasks={tasks} 
+                openMenu={() => setSidebarVisible(true)} 
+                openProfile={() => setProfileVisible(true)}
+                onAddTask={aiAddTask}
+                onAddHabit={aiAddHabit}
+                onAddGoal={aiAddGoal}
+                onStartFocus={aiStartFocus}
+            />
+        );
       case ViewState.CYBER_KNIGHT:
         return <CyberKnight player={player} user={user} quests={quests} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} />;
       case ViewState.REFLECTION:

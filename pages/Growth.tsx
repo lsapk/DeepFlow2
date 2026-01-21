@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Switch, Alert } from 'react-native';
 import { PlayerProfile, UserProfile, Task } from '../types';
-import { Send, Menu, Sparkles, TrendingUp, BrainCircuit, Clock, BarChart2, PieChart, Activity } from 'lucide-react-native';
-import { generateCoaching } from '../services/ai';
+import { Send, Menu, TrendingUp, Clock, BarChart2, PieChart, Activity, Mic, Zap, CheckCircle2 } from 'lucide-react-native';
+import { generateActionableCoaching } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
 
@@ -12,67 +12,117 @@ interface GrowthProps {
   tasks: Task[]; 
   openMenu: () => void;
   openProfile: () => void;
+  // Fonctions de callback pour les actions IA
+  onAddTask: (title: string, priority: string) => void;
+  onAddHabit: (title: string) => void;
+  onAddGoal: (title: string) => void;
+  onStartFocus: (minutes: number) => void;
 }
 
-const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProfile }) => {
+const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProfile, onAddTask, onAddHabit, onAddGoal, onStartFocus }) => {
   const insets = useSafeAreaInsets();
   
-  // Tabs: 'OVERVIEW' | 'ANALYTICS' | 'AI_COACH'
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ANALYTICS' | 'AI_COACH'>('OVERVIEW');
 
   // AI Chat State
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-      { role: 'ai', text: `Bonjour ${user.display_name?.split(' ')[0]}. Je suis prêt à analyser tes performances. Par quoi commençons-nous ?` }
+      { role: 'ai', text: `Bonjour ${user.display_name?.split(' ')[0]}. Active le "Mode Création" pour que je gère tes tâches et focus directement.` }
   ]);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [isCreationMode, setIsCreationMode] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Stats State
+  // REAL Stats State
   const [weeklyFocusData, setWeeklyFocusData] = useState<number[]>([0,0,0,0,0,0,0]);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
+  const [bestDay, setBestDay] = useState('N/A');
   const [taskCompletionRate, setTaskCompletionRate] = useState(0);
+  const [tasksByPriority, setTasksByPriority] = useState({ high: 0, medium: 0, low: 0 });
 
   useEffect(() => {
-      fetchFocusStats();
-      calculateTaskStats();
+      fetchRealFocusStats();
+      calculateRealTaskStats();
   }, [tasks]);
 
-  const calculateTaskStats = () => {
+  const calculateRealTaskStats = () => {
       const total = tasks.length;
       if (total === 0) {
           setTaskCompletionRate(0);
+          setTasksByPriority({ high: 0, medium: 0, low: 0 });
           return;
       }
       const completed = tasks.filter(t => t.completed).length;
       setTaskCompletionRate(Math.round((completed / total) * 100));
+
+      setTasksByPriority({
+          high: tasks.filter(t => t.priority === 'high' && !t.completed).length,
+          medium: tasks.filter(t => t.priority === 'medium' && !t.completed).length,
+          low: tasks.filter(t => t.priority === 'low' && !t.completed).length,
+      });
   };
 
-  const fetchFocusStats = async () => {
+  const fetchRealFocusStats = async () => {
+      // Fetch sessions for the last 7 days from Supabase
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
       const { data: sessions } = await supabase
           .from('focus_sessions')
           .select('duration, completed_at')
           .eq('user_id', user.id)
-          .gte('completed_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+          .gte('completed_at', sevenDaysAgo.toISOString());
 
-      if (sessions) {
+      if (sessions && sessions.length > 0) {
           const daysMap = new Array(7).fill(0);
           let total = 0;
+          let maxDuration = 0;
+          let bestDayIndex = 0;
           
           sessions.forEach(session => {
               const date = new Date(session.completed_at);
               const today = new Date();
-              const diffTime = Math.abs(today.getTime() - date.getTime());
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1; 
+              // Calculate difference in days from today (0 = today, 1 = yesterday...)
+              const diffTime = Math.abs(today.setHours(0,0,0,0) - date.setHours(0,0,0,0));
+              const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
               
               if (diffDays >= 0 && diffDays < 7) {
+                  // Map to array index (6 is today, 0 is 7 days ago) or reverse
+                  // Let's visualize: Index 6 = Today, Index 5 = Yesterday...
                   daysMap[6 - diffDays] += session.duration;
               }
               total += session.duration;
           });
+
+          // Find best day
+          daysMap.forEach((val, idx) => {
+              if (val > maxDuration) {
+                  maxDuration = val;
+                  bestDayIndex = idx;
+              }
+          });
           
+          if (maxDuration > 0) {
+              const d = new Date();
+              d.setDate(d.getDate() - (6 - bestDayIndex));
+              setBestDay(d.toLocaleDateString('fr-FR', { weekday: 'long' }));
+          }
+
           setWeeklyFocusData(daysMap);
           setTotalFocusTime(total);
+      } else {
+          setTotalFocusTime(0);
+          setBestDay('N/A');
+          setWeeklyFocusData([0,0,0,0,0,0,0]);
+      }
+  };
+
+  const handleVoiceInput = () => {
+      if (isCreationMode) {
+          // Simulation vocale : injecte du texte qui sera traité comme une commande
+          setChatInput("Crée une tâche 'Préparer la réunion' en urgence");
+      } else {
+          Alert.alert("Info", "Le mode création doit être activé pour les commandes vocales.");
       }
   };
 
@@ -86,15 +136,37 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
       
       const context = {
           name: user.display_name,
-          level: player.level,
-          xp: player.experience_points,
           pendingTasks: tasks.filter(t => !t.completed).length,
-          weeklyFocusMinutes: totalFocusTime
+          completionRate: taskCompletionRate
       };
 
-      const response = await generateCoaching(userMsg, context);
+      const response = await generateActionableCoaching(userMsg, context, isCreationMode);
       
-      setMessages(prev => [...prev, { role: 'ai', text: response }]);
+      // Execute Action if present
+      if (response.action) {
+          const { action, data } = response.action;
+          
+          try {
+              if (action === 'CREATE_TASK') {
+                  onAddTask(data.title, data.priority || 'medium');
+                  setMessages(prev => [...prev, { role: 'ai', text: `✅ Action effectuée : Tâche "${data.title}" créée.` }]);
+              } else if (action === 'CREATE_HABIT') {
+                  onAddHabit(data.title);
+                  setMessages(prev => [...prev, { role: 'ai', text: `✅ Action effectuée : Habitude "${data.title}" ajoutée.` }]);
+              } else if (action === 'CREATE_GOAL') {
+                  onAddGoal(data.title);
+                  setMessages(prev => [...prev, { role: 'ai', text: `✅ Action effectuée : Objectif "${data.title}" défini.` }]);
+              } else if (action === 'START_FOCUS') {
+                  onStartFocus(data.minutes || 25);
+                  // Message automatique handled par le changement de vue
+              }
+          } catch (e) {
+              setMessages(prev => [...prev, { role: 'ai', text: "❌ J'ai compris l'action mais une erreur est survenue." }]);
+          }
+      } else {
+          setMessages(prev => [...prev, { role: 'ai', text: response.text }]);
+      }
+
       setLoadingAi(false);
   };
 
@@ -102,36 +174,43 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
 
   const renderOverview = () => (
       <View style={{ gap: 16 }}>
-          {/* KPI Cards */}
-          <View style={styles.kpiRow}>
+          {/* Main KPI */}
+          <View style={styles.kpiGrid}>
               <View style={styles.kpiCard}>
-                  <Activity size={20} color="#C4B5FD" style={{marginBottom: 8}} />
+                  <Activity size={24} color="#C4B5FD" />
                   <Text style={styles.kpiValue}>{taskCompletionRate}%</Text>
                   <Text style={styles.kpiLabel}>Tâches Complétées</Text>
               </View>
               <View style={styles.kpiCard}>
-                  <Clock size={20} color="#4ADE80" style={{marginBottom: 8}} />
+                  <Clock size={24} color="#4ADE80" />
                   <Text style={styles.kpiValue}>{Math.floor(totalFocusTime / 60)}h</Text>
                   <Text style={styles.kpiLabel}>Focus Hebdo</Text>
+              </View>
+              <View style={styles.kpiCard}>
+                  <TrendingUp size={24} color="#FACC15" />
+                  <Text style={styles.kpiValue}>{player.level}</Text>
+                  <Text style={styles.kpiLabel}>Niveau Actuel</Text>
               </View>
           </View>
 
           <View style={styles.insightBox}>
-             <View style={{flexDirection: 'row', gap: 10, marginBottom: 8}}>
-                 <Sparkles size={18} color="#FACC15" />
-                 <Text style={styles.insightTitle}>Suggestion IA</Text>
-             </View>
-             <Text style={styles.insightText}>
-                 {taskCompletionRate < 50 
-                    ? "Votre taux de complétion est faible cette semaine. Essayez de diviser vos tâches en sous-tâches plus petites."
-                    : "Excellent rythme ! Vous êtes en bonne voie pour atteindre le niveau supérieur."}
-             </Text>
+             <Text style={styles.insightTitle}>⚡ Analyse de Performance</Text>
+             {bestDay !== 'N/A' ? (
+                 <Text style={styles.insightText}>
+                     Votre journée la plus productive est le <Text style={{fontWeight:'bold', color: '#FFF'}}>{bestDay}</Text>.
+                     Utilisez ce jour pour vos tâches les plus complexes.
+                 </Text>
+             ) : (
+                 <Text style={styles.insightText}>
+                     Pas encore assez de données de focus pour analyser votre meilleure journée. Lancez une session !
+                 </Text>
+             )}
           </View>
       </View>
   );
 
   const renderAnalytics = () => {
-    const maxVal = Math.max(...weeklyFocusData, 60);
+    const maxVal = Math.max(...weeklyFocusData, 60); // Min scale 60m
     const dayLabels = [];
     for (let i=6; i>=0; i--) {
         const d = new Date();
@@ -141,10 +220,11 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
 
     return (
       <View style={{ gap: 20 }}>
+          {/* Focus Chart (Real Data) */}
           <View style={styles.analysisCard}>
             <View style={styles.cardHeader}>
                 <BarChart2 size={20} color="#C4B5FD" />
-                <Text style={styles.cardTitle}>Focus (7 derniers jours)</Text>
+                <Text style={styles.cardTitle}>Temps de Focus (7 derniers jours)</Text>
             </View>
             <View style={styles.chartContainer}>
                 {weeklyFocusData.map((val, idx) => {
@@ -162,23 +242,27 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
             </View>
           </View>
 
+          {/* Priority Breakdown (Real Data) */}
           <View style={styles.analysisCard}>
             <View style={styles.cardHeader}>
-                <PieChart size={20} color="#4ADE80" />
-                <Text style={styles.cardTitle}>Répartition des Tâches</Text>
+                <PieChart size={20} color="#F87171" />
+                <Text style={styles.cardTitle}>Charge de Travail par Priorité</Text>
             </View>
-            <View style={styles.statsList}>
-                <View style={styles.statRow}>
-                    <Text style={styles.statRowLabel}>Total</Text>
-                    <Text style={styles.statRowValue}>{tasks.length}</Text>
+            <View style={styles.priorityBars}>
+                <View style={styles.pBarRow}>
+                    <Text style={[styles.pLabel, {color: '#EF4444'}]}>High</Text>
+                    <View style={styles.pTrack}><View style={[styles.pFill, {width: `${Math.min(100, tasksByPriority.high * 10)}%`, backgroundColor: '#EF4444'}]} /></View>
+                    <Text style={styles.pValue}>{tasksByPriority.high}</Text>
                 </View>
-                <View style={styles.statRow}>
-                    <Text style={styles.statRowLabel}>En attente</Text>
-                    <Text style={styles.statRowValue}>{tasks.filter(t => !t.completed).length}</Text>
+                <View style={styles.pBarRow}>
+                    <Text style={[styles.pLabel, {color: '#F59E0B'}]}>Medium</Text>
+                    <View style={styles.pTrack}><View style={[styles.pFill, {width: `${Math.min(100, tasksByPriority.medium * 10)}%`, backgroundColor: '#F59E0B'}]} /></View>
+                    <Text style={styles.pValue}>{tasksByPriority.medium}</Text>
                 </View>
-                <View style={styles.statRow}>
-                    <Text style={styles.statRowLabel}>Priorité Haute</Text>
-                    <Text style={[styles.statRowValue, { color: '#F87171' }]}>{tasks.filter(t => t.priority === 'high' && !t.completed).length}</Text>
+                <View style={styles.pBarRow}>
+                    <Text style={[styles.pLabel, {color: '#3B82F6'}]}>Low</Text>
+                    <View style={styles.pTrack}><View style={[styles.pFill, {width: `${Math.min(100, tasksByPriority.low * 10)}%`, backgroundColor: '#3B82F6'}]} /></View>
+                    <Text style={styles.pValue}>{tasksByPriority.low}</Text>
                 </View>
             </View>
           </View>
@@ -188,6 +272,19 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
 
   const renderAiCoach = () => (
       <View style={{ flex: 1 }}>
+        <View style={styles.modeSwitchContainer}>
+            <View>
+                <Text style={[styles.modeLabel, isCreationMode && {color: '#4ADE80'}]}>Mode Création</Text>
+                <Text style={styles.modeSub}>L'IA peut créer des tâches/focus</Text>
+            </View>
+            <Switch 
+                value={isCreationMode} 
+                onValueChange={setIsCreationMode}
+                trackColor={{ false: "#333", true: "#4ADE80" }}
+                thumbColor="#FFF"
+            />
+        </View>
+
         <ScrollView 
             style={styles.chatScroll}
             contentContainerStyle={{ paddingBottom: 20 }}
@@ -205,10 +302,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
                 </View>
             )}
         </ScrollView>
+        
         <View style={styles.inputArea}>
+            <TouchableOpacity style={styles.voiceBtn} onPress={handleVoiceInput}>
+                <Mic size={20} color={isCreationMode ? "#4ADE80" : "#FFF"} />
+            </TouchableOpacity>
             <TextInput 
                 style={styles.textInput}
-                placeholder="Discuter avec le coach..."
+                placeholder={isCreationMode ? "Ex: Crée une tâche..." : "Discuter avec le coach..."}
                 placeholderTextColor="#666"
                 value={chatInput}
                 onChangeText={setChatInput}
@@ -327,9 +428,10 @@ const styles = StyleSheet.create({
   },
   
   // Overview
-  kpiRow: {
+  kpiGrid: {
       flexDirection: 'row',
-      gap: 16,
+      justifyContent: 'space-between',
+      gap: 10,
   },
   kpiCard: {
       flex: 1,
@@ -338,32 +440,34 @@ const styles = StyleSheet.create({
       padding: 16,
       borderWidth: 1,
       borderColor: '#262626',
-      alignItems: 'flex-start',
+      alignItems: 'center',
   },
   kpiValue: {
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: '700',
       color: '#FFF',
-      marginBottom: 2,
+      marginVertical: 4,
   },
   kpiLabel: {
       color: '#888',
-      fontSize: 12,
+      fontSize: 11,
+      textAlign: 'center',
   },
   insightBox: {
-      backgroundColor: 'rgba(250, 204, 21, 0.05)',
+      backgroundColor: '#171717',
       borderRadius: 12,
       padding: 16,
-      borderWidth: 1,
-      borderColor: 'rgba(250, 204, 21, 0.2)',
+      borderLeftWidth: 4,
+      borderLeftColor: '#FACC15',
   },
   insightTitle: {
       color: '#FACC15',
       fontWeight: '700',
       fontSize: 14,
+      marginBottom: 4,
   },
   insightText: {
-      color: '#DDD',
+      color: '#CCC',
       fontSize: 14,
       lineHeight: 20,
   },
@@ -406,30 +510,59 @@ const styles = StyleSheet.create({
       color: '#666',
       fontSize: 10,
   },
-  statsList: {
+  priorityBars: {
       gap: 12,
   },
-  statRow: {
+  pBarRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      paddingBottom: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: '#222',
+      alignItems: 'center',
+      gap: 10,
   },
-  statRowLabel: {
-      color: '#AAA',
-      fontSize: 14,
+  pLabel: {
+      width: 50,
+      fontSize: 12,
+      fontWeight: '600',
   },
-  statRowValue: {
+  pTrack: {
+      flex: 1,
+      height: 8,
+      backgroundColor: '#333',
+      borderRadius: 4,
+      overflow: 'hidden',
+  },
+  pFill: {
+      height: '100%',
+  },
+  pValue: {
       color: '#FFF',
-      fontWeight: '700',
-      fontSize: 14,
+      fontSize: 12,
+      width: 20,
+      textAlign: 'right',
   },
 
   // Chat
+  modeSwitchContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: '#222',
+  },
+  modeLabel: {
+      color: '#DDD',
+      fontSize: 14,
+      fontWeight: '600',
+  },
+  modeSub: {
+      color: '#666',
+      fontSize: 12,
+  },
   chatScroll: {
       flex: 1,
       paddingHorizontal: 20,
+      paddingTop: 20,
   },
   messageBubble: {
       padding: 12,
@@ -464,7 +597,15 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      marginBottom: 65, // Bottom nav space
+      marginBottom: 65, 
+  },
+  voiceBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#333',
+      alignItems: 'center',
+      justifyContent: 'center',
   },
   textInput: {
       flex: 1,

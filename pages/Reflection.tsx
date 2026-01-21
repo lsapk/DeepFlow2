@@ -1,111 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
 import { Reflection } from '../types';
-import { BrainCircuit, Sparkles, Send, X, Plus, Menu } from 'lucide-react-native';
+import { BrainCircuit, Sparkles, Send, X, Plus, Menu, Save, RefreshCw } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-
-// 100 Questions de développement personnel et d'introspection
-const REFLECTION_QUESTIONS = [
-    "Quelle est ma plus grande peur et pourquoi ?",
-    "Si je ne pouvais pas échouer, que ferais-je aujourd'hui ?",
-    "Quelles sont les 3 valeurs les plus importantes pour moi ?",
-    "De quoi suis-je le plus fier cette semaine ?",
-    "Quelle habitude me retient le plus en arrière ?",
-    "Qui m'inspire le plus et pourquoi ?",
-    "Quel est le dernier compliment que j'ai reçu et comment l'ai-je accueilli ?",
-    "Quelle leçon douloureuse ai-je apprise récemment ?",
-    "Si je pouvais parler à mon moi d'il y a 5 ans, que lui dirais-je ?",
-    "Qu'est-ce qui me donne le plus d'énergie ?",
-    "Qu'est-ce qui me draine le plus d'énergie ?",
-    "Quelle est ma définition du succès ?",
-    "Suis-je plus introverti ou extraverti, et comment cela influence-t-il ma vie ?",
-    "Quel est le dernier livre ou film qui a changé ma perspective ?",
-    "Si je devais mourir demain, quel serait mon plus grand regret ?",
-    "Comment je réagis face au stress ?",
-    "Quelle est ma plus grande qualité ?",
-    "Quel est mon plus grand défaut sur lequel je veux travailler ?",
-    "Qu'est-ce que je prends trop au sérieux ?",
-    "Qu'est-ce que je ne prends pas assez au sérieux ?",
-    "Quelle est la chose la plus gentille que j'ai faite pour quelqu'un récemment ?",
-    "Quelle est la chose la plus gentille que quelqu'un a faite pour moi récemment ?",
-    "Est-ce que je vis dans le passé, le présent ou le futur ?",
-    "Quelles sont mes croyances limitantes ?",
-    "Si l'argent n'existait pas, comment passerais-je mon temps ?",
-    "Quelle relation dans ma vie a besoin de plus d'attention ?",
-    "Quelle relation dans ma vie est toxique ?",
-    "Qu'est-ce que je procrastine depuis longtemps ?",
-    "Comment je me parle à moi-même (dialogue intérieur) ?",
-    "Quelle est ma routine matinale idéale ?",
-    "Quelle est ma routine du soir idéale ?",
-    "Qu'est-ce que je dois pardonner (à moi-même ou aux autres) ?",
-    "Quel est mon plus grand rêve d'enfant ?",
-    "Est-ce que je suis heureux de la direction que prend ma vie ?",
-    "Qu'est-ce que je ferais différemment si je recommençais cette année ?",
-    "Quel risque devrais-je prendre ?",
-    "Quelle compétence aimerais-je maîtriser ?",
-    "Comment je définis l'amour ?",
-    "Comment je définis l'amitié ?",
-    "Qu'est-ce qui me met en colère et pourquoi ?",
-    "Qu'est-ce qui me fait pleurer de joie ?",
-    "Quelle est ma place dans l'univers ?",
-    "Est-ce que je prends soin de mon corps ?",
-    "Est-ce que je prends soin de mon esprit ?",
-    "Quelle est la meilleure décision que j'ai prise ?",
-    "Quelle est la pire décision que j'ai prise ?",
-    "Comment je gère l'échec ?",
-    "Comment je célèbre mes victoires ?",
-    "Qu'est-ce que je veux laisser comme héritage ?",
-    "Si je pouvais changer une chose dans le monde, ce serait quoi ?",
-    "Quelle est ma citation préférée ?",
-    "Quand me suis-je senti le plus vivant ?",
-    "Qu'est-ce que je cache aux autres ?",
-    "Qu'est-ce que je cache à moi-même ?",
-    "Quelle est ma relation avec la technologie ?",
-    "Suis-je un bon auditeur ?",
-    "Est-ce que je juge trop vite les autres ?",
-    "Quelle est la chose la plus courageuse que j'ai faite ?",
-    "Qu'est-ce que je voudrais apprendre à mes enfants (ou futurs enfants) ?",
-    "Quelle est ma saison préférée et pourquoi ?",
-    "Quel est mon endroit préféré sur Terre ?",
-    "Si je pouvais avoir un super-pouvoir, lequel serait-ce ?",
-    "Quelle est la chose la plus importante que j'ai apprise cette année ?",
-    "Comment je peux être plus bienveillant envers moi-même ?",
-    "Qu'est-ce que je dois arrêter de faire immédiatement ?",
-    "Qu'est-ce que je dois commencer à faire immédiatement ?",
-    "Quelle est ma plus grande distraction ?",
-    "Comment je définis la liberté ?",
-    "Est-ce que je suis authentique ?",
-    "Qu'est-ce qui me passionne vraiment ?",
-    "Si je pouvais dîner avec une personne (vivante ou morte), qui serait-ce ?",
-    "Quelle est ma plus grande insécurité ?",
-    "Comment je réagis à la critique ?",
-    "Est-ce que je demande de l'aide quand j'en ai besoin ?",
-    "Qu'est-ce que je ferais si je savais que personne ne me jugerait ?",
-    "Quelle est la chose la plus difficile que j'ai surmontée ?",
-    "Qu'est-ce que je veux accomplir dans les 5 prochaines années ?",
-    "Est-ce que je suis reconnaissant ?",
-    "Pour quoi suis-je reconnaissant aujourd'hui ?",
-    "Quelle est ma relation avec la nature ?",
-    "Est-ce que je dors assez ?",
-    "Quelle est ma relation avec la nourriture ?",
-    "Qu'est-ce que je ferais avec 10 millions d'euros ?",
-    "Quelle est la chose la plus drôle qui m'est arrivée ?",
-    "Est-ce que je suis patient ?",
-    "Comment je gère les conflits ?",
-    "Quelle est ma définition de la beauté ?",
-    "Est-ce que je suis curieux ?",
-    "Qu'est-ce que je veux améliorer dans ma personnalité ?",
-    "Si je pouvais vivre à une autre époque, laquelle choisirais-je ?",
-    "Quelle est la chose la plus spontanée que j'ai faite ?",
-    "Est-ce que je suis un leader ou un suiveur ?",
-    "Quelle est ma plus grande source de stress ?",
-    "Comment je me détends ?",
-    "Est-ce que je suis fiable ?",
-    "Quelle est la promesse que je dois me faire à moi-même ?",
-    "Est-ce que je vis selon mes propres règles ou celles des autres ?",
-    "Qu'est-ce que je ressens en ce moment précis ?",
-    "Quelle question aimerais-je qu'on me pose ?"
-];
+import { addXp, REWARDS } from '../services/gamification';
+import { generateReflectionQuestion } from '../services/ai';
 
 interface ReflectionProps {
   userId: string;
@@ -116,9 +15,10 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   
-  // Create State
-  const [question, setQuestion] = useState('');
+  // State for new entry
+  const [question, setQuestion] = useState('Chargement de la question...');
   const [answer, setAnswer] = useState('');
+  const [loadingQ, setLoadingQ] = useState(false);
 
   useEffect(() => {
       if (userId) fetchReflections();
@@ -133,21 +33,17 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
       if (data) setReflections(data);
   };
 
+  const getNewQuestion = async () => {
+      setLoadingQ(true);
+      const q = await generateReflectionQuestion();
+      setQuestion(q);
+      setLoadingQ(false);
+  };
+
   const openNewSession = () => {
       setModalVisible(true);
       setAnswer('');
-      // Pick a random question from the hardcoded list
-      const randomQ = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
-      setQuestion(randomQ);
-  };
-
-  const changeQuestion = () => {
-      let newQ = question;
-      // Ensure we get a different question
-      while (newQ === question) {
-          newQ = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
-      }
-      setQuestion(newQ);
+      getNewQuestion();
   };
 
   const saveReflection = async () => {
@@ -161,6 +57,10 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
       });
 
       if (!error) {
+          // Add XP
+          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
+          if (player) await addXp(userId, REWARDS.JOURNAL, player);
+
           fetchReflections();
           setModalVisible(false);
       } else {
@@ -171,7 +71,7 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.leftRow}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
             {openMenu && (
                  <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
                       <Menu size={24} color="#FFF" />
@@ -188,15 +88,20 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
           {reflections.length === 0 ? (
               <View style={styles.emptyState}>
                   <BrainCircuit size={60} color="#333" style={{marginBottom: 20}} />
-                  <Text style={styles.emptyText}>Commencez votre voyage intérieur.</Text>
+                  <Text style={styles.emptyText}>Prenez un moment pour vous.</Text>
                   <TouchableOpacity style={styles.ctaBtn} onPress={openNewSession}>
-                      <Text style={styles.ctaText}>Lancer une Réflexion</Text>
+                      <Text style={styles.ctaText}>Commencer</Text>
                   </TouchableOpacity>
               </View>
           ) : (
               reflections.map((ref) => (
                   <View key={ref.id} style={styles.card}>
-                      <Text style={styles.date}>{new Date(ref.created_at).toLocaleDateString()}</Text>
+                      <View style={styles.cardHeader}>
+                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                              <Sparkles size={16} color="#C4B5FD" />
+                              <Text style={styles.date}>{new Date(ref.created_at).toLocaleDateString()}</Text>
+                          </View>
+                      </View>
                       <Text style={styles.questionText}>{ref.question}</Text>
                       <View style={styles.divider} />
                       <Text style={styles.answerText}>{ref.answer}</Text>
@@ -205,46 +110,49 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
           )}
       </ScrollView>
 
-      {/* NEW REFLECTION MODAL */}
+      {/* MODAL SIMILAIRE AU JOURNAL */}
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
-          <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Introspection</Text>
-                  <TouchableOpacity onPress={() => setModalVisible(false)}>
-                      <X size={24} color="#FFF" />
-                  </TouchableOpacity>
-              </View>
-
-              <ScrollView contentContainerStyle={styles.modalBody}>
-                  <View style={styles.aiBox}>
-                      <View style={styles.aiLabel}>
-                          <Sparkles size={16} color="#000" />
-                          <Text style={styles.aiLabelText}>Question du jour</Text>
-                      </View>
-                      
-                      <Text style={styles.generatedQuestion}>{question}</Text>
-                      
-                      <TouchableOpacity style={styles.regenBtn} onPress={changeQuestion}>
-                          <Text style={styles.regenText}>Autre question</Text>
+          <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>Introspection</Text>
+                      <TouchableOpacity onPress={() => setModalVisible(false)}>
+                          <X size={24} color="#FFF" />
                       </TouchableOpacity>
                   </View>
 
-                  <Text style={styles.label}>VOTRE RÉPONSE</Text>
-                  <TextInput 
-                      style={styles.input}
-                      multiline
-                      textAlignVertical="top"
-                      placeholder="Écrivez librement..."
-                      placeholderTextColor="#666"
-                      value={answer}
-                      onChangeText={setAnswer}
-                  />
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                      <View style={styles.aiBox}>
+                          <View style={styles.aiLabel}>
+                              <Sparkles size={16} color="#000" />
+                              <Text style={styles.aiLabelText}>Question générée par IA</Text>
+                          </View>
+                          <Text style={styles.generatedQuestion}>
+                              {loadingQ ? "Génération en cours..." : question}
+                          </Text>
+                          <TouchableOpacity style={styles.regenBtn} onPress={getNewQuestion} disabled={loadingQ}>
+                              <RefreshCw size={14} color="#000" style={{marginRight: 6}} />
+                              <Text style={styles.regenText}>Autre question</Text>
+                          </TouchableOpacity>
+                      </View>
 
-                  <TouchableOpacity style={styles.saveBtn} onPress={saveReflection}>
-                      <Send size={20} color="#000" />
-                      <Text style={styles.saveBtnText}>Enregistrer</Text>
-                  </TouchableOpacity>
-              </ScrollView>
+                      <Text style={styles.label}>VOTRE RÉPONSE</Text>
+                      <TextInput 
+                          style={styles.input}
+                          multiline
+                          textAlignVertical="top"
+                          placeholder="Écrivez librement ce que vous ressentez..."
+                          placeholderTextColor="#666"
+                          value={answer}
+                          onChangeText={setAnswer}
+                      />
+
+                      <TouchableOpacity style={styles.saveBtn} onPress={saveReflection}>
+                          <Save size={20} color="#000" />
+                          <Text style={styles.saveBtnText}>Enregistrer (+20 XP)</Text>
+                      </TouchableOpacity>
+                  </ScrollView>
+              </View>
           </View>
       </Modal>
     </View>
@@ -261,17 +169,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 10,
   },
-  leftRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   largeTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
     color: '#FFF',
   },
@@ -283,14 +192,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scrollContent: {
-      paddingHorizontal: 20,
+      paddingHorizontal: 16,
       paddingBottom: 100,
       gap: 16,
   },
@@ -316,22 +219,25 @@ const styles = StyleSheet.create({
   card: {
       backgroundColor: '#171717',
       borderRadius: 16,
-      padding: 20,
+      padding: 16,
       borderWidth: 1,
       borderColor: '#262626',
   },
+  cardHeader: {
+      marginBottom: 12,
+  },
   date: {
-      color: '#666',
+      color: '#888',
       fontSize: 12,
-      marginBottom: 8,
       fontWeight: '600',
   },
   questionText: {
-      color: '#C4B5FD',
+      color: '#FFF',
       fontSize: 18,
-      fontWeight: '600',
+      fontWeight: '700',
       lineHeight: 24,
       fontStyle: 'italic',
+      marginBottom: 4,
   },
   divider: {
       height: 1,
@@ -339,31 +245,30 @@ const styles = StyleSheet.create({
       marginVertical: 12,
   },
   answerText: {
-      color: '#DDD',
+      color: '#CCC',
       fontSize: 15,
       lineHeight: 22,
   },
-  modalContainer: {
+  
+  // MODAL
+  modalOverlay: {
       flex: 1,
       backgroundColor: '#000',
-      paddingTop: 20,
+  },
+  modalContent: {
+      flex: 1,
+      padding: 20,
   },
   modalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingBottom: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: '#222',
+      marginBottom: 20,
   },
   modalTitle: {
-      fontSize: 18,
-      fontWeight: '600',
+      fontSize: 24,
+      fontWeight: '700',
       color: '#FFF',
-  },
-  modalBody: {
-      padding: 20,
   },
   aiBox: {
       backgroundColor: '#C4B5FD',
@@ -386,27 +291,30 @@ const styles = StyleSheet.create({
   generatedQuestion: {
       color: '#000',
       fontSize: 20,
-      fontWeight: '600',
+      fontWeight: '700',
       lineHeight: 28,
-      marginBottom: 12,
+      marginBottom: 16,
   },
   regenBtn: {
       alignSelf: 'flex-start',
-      paddingVertical: 6,
+      paddingVertical: 8,
       paddingHorizontal: 12,
       backgroundColor: 'rgba(0,0,0,0.1)',
       borderRadius: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
   },
   regenText: {
-      fontSize: 12,
+      fontSize: 13,
       color: '#000',
       fontWeight: '600',
   },
   label: {
-      color: '#666',
+      color: '#888',
       fontSize: 12,
       fontWeight: '600',
       marginBottom: 10,
+      textTransform: 'uppercase',
   },
   input: {
       backgroundColor: '#171717',

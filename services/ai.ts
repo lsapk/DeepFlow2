@@ -1,16 +1,14 @@
 import { supabase } from './supabase';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialisation du client Gemini
-// NOTE: L'erreur 403 signifie que cette variable est vide ou invalide.
-// Assurez-vous d'avoir configuré votre variable d'environnement (ex: via app.config.js ou .env)
-const API_KEY = process.env.API_KEY;
+// Configuration API Key
+const API_KEY = process.env.API_KEY || "AIzaSyBRsXHPOaFQVcOH9rCKx39uH8Bsu462uGo";
 
 let genAI: GoogleGenerativeAI | null = null;
 if (API_KEY) {
     genAI = new GoogleGenerativeAI(API_KEY);
 } else {
-    console.warn("Gemini API Key is missing in process.env.API_KEY. AI features will fail.");
+    console.warn("Gemini API Key is missing.");
 }
 
 // Helper pour logger l'utilisation
@@ -46,39 +44,75 @@ async function logAiUsage(type: 'chat' | 'analysis') {
     }
 }
 
-export const generateCoaching = async (
+// Mode Création : L'IA renvoie du JSON pour agir sur l'app
+export const generateActionableCoaching = async (
   userMessage: string, 
-  userContext: any
-): Promise<string> => {
-  if (!genAI) return "Clé API Gemini manquante. Veuillez configurer l'application.";
+  userContext: any,
+  isCreationMode: boolean
+): Promise<{ text: string, action?: any }> => {
+  if (!genAI) return { text: "Clé API manquante." };
 
   await logAiUsage('chat');
   
   try {
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: `
-          You are DeepFlow, a gamified productivity coach.
-          User Context:
-          - Name: ${userContext.name}
-          - Level: ${userContext.level}
-          - XP: ${userContext.xp}
-          - Current Tasks Pending: ${userContext.pendingTasks}
-          
-          Your goal is to motivate the user, give short actionable advice, and act like a "Cyber Knight" companion.
-          Keep responses concise (under 50 words) and encouraging.
-          Always reply in French.
-        `
-    });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    let prompt = `
+      Tu es DeepFlow, un coach de productivité.
+      
+      CONTEXTE UTILISATEUR:
+      - Tâches en attente: ${userContext.pendingTasks}
+      - Taux de complétion: ${userContext.completionRate}%
+      
+      RÈGLES:
+      1. Sois concis, motivant et direct.
+      2. Si 'isCreationMode' est TRUE, tu DOIS analyser si l'utilisateur veut créer quelque chose.
+    `;
 
-    const result = await model.generateContent(userMessage);
-    const response = await result.response;
-    return response.text();
+    if (isCreationMode) {
+        prompt += `
+        IMPORTANT - MODE ACTION ACTIVÉ:
+        Si l'utilisateur demande de créer une tâche, une habitude, un objectif ou lancer un focus, TU DOIS RÉPONDRE UNIQUEMENT AVEC UN JSON VALIDE (pas de markdown, pas de texte avant/après).
+        
+        FORMATS JSON STRICTS:
+        - Tâche: { "action": "CREATE_TASK", "data": { "title": "...", "priority": "high" | "medium" | "low" } }
+        - Habitude: { "action": "CREATE_HABIT", "data": { "title": "...", "frequency": "daily" } }
+        - Objectif: { "action": "CREATE_GOAL", "data": { "title": "..." } }
+        - Focus: { "action": "START_FOCUS", "data": { "minutes": 25 } }
+        
+        Exemple: Utilisateur: "Ajoute Payer loyer en urgent" -> Réponse: { "action": "CREATE_TASK", "data": { "title": "Payer loyer", "priority": "high" } }
+        
+        Si ce n'est pas une action, réponds normalement en texte.
+        `;
+    }
+
+    const result = await model.generateContent(prompt + "\n\nMessage utilisateur: " + userMessage);
+    const responseText = await result.response.text();
+
+    // Nettoyage pour parser le JSON si le modèle met des ```json ... ```
+    const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    try {
+        if (cleanText.startsWith('{') && cleanText.endsWith('}')) {
+            const actionData = JSON.parse(cleanText);
+            return { text: "Action identifiée...", action: actionData };
+        }
+    } catch (e) {
+        // Pas du JSON, c'est une réponse texte normale
+    }
+
+    return { text: responseText };
+
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Erreur de connexion à l'IA. Vérifiez votre clé API et vos quotas.";
+    return { text: "Erreur de connexion à l'IA." };
   }
 };
+
+export const generateCoaching = async (msg: string, ctx: any) => {
+    const res = await generateActionableCoaching(msg, ctx, false);
+    return res.text;
+}
 
 export const generateReflectionQuestion = async (): Promise<string> => {
   if (!genAI) return "Clé API manquante.";
@@ -86,11 +120,10 @@ export const generateReflectionQuestion = async (): Promise<string> => {
   await logAiUsage('analysis');
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent("Génère une seule question profonde et introspective pour un journal de productivité et de développement personnel. En Français. Juste la question, sans guillemets.");
+    const result = await model.generateContent("Génère une seule question de développement personnel profonde et originale en Français. Juste la question.");
     const response = await result.response;
-    return response.text().trim() || "Quelle a été votre plus grande victoire aujourd'hui ?";
+    return response.text().trim();
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Sur quoi souhaitez-vous réfléchir aujourd'hui ?";
+    return "De quoi êtes-vous le plus reconnaissant aujourd'hui ?";
   }
 };
