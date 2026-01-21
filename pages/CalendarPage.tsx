@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Flame, Globe, LogOut, Menu } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Flame, Globe, LogOut, Menu, Sparkles, Calendar as CalendarIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Task, Habit, CalendarEvent } from '../types';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { generateCoaching } from '../services/ai';
 
 WebBrowser.maybeCompleteAuthSession();
+
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 interface CalendarPageProps {
     tasks: Task[];
@@ -19,12 +26,14 @@ interface CalendarPageProps {
 const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, toggleHabit, openMenu }) => {
     const insets = useSafeAreaInsets();
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [currentMonth, setCurrentMonth] = useState(new Date()); // For grid navigation
     const [dayEvents, setDayEvents] = useState<CalendarEvent[]>([]);
     
     // Google Calendar State
     const [googleToken, setGoogleToken] = useState<string | null>(null);
     const [googleEvents, setGoogleEvents] = useState<CalendarEvent[]>([]);
     const [loadingGoogle, setLoadingGoogle] = useState(false);
+    const [loadingAi, setLoadingAi] = useState(false);
 
     // Configuration OAuth
     const [request, response, promptAsync] = Google.useAuthRequest({
@@ -48,10 +57,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         generateDailyEvents();
     }, [selectedDate, tasks, habits, googleEvents]);
 
-    const changeDate = (days: number) => {
-        const newDate = new Date(selectedDate);
-        newDate.setDate(newDate.getDate() + days);
-        setSelectedDate(newDate);
+    const changeMonth = (months: number) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        const newDate = new Date(currentMonth);
+        newDate.setMonth(newDate.getMonth() + months);
+        setCurrentMonth(newDate);
     };
 
     const isSameDay = (d1: Date, d2: Date) => {
@@ -82,7 +92,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                     let end = item.end.dateTime;
                     let isAllDay = false;
 
-                    // Gestion des événements journée entière
                     if (!start && item.start.date) {
                         start = item.start.date;
                         isAllDay = true;
@@ -165,120 +174,185 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         setDayEvents(events);
     };
 
+    const planWithAi = async () => {
+        setLoadingAi(true);
+        const context = {
+            events: dayEvents.map(e => e.title).join(', '),
+            date: selectedDate.toDateString()
+        };
+        const suggestion = await generateCoaching("Optimise ma journée basée sur mes événements actuels. Donne moi un planning textuel court.", context);
+        setLoadingAi(false);
+        Alert.alert("Planning IA", suggestion);
+    };
+
+    // --- GRID LOGIC ---
+    const getDaysArray = () => {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        
+        const days = [];
+        const emptyDaysStart = firstDay.getDay(); // 0 is Sunday
+        
+        for(let i = 0; i < emptyDaysStart; i++) {
+            days.push(null);
+        }
+        
+        for(let i = 1; i <= lastDay.getDate(); i++) {
+            days.push(new Date(year, month, i));
+        }
+        
+        return days;
+    };
+
+    const hasEventOnDay = (date: Date) => {
+        // Simple check just to show a dot
+        const dStr = date.toDateString();
+        // Check tasks
+        if (tasks.some(t => t.due_date && new Date(t.due_date).toDateString() === dStr)) return true;
+        // Check google
+        if (googleEvents.some(g => g.meta?.rawStart && new Date(g.meta.rawStart).toDateString() === dStr)) return true;
+        return false;
+    };
+
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
+            {/* Header */}
             <View style={styles.header}>
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-                    {openMenu && (
-                        <TouchableOpacity style={styles.syncBtn} onPress={openMenu}>
-                            <Menu size={24} color="#FFF" />
-                        </TouchableOpacity>
-                    )}
-                    <Text style={styles.headerTitle}>Calendrier</Text>
-                </View>
-                
-                {/* Google Sync Button */}
+                <TouchableOpacity onPress={openMenu} style={styles.iconBtn}>
+                     <Menu size={24} color="#FFF" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Calendrier</Text>
                 <TouchableOpacity 
-                    style={[styles.syncBtn, googleToken && styles.syncBtnActive]}
                     onPress={() => !googleToken ? promptAsync() : setGoogleToken(null)}
                     disabled={!request}
+                    style={styles.googleBtn}
                 >
-                    {loadingGoogle ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                    ) : (
-                         googleToken ? (
-                             <LogOut size={20} color="#EF4444" /> // Disconnect icon if connected
-                         ) : (
-                            <Globe size={20} color="#FFF" />
-                         )
+                    {loadingGoogle ? <ActivityIndicator size="small" color="#FFF" /> : (
+                        <Globe size={20} color={googleToken ? "#4285F4" : "#FFF"} />
                     )}
                 </TouchableOpacity>
             </View>
 
-            {/* Date Navigator */}
-            <View style={styles.dateNav}>
-                <TouchableOpacity onPress={() => changeDate(-1)} style={styles.navBtn}>
+            {/* MONTH NAVIGATOR */}
+            <View style={styles.monthNav}>
+                <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.navBtn}>
                     <ChevronLeft size={24} color="#FFF" />
                 </TouchableOpacity>
-                <View style={{alignItems: 'center'}}>
-                    <Text style={styles.dateText}>
-                        {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </Text>
-                    <Text style={styles.yearText}>{selectedDate.getFullYear()}</Text>
-                </View>
-                <TouchableOpacity onPress={() => changeDate(1)} style={styles.navBtn}>
+                <Text style={styles.monthTitle}>
+                    {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}
+                </Text>
+                <TouchableOpacity onPress={() => changeMonth(1)} style={styles.navBtn}>
                     <ChevronRight size={24} color="#FFF" />
                 </TouchableOpacity>
             </View>
 
-            {!googleToken && (
-                <TouchableOpacity style={styles.googlePromo} onPress={() => promptAsync()} disabled={!request}>
-                    <Text style={styles.googlePromoText}>Connecter Google Calendar</Text>
-                </TouchableOpacity>
-            )}
-
-            <ScrollView contentContainerStyle={styles.content}>
-                {dayEvents.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyText}>Rien de prévu pour ce jour.</Text>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                
+                {/* CALENDAR GRID */}
+                <View style={styles.gridContainer}>
+                    <View style={styles.weekRow}>
+                        {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d,i) => (
+                            <Text key={i} style={styles.weekDayText}>{d}</Text>
+                        ))}
                     </View>
-                ) : (
-                    dayEvents.map((event, index) => (
-                        <TouchableOpacity 
-                            key={`${event.type}-${event.id}-${index}`} 
-                            style={styles.eventCard}
-                            activeOpacity={event.type === 'google' ? 1 : 0.7}
-                            onPress={() => {
-                                if (event.type === 'task') toggleTask(event.id);
-                                if (event.type === 'habit') toggleHabit(event.id);
-                            }}
-                        >
-                            <View style={[
-                                styles.timeStrip, 
-                                { backgroundColor: event.type === 'google' ? '#4285F4' : (event.type === 'habit' ? '#FF9500' : '#C4B5FD') }
-                            ]} />
+                    <View style={styles.daysGrid}>
+                        {getDaysArray().map((date, index) => {
+                            if (!date) return <View key={index} style={styles.dayCell} />;
                             
-                            <View style={styles.eventContent}>
-                                <View style={styles.eventHeader}>
-                                    <Text style={[styles.eventTitle, event.status === 'completed' && styles.textDone]}>{event.title}</Text>
-                                    
-                                    {event.type !== 'google' ? (
-                                        event.status === 'completed' 
-                                            ? <CheckCircle2 size={18} color={event.type === 'habit' ? '#FF9500' : '#C4B5FD'} />
-                                            : <Circle size={18} color="#444" />
-                                    ) : (
-                                        <Globe size={14} color="#4285F4" />
-                                    )}
-                                </View>
+                            const isSelected = isSameDay(date, selectedDate);
+                            const isToday = isSameDay(date, new Date());
+                            const hasEvent = hasEventOnDay(date);
+
+                            return (
+                                <TouchableOpacity 
+                                    key={index} 
+                                    style={[
+                                        styles.dayCell, 
+                                        isSelected && styles.dayCellSelected,
+                                        isToday && !isSelected && styles.dayCellToday
+                                    ]} 
+                                    onPress={() => {
+                                        setSelectedDate(date);
+                                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.dayNum, 
+                                        isSelected && { color: '#000', fontWeight: '700' },
+                                        isToday && !isSelected && { color: '#007AFF' }
+                                    ]}>{date.getDate()}</Text>
+                                    {hasEvent && <View style={[styles.eventDot, isSelected && { backgroundColor: '#000' }]} />}
+                                </TouchableOpacity>
+                            )
+                        })}
+                    </View>
+                </View>
+
+                {/* AI PLANNER */}
+                <TouchableOpacity style={styles.aiPlannerBtn} onPress={planWithAi} disabled={loadingAi}>
+                    {loadingAi ? <ActivityIndicator color="#000" /> : (
+                        <>
+                            <Sparkles size={18} color="#000" />
+                            <Text style={styles.aiPlannerText}>Planifier ma journée avec l'IA</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+
+                {/* EVENTS LIST */}
+                <View style={styles.eventsList}>
+                    <Text style={styles.selectedDateTitle}>
+                        {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </Text>
+                    
+                    {dayEvents.length === 0 ? (
+                        <Text style={styles.emptyText}>Rien de prévu.</Text>
+                    ) : (
+                        dayEvents.map((event, index) => (
+                            <TouchableOpacity 
+                                key={`${event.type}-${event.id}-${index}`} 
+                                style={styles.eventCard}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                    if (event.type === 'task') toggleTask(event.id);
+                                    if (event.type === 'habit') toggleHabit(event.id);
+                                }}
+                            >
+                                <View style={[
+                                    styles.timeStrip, 
+                                    { backgroundColor: event.type === 'google' ? '#4285F4' : (event.type === 'habit' ? '#FF9500' : '#C4B5FD') }
+                                ]} />
                                 
-                                <View style={styles.eventFooter}>
-                                    {event.start_time ? (
-                                        <Text style={styles.eventTime}>{event.start_time} - {event.end_time}</Text>
-                                    ) : (
-                                        <Text style={styles.eventTime}>Toute la journée</Text>
-                                    )}
+                                <View style={styles.eventContent}>
+                                    <View style={styles.eventHeader}>
+                                        <Text style={[styles.eventTitle, event.status === 'completed' && styles.textDone]}>{event.title}</Text>
+                                        
+                                        {event.type !== 'google' ? (
+                                            event.status === 'completed' 
+                                                ? <CheckCircle2 size={18} color={event.type === 'habit' ? '#FF9500' : '#C4B5FD'} />
+                                                : <Circle size={18} color="#444" />
+                                        ) : (
+                                            <Globe size={14} color="#4285F4" />
+                                        )}
+                                    </View>
                                     
-                                    <View style={[styles.tagBadge, event.type === 'google' && { backgroundColor: 'rgba(66, 133, 244, 0.2)' }]}>
-                                        {event.type === 'habit' && <Flame size={10} color="#FFF" style={{marginRight:4}} />}
-                                        <Text style={[styles.tagText, event.type === 'google' && { color: '#4285F4' }]}>
+                                    <View style={styles.eventFooter}>
+                                        {event.start_time ? (
+                                            <Text style={styles.eventTime}>{event.start_time} - {event.end_time}</Text>
+                                        ) : (
+                                            <Text style={styles.eventTime}>Toute la journée</Text>
+                                        )}
+                                        <Text style={styles.eventType}>
                                             {event.type === 'google' ? 'Google' : (event.type === 'habit' ? 'Habitude' : 'Tâche')}
                                         </Text>
                                     </View>
                                 </View>
-                            </View>
-                        </TouchableOpacity>
-                    ))
-                )}
-                
-                {/* Timeline visual filler */}
-                <View style={styles.timelineContainer}>
-                    {[8,9,10,11,12,13,14,15,16,17,18,19,20].map(hour => (
-                        <View key={hour} style={styles.hourRow}>
-                            <Text style={styles.hourText}>{hour}:00</Text>
-                            <View style={styles.hourLine} />
-                        </View>
-                    ))}
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </View>
+                
             </ScrollView>
         </View>
     );
@@ -294,71 +368,133 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingVertical: 15,
+        marginTop: 10,
     },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#FFF',
-    },
-    syncBtn: {
+    iconBtn: {
         width: 40,
         height: 40,
-        backgroundColor: '#171717',
-        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#333',
     },
-    syncBtnActive: {
-        borderColor: '#EF4444', // Red border to indicate logout option
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    googleBtn: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 20,
+        backgroundColor: '#1C1C1E',
     },
-    dateNav: {
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#FFF',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+        zIndex: -1,
+    },
+    monthNav: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        marginBottom: 10,
-        backgroundColor: '#111',
-        marginHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 16,
+        marginBottom: 20,
     },
     navBtn: {
         padding: 8,
     },
-    dateText: {
+    monthTitle: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: '600',
-        textTransform: 'capitalize',
+        fontWeight: '700',
     },
-    yearText: {
-        color: '#666',
-        fontSize: 12,
-    },
-    googlePromo: {
-        marginHorizontal: 20,
-        marginBottom: 10,
-        padding: 10,
-        backgroundColor: 'rgba(66, 133, 244, 0.1)',
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    googlePromoText: {
-        color: '#4285F4',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    content: {
-        paddingHorizontal: 20,
+    scrollContent: {
         paddingBottom: 100,
     },
-    emptyState: {
-        padding: 20,
+    // GRID
+    gridContainer: {
+        marginHorizontal: 20,
+        backgroundColor: '#171717',
+        borderRadius: 20,
+        padding: 10,
+        marginBottom: 20,
+    },
+    weekRow: {
+        flexDirection: 'row',
+        marginBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+        paddingBottom: 8,
+    },
+    weekDayText: {
+        flex: 1,
+        textAlign: 'center',
+        color: '#888',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    daysGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    },
+    dayCell: {
+        width: '14.28%', // 100% / 7
+        aspectRatio: 1,
         alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 4,
+        borderRadius: 12,
+    },
+    dayCellSelected: {
+        backgroundColor: '#FFF',
+    },
+    dayCellToday: {
+        borderWidth: 1,
+        borderColor: '#007AFF',
+    },
+    dayNum: {
+        color: '#FFF',
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    eventDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#C4B5FD',
+        marginTop: 4,
+    },
+    
+    // AI
+    aiPlannerBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#C4B5FD',
+        marginHorizontal: 20,
+        padding: 14,
+        borderRadius: 16,
+        gap: 8,
+        marginBottom: 20,
+    },
+    aiPlannerText: {
+        color: '#000',
+        fontWeight: '600',
+        fontSize: 15,
+    },
+
+    // EVENTS
+    eventsList: {
+        paddingHorizontal: 20,
+    },
+    selectedDateTitle: {
+        color: '#888',
+        fontSize: 13,
+        fontWeight: '600',
+        marginBottom: 12,
+        textTransform: 'uppercase',
     },
     emptyText: {
         color: '#666',
@@ -409,39 +545,9 @@ const styles = StyleSheet.create({
         color: '#888',
         fontSize: 13,
     },
-    tagBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#333',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    tagText: {
-        color: '#CCC',
-        fontSize: 10,
-        fontWeight: '600',
-    },
-    timelineContainer: {
-        marginTop: 20,
-        paddingTop: 20,
-        borderTopWidth: 1,
-        borderTopColor: '#222',
-    },
-    hourRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: 60,
-    },
-    hourText: {
-        color: '#444',
-        width: 40,
-        fontSize: 12,
-    },
-    hourLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#222',
+    eventType: {
+        color: '#666',
+        fontSize: 11,
     }
 });
 

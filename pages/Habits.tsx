@@ -137,30 +137,21 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-             {openMenu && (
-                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                      <Menu size={24} color={colors.accent} />
-                  </TouchableOpacity>
-             )}
-             <View>
-                 <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
-                 <Text style={[styles.subtitle, {color: colors.textSub}]}>{showAllDays ? 'Toutes les habitudes' : 'Aujourd\'hui'}</Text>
-             </View>
-        </View>
+         <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+              <Menu size={24} color={colors.accent} />
+          </TouchableOpacity>
+         
+         <View style={styles.headerTitleContainer}>
+             <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
+             <Text style={[styles.subtitle, {color: colors.textSub}]}>{showAllDays ? 'Toutes' : 'Aujourd\'hui'}</Text>
+         </View>
+
         <View style={styles.headerButtons}>
             <TouchableOpacity 
                 style={[styles.iconBtn, {backgroundColor: colors.cardBg}, showAllDays && {backgroundColor: colors.border}]} 
                 onPress={() => setShowAllDays(!showAllDays)}
             >
                 <Filter size={20} color={colors.text} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-                style={[styles.iconBtn, {backgroundColor: colors.cardBg}, showArchived && {backgroundColor: colors.border}]} 
-                onPress={() => setShowArchived(!showArchived)}
-            >
-                <Archive size={20} color={colors.text} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
@@ -310,14 +301,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 16,
     marginTop: 10,
+    height: 50,
+  },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      zIndex: -1,
   },
   largeTitle: {
-    fontSize: 34,
+    fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 0.35,
   },
   subtitle: {
-      fontSize: 15,
+      fontSize: 10,
+      letterSpacing: 1,
   },
   headerButtons: {
       flexDirection: 'row',

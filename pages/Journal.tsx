@@ -109,14 +109,10 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.header}>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-                {openMenu && (
-                    <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                        <Menu size={24} color={colors.accent} />
-                    </TouchableOpacity>
-                )}
-                <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
-            </View>
+            <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                <Menu size={24} color={colors.accent} />
+            </TouchableOpacity>
+            <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
             <TouchableOpacity onPress={openModal} style={styles.addButton}>
                 <Plus size={24} color={colors.accent} />
             </TouchableOpacity>
@@ -238,6 +234,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginTop: 10, 
     marginBottom: 10,
+    height: 50,
   },
   iconBtn: {
       width: 40,
@@ -246,9 +243,13 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
   },
   largeTitle: {
-    fontSize: 34,
+    fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 0.35,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    zIndex: -1,
   },
   addButton: {
       width: 40,

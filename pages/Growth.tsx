@@ -1,10 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Switch, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Switch, Alert, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager } from 'react-native';
 import { PlayerProfile, UserProfile, Task } from '../types';
-import { Send, Menu, TrendingUp, Clock, BarChart2, Activity, Mic } from 'lucide-react-native';
+import { Send, Menu, TrendingUp, Clock, BarChart2, Activity, Mic, PieChart } from 'lucide-react-native';
 import { generateActionableCoaching } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
+import Svg, { Circle, G } from 'react-native-svg';
+
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 interface GrowthProps {
   player: PlayerProfile;
@@ -42,11 +49,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
   const [isCreationMode, setIsCreationMode] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Stats State... (Same as before)
+  // Stats State
   const [weeklyFocusData, setWeeklyFocusData] = useState<number[]>([0,0,0,0,0,0,0]);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
   const [bestDay, setBestDay] = useState('N/A');
   const [taskCompletionRate, setTaskCompletionRate] = useState(0);
+  const [taskDistribution, setTaskDistribution] = useState({ high: 0, medium: 0, low: 0 });
 
   useEffect(() => {
       fetchRealFocusStats();
@@ -57,10 +65,16 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
       const total = tasks.length;
       if (total === 0) {
           setTaskCompletionRate(0);
+          setTaskDistribution({ high: 0, medium: 0, low: 0 });
           return;
       }
       const completed = tasks.filter(t => t.completed).length;
       setTaskCompletionRate(Math.round((completed / total) * 100));
+
+      const high = tasks.filter(t => t.priority === 'high').length;
+      const medium = tasks.filter(t => t.priority === 'medium').length;
+      const low = tasks.filter(t => t.priority === 'low').length;
+      setTaskDistribution({ high, medium, low });
   };
 
   const fetchRealFocusStats = async () => {
@@ -111,6 +125,11 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
           setBestDay('N/A');
           setWeeklyFocusData([0,0,0,0,0,0,0]);
       }
+  };
+
+  const switchTab = (tab: any) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setActiveTab(tab);
   };
 
   const handleVoiceInput = () => {
@@ -180,11 +199,33 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
                   <Text style={styles.kpiLabel}>Niveau</Text>
               </View>
           </View>
+          
+          {/* Simple Circle Chart for Task Distribution */}
+          <View style={[styles.analysisCard, {backgroundColor: colors.card, borderColor: colors.border}]}>
+               <View style={styles.cardHeader}>
+                    <PieChart size={20} color="#FACC15" />
+                    <Text style={[styles.cardTitle, {color: colors.text}]}>Répartition des Tâches</Text>
+               </View>
+               <View style={styles.distributionRow}>
+                   <View style={styles.distItem}>
+                       <View style={[styles.dot, {backgroundColor: '#FF3B30'}]} />
+                       <Text style={{color: colors.text}}>Haute: {taskDistribution.high}</Text>
+                   </View>
+                   <View style={styles.distItem}>
+                       <View style={[styles.dot, {backgroundColor: '#FF9500'}]} />
+                       <Text style={{color: colors.text}}>Moyenne: {taskDistribution.medium}</Text>
+                   </View>
+                   <View style={styles.distItem}>
+                       <View style={[styles.dot, {backgroundColor: '#34C759'}]} />
+                       <Text style={{color: colors.text}}>Basse: {taskDistribution.low}</Text>
+                   </View>
+               </View>
+          </View>
 
           <View style={[styles.insightBox, {backgroundColor: colors.card}]}>
              <Text style={styles.insightTitle}>⚡ Analyse de Performance</Text>
              <Text style={[styles.insightText, {color: colors.subText}]}>
-                 {bestDay !== 'N/A' ? `Meilleure journée : ${bestDay}` : "Pas assez de données de focus."}
+                 {bestDay !== 'N/A' ? `Vous êtes plus productif le ${bestDay}. Essayez de placer vos tâches complexes ce jour-là.` : "Continuez d'utiliser le mode Focus pour obtenir des insights."}
              </Text>
           </View>
       </View>
@@ -253,7 +294,13 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
             >
                 {messages.map((msg, index) => (
                     <View key={index} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : [styles.aiBubble, { backgroundColor: isDarkMode ? '#262626' : '#E5E5EA' }]]}>
-                        <Text style={[msg.role === 'user' ? styles.userText : styles.aiText, msg.role === 'ai' && !isDarkMode && { color: '#000' }]}>{msg.text}</Text>
+                        {/* FIX: Explicit color for AI text in Dark Mode */}
+                        <Text style={[
+                            msg.role === 'user' ? styles.userText : styles.aiText, 
+                            msg.role === 'ai' && { color: isDarkMode ? '#FFF' : '#000' }
+                        ]}>
+                            {msg.text}
+                        </Text>
                     </View>
                 ))}
                 {loadingAi && <ActivityIndicator size="small" color={colors.text} style={{alignSelf: 'flex-start', margin: 10}} />}
@@ -261,7 +308,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
             
             <View style={[
                 styles.inputArea, 
-                { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) + 70 } // Add massive padding for bottom nav clearance
+                { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) + 70 }
             ]}>
                 <TouchableOpacity style={[styles.voiceBtn, { backgroundColor: isDarkMode ? '#333' : '#E5E5EA' }]} onPress={handleVoiceInput}>
                     <Mic size={20} color={isCreationMode ? "#4ADE80" : (isDarkMode ? "#FFF" : "#000")} />
@@ -285,14 +332,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-             {openMenu && (
-                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                      <Menu size={24} color={colors.button} />
-                  </TouchableOpacity>
-             )}
-            <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
-        </View>
+        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+            <Menu size={24} color={colors.button} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
         <TouchableOpacity onPress={openProfile}>
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
@@ -303,7 +346,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
 
       <View style={[styles.tabBar, {borderColor: colors.border}]}>
           {(['OVERVIEW', 'ANALYTICS', 'AI_COACH'] as const).map(tab => (
-              <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[styles.tabItem, activeTab === tab && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
+              <TouchableOpacity key={tab} onPress={() => switchTab(tab)} style={[styles.tabItem, activeTab === tab && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
                   <Text style={[styles.tabText, activeTab === tab && {color: colors.text}]}>{tab}</Text>
               </TouchableOpacity>
           ))}
@@ -330,8 +373,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12, 
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     marginTop: 10,
     marginBottom: 10,
   },
@@ -342,9 +385,13 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
   },
   headerTitle: {
-      fontSize: 34,
+      fontSize: 22,
       fontWeight: '700',
-      letterSpacing: 0.35,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      textAlign: 'center',
+      zIndex: -1,
   },
   avatar: {
     width: 36,
@@ -446,6 +493,20 @@ const styles = StyleSheet.create({
   dayLabel: {
       color: '#666',
       fontSize: 10,
+  },
+  distributionRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+  },
+  distItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+  },
+  dot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
   },
   modeSwitchContainer: {
       flexDirection: 'row',

@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation, UIManager } from 'react-native';
 import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2 } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';
 import { addXp, REWARDS } from '../services/gamification';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.70, 280); 
@@ -20,6 +27,7 @@ interface FocusProps {
 }
 
 const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, openMenu }) => {
+  const insets = useSafeAreaInsets();
   const [viewMode, setViewMode] = useState<'CONFIG' | 'RUNNING' | 'HISTORY' | 'MANUAL'>('CONFIG');
   
   // Timer State
@@ -109,6 +117,11 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       }
   }, [viewMode]);
 
+  const changeView = (mode: 'CONFIG' | 'RUNNING' | 'HISTORY' | 'MANUAL') => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setViewMode(mode);
+  }
+
   const fetchHistory = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -143,7 +156,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       setDurationMinutes(d);
       setTimeLeft(d * 60);
       setIsActive(true);
-      setViewMode('RUNNING');
+      changeView('RUNNING');
   };
 
   const completeSession = async () => {
@@ -159,7 +172,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               completed_at: now.toISOString(),
               started_at: startedAt,
               title: sessionTitle || 'Session Focus',
-              // linked_task_id: selectedTaskId // Commented out as it might violate strict CSV schema if column missing, keeping link via logic or title
           });
 
           let xpAmount = REWARDS.FOCUS_SHORT;
@@ -172,7 +184,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               Alert.alert("Focus Terminé", `Bravo ! +${xpAmount} XP`);
           }
       }
-      setViewMode('HISTORY');
+      changeView('HISTORY');
       setSessionTitle('');
       setSelectedTaskId(null);
   };
@@ -187,7 +199,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user && !isNaN(duration)) {
-          // Calculate start based on completion time (Manual Date)
           const completedAt = new Date(manualDate);
           const startedAt = new Date(completedAt.getTime() - duration * 60000);
 
@@ -200,10 +211,10 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           });
 
           const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
-          if (player) await addXp(user.id, Math.floor(duration / 2), player); // Moins d'XP pour manuel
+          if (player) await addXp(user.id, Math.floor(duration / 2), player); 
           
           Alert.alert("Succès", "Session ajoutée.");
-          setViewMode('HISTORY');
+          changeView('HISTORY');
       }
   };
 
@@ -284,7 +295,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
             <Text style={styles.startBtnText}>Démarrer le Focus</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setViewMode('MANUAL')} style={styles.manualLink}>
+        <TouchableOpacity onPress={() => changeView('MANUAL')} style={styles.manualLink}>
             <Text style={{color: colors.subText, textDecorationLine: 'underline'}}>Ajouter une session passée manuellement</Text>
         </TouchableOpacity>
     </ScrollView>
@@ -311,7 +322,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         </View>
 
         <View style={styles.controls}>
-            <TouchableOpacity onPress={() => { setIsActive(false); setViewMode('CONFIG'); }} style={styles.controlBtnSecondary}>
+            <TouchableOpacity onPress={() => { setIsActive(false); changeView('CONFIG'); }} style={styles.controlBtnSecondary}>
                 <X size={24} color="#FFF" />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setIsActive(!isActive)} style={styles.playBtn}>
@@ -354,7 +365,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               <Text style={styles.startBtnText}>Enregistrer</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity onPress={() => setViewMode('CONFIG')} style={styles.manualLink}>
+          <TouchableOpacity onPress={() => changeView('CONFIG')} style={styles.manualLink}>
             <Text style={{color: colors.accent}}>Retour</Text>
           </TouchableOpacity>
       </ScrollView>
@@ -402,24 +413,19 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: 20 }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <View style={styles.header}>
-             <View style={{flexDirection: 'row', gap: 10, alignItems: 'center'}}>
-                 {openMenu && (
-                    <TouchableOpacity onPress={openMenu} style={styles.iconBtn}>
-                        <Menu size={24} color={colors.accent} />
-                    </TouchableOpacity>
-                 )}
-                 <TouchableOpacity onPress={onExit} style={styles.iconBtn}>
-                    <X size={24} color={colors.subText} />
-                 </TouchableOpacity>
-             </View>
-             
+            <TouchableOpacity onPress={openMenu} style={styles.menuBtn}>
+                <Menu size={24} color={colors.text} />
+            </TouchableOpacity>
+            
+            <Text style={[styles.headerTitle, {color: colors.text}]}>Mode Focus</Text>
+
              <View style={[styles.modeTabs, {backgroundColor: isDarkMode ? '#1C1C1E' : '#E5E5EA'}]}>
-                 <TouchableOpacity onPress={() => setViewMode('CONFIG')} style={[styles.tab, (viewMode === 'CONFIG' || viewMode === 'MANUAL') && {backgroundColor: colors.card}]}>
+                 <TouchableOpacity onPress={() => changeView('CONFIG')} style={[styles.tab, (viewMode === 'CONFIG' || viewMode === 'MANUAL') && {backgroundColor: colors.card}]}>
                      <Timer size={16} color={(viewMode === 'CONFIG' || viewMode === 'MANUAL') ? colors.text : colors.subText} />
                  </TouchableOpacity>
-                 <TouchableOpacity onPress={() => setViewMode('HISTORY')} style={[styles.tab, viewMode === 'HISTORY' && {backgroundColor: colors.card}]}>
+                 <TouchableOpacity onPress={() => changeView('HISTORY')} style={[styles.tab, viewMode === 'HISTORY' && {backgroundColor: colors.card}]}>
                      <List size={16} color={viewMode === 'HISTORY' ? colors.text : colors.subText} />
                  </TouchableOpacity>
              </View>
@@ -429,6 +435,12 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         {viewMode === 'RUNNING' && renderRunning()}
         {viewMode === 'MANUAL' && renderManual()}
         {viewMode === 'HISTORY' && renderHistory()}
+
+        {viewMode === 'CONFIG' && (
+             <TouchableOpacity style={styles.closeFloat} onPress={onExit}>
+                <X size={24} color="#8E8E93" />
+             </TouchableOpacity>
+        )}
     </View>
   );
 };
@@ -438,19 +450,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    height: 60,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    marginBottom: 10,
+    height: 60,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  menuBtn: {
+      padding: 8,
+  },
+  headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      textAlign: 'center',
+      zIndex: -1,
   },
   modeTabs: {
       flexDirection: 'row',
@@ -459,8 +477,14 @@ const styles = StyleSheet.create({
   },
   tab: {
       paddingVertical: 8,
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       borderRadius: 8,
+  },
+  closeFloat: {
+      position: 'absolute',
+      bottom: 40,
+      alignSelf: 'center',
+      padding: 12,
   },
   title: {
       fontSize: 28,

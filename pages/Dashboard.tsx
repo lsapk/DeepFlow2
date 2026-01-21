@@ -1,8 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
-import { Check, Flame, Plus, Play, Menu, ArrowRight } from 'lucide-react-native';
+import { Check, Flame, Plus, Play, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 interface DashboardProps {
   user: UserProfile;
@@ -56,6 +62,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
   const activeTasks = tasks.filter(t => !t.completed && t.priority === 'high').slice(0, 5); 
 
+  const handleToggleTask = (id: string) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      toggleTask(id);
+  }
+
   // Score Calcul
   const completedTasksCount = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length || 1;
@@ -84,9 +95,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             <Menu size={24} color={colors.accent} />
         </TouchableOpacity>
         
-        <View>
+        <View style={styles.headerTitleContainer}>
             <Text style={[styles.dateText, {color: colors.textSub}]}>
-                {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
+                {today.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }).toUpperCase()}
             </Text>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Aujourd'hui</Text>
         </View>
@@ -180,7 +191,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                         <TouchableOpacity 
                             key={task.id} 
                             style={[styles.taskRow, index < activeTasks.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} 
-                            onPress={() => toggleTask(task.id)}
+                            onPress={() => handleToggleTask(task.id)}
                             activeOpacity={0.7}
                         >
                             <View style={[styles.checkbox, { borderColor: colors.textSub }, task.completed && { backgroundColor: colors.success, borderColor: colors.success }]}>
@@ -217,8 +228,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginBottom: 10,
+    paddingVertical: 15,
+    marginTop: 10,
   },
   iconBtn: {
       width: 40,
@@ -226,15 +237,22 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
   },
+  headerTitleContainer: {
+      position: 'absolute',
+      left: 0, 
+      right: 0,
+      alignItems: 'center',
+      zIndex: -1,
+  },
   dateText: {
-      fontSize: 13,
+      fontSize: 10,
       fontWeight: '600',
       marginBottom: 2,
+      letterSpacing: 1,
   },
   headerTitle: {
-      fontSize: 28,
+      fontSize: 20,
       fontWeight: '700',
-      letterSpacing: 0.35,
   },
   avatar: {
     width: 36,

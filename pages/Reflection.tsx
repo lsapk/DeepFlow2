@@ -207,19 +207,11 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
     <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: insets.top}]}>
       {/* Header Styled Apple */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-            {openMenu && (
-                 <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                      <Menu size={24} color={colors.button} />
-                 </TouchableOpacity>
-            )}
-            <View style={{marginLeft: 4}}>
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                    <BookOpen size={24} color={colors.text} />
-                    <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
-                </View>
-            </View>
-        </View>
+        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+            <Menu size={24} color={colors.button} />
+        </TouchableOpacity>
+        
+        <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
 
         {/* Toggle View Button */}
         <TouchableOpacity 
@@ -228,12 +220,12 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
         >
             {viewMode === 'WRITE' ? (
                 <>
-                    <History size={18} color={colors.text} />
+                    <History size={16} color={colors.text} />
                     <Text style={[styles.toggleText, {color: colors.text}]}>Historique</Text>
                 </>
             ) : (
                 <>
-                    <PenLine size={18} color={colors.text} />
+                    <PenLine size={16} color={colors.text} />
                     <Text style={[styles.toggleText, {color: colors.text}]}>Écrire</Text>
                 </>
             )}
@@ -256,36 +248,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 10,
-  },
-  headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    marginTop: 10,
+    marginBottom: 10,
   },
   iconBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
   headerTitle: {
-    fontSize: 28, // Large title style
-    fontWeight: '700',
-    letterSpacing: 0.3,
+      fontSize: 22,
+      fontWeight: '700',
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      textAlign: 'center',
+      zIndex: -1,
   },
   toggleBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderRadius: 20,
+      paddingHorizontal: 12,
+      borderRadius: 16,
       gap: 6,
   },
   toggleText: {
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '600',
   },
   contentContainer: {

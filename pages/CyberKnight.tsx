@@ -195,14 +195,11 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       {/* UNIFORM HEADER */}
       <View style={styles.header}>
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-             {openMenu && (
-                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                      <Menu size={24} color={colors.button} />
-                  </TouchableOpacity>
-             )}
-            <Text style={[styles.largeTitle, {color: colors.text}]}>Cyber Knight</Text>
-        </View>
+        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+            <Menu size={24} color={colors.button} />
+        </TouchableOpacity>
+        
+        <Text style={[styles.largeTitle, {color: colors.text}]}>Cyber Knight</Text>
 
         <TouchableOpacity onPress={openProfile}>
             <Image 
@@ -245,7 +242,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 15,
     marginTop: 10,
     marginBottom: 10,
   },
@@ -256,9 +253,13 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
   },
   largeTitle: {
-      fontSize: 34,
+      fontSize: 22,
       fontWeight: '700',
-      letterSpacing: 0.35,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      textAlign: 'center',
+      zIndex: -1,
   },
   avatar: {
     width: 36,

@@ -106,14 +106,10 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-              {openMenu && (
-                  <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                      <Menu size={24} color={colors.accent} />
-                  </TouchableOpacity>
-              )}
-              <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
-          </View>
+          <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+              <Menu size={24} color={colors.accent} />
+          </TouchableOpacity>
+          <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
                 <Plus size={24} color={colors.accent} />
           </TouchableOpacity>
@@ -394,12 +390,17 @@ const styles = StyleSheet.create({
     marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    height: 50,
   },
   largeTitle: {
-    fontSize: 34,
+    fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 0.35,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    zIndex: -1,
   },
   iconBtn: {
     width: 40,

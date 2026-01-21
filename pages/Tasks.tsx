@@ -113,14 +113,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-              {openMenu && (
-                  <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
-                      <Menu size={24} color={colors.accent} />
-                  </TouchableOpacity>
-              )}
-              <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
-          </View>
+          <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
+              <Menu size={24} color={colors.accent} />
+          </TouchableOpacity>
+          <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
                 <Plus size={24} color={colors.accent} />
           </TouchableOpacity>
@@ -414,12 +410,17 @@ const styles = StyleSheet.create({
     marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    height: 50,
   },
   largeTitle: {
-    fontSize: 34,
+    fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 0.35,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    zIndex: -1,
   },
   addButton: {
     width: 40,
