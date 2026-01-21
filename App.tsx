@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, StatusBar, View, ActivityIndicator, Modal, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView, StatusBar, View, ActivityIndicator, Modal, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
@@ -18,6 +18,16 @@ import CalendarPage from './pages/CalendarPage';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabase';
 import { Trophy, Bell } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
+
+// Configuration Notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.AUTH);
@@ -34,6 +44,10 @@ const App: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [quests, setQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Settings & Theme
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [userSettings, setUserSettings] = useState<any>(null);
 
   // Focus specific prop logic
   const [startFocusMinutes, setStartFocusMinutes] = useState<number | null>(null);
@@ -42,34 +56,56 @@ const App: React.FC = () => {
   const [showLevelUp, setShowLevelUp] = useState(false);
   const prevLevelRef = useRef<number | null>(null);
 
-  // --- NOTIFICATION SYSTEM (In-App) ---
+  // --- NOTIFICATION SYSTEM (In-App & Local) ---
   useEffect(() => {
-      // Vérification périodique des notifications (toutes les minutes)
+      registerForPushNotificationsAsync();
+      
       const interval = setInterval(() => {
           checkNotifications();
       }, 60000);
       return () => clearInterval(interval);
-  }, [tasks, habits]);
+  }, [tasks]);
 
-  const checkNotifications = async () => {
-      const now = new Date();
-      
-      const { data: recentFocus } = await supabase.from('focus_sessions')
-        .select('*')
-        .eq('user_id', user?.id)
-        .gte('completed_at', new Date(now.getTime() - 60000).toISOString())
-        .limit(1);
-        
-      if (recentFocus && recentFocus.length > 0) {
-          // Notification already handled by Focus page completion alert
+  const registerForPushNotificationsAsync = async () => {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
       }
 
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+      }
+  };
+
+  const checkNotifications = async () => {
+      if (userSettings && !userSettings.notifications_enabled) return;
+
+      const now = new Date();
+      
       tasks.forEach(task => {
           if (!task.completed && task.due_date) {
               const due = new Date(task.due_date);
               const diff = due.getTime() - now.getTime();
+              // Alert 30 mins before
               if (diff > 0 && diff < 30 * 60 * 1000) {
-                  Alert.alert("Rappel Tâche", `La tâche "${task.title}" arrive à échéance bientôt !`);
+                  Notifications.scheduleNotificationAsync({
+                      content: {
+                          title: "Rappel Tâche 📅",
+                          body: `"${task.title}" arrive à échéance dans moins de 30 min !`,
+                      },
+                      trigger: null, // Send immediately
+                  });
               }
           }
       });
@@ -110,8 +146,7 @@ const App: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'habit_completions', filter: `user_id=eq.${userId}` }, () => fetchHabits(userId)) 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subobjectives', filter: `user_id=eq.${userId}` }, () => fetchGoals(userId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quests', filter: `user_id=eq.${userId}` }, () => fetchQuests(userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_settings', filter: `id=eq.${userId}` }, () => fetchSettings(userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, () => fetchPlayer(userId))
       .subscribe();
 
@@ -164,6 +199,14 @@ const App: React.FC = () => {
       if (data) setQuests(data);
   };
 
+  const fetchSettings = async (userId: string) => {
+      const { data } = await supabase.from('user_settings').select('*').eq('id', userId).single();
+      if (data) {
+          setUserSettings(data);
+          setIsDarkMode(data.theme === 'dark');
+      }
+  };
+
   const fetchPlayer = async (userId: string) => {
     const { data } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
     if (data) {
@@ -183,6 +226,7 @@ const App: React.FC = () => {
       
       await Promise.all([
           fetchPlayer(userId),
+          fetchSettings(userId),
           fetchTasks(userId),
           fetchHabits(userId),
           fetchGoals(userId),
@@ -203,7 +247,7 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
   };
 
-  // --- ACTIONS (PASSED TO AI) ---
+  // --- ACTIONS (PASSED TO AI & UI) ---
   const aiAddTask = async (title: string, priority: string) => {
       const max = tasks.length > 0 ? Math.max(...tasks.map(x=>x.sort_order)) : 0;
       await supabase.from('tasks').insert({
@@ -241,39 +285,55 @@ const App: React.FC = () => {
   };
 
   const aiStartFocus = (minutes: number) => {
-      // En production, on passerait 'minutes' via props au composant Focus
-      // Ici, on redirige simplement
       setCurrentView(ViewState.FOCUS_MODE);
   };
 
-  // --- EXISTING ACTIONS ---
+  // --- TOGGLES WITH OPTIMISTIC UPDATES ---
   const toggleHabit = async (id: string) => {
-      const habit = habits.find(h => h.id === id);
-      if (!habit || !player || !user) return;
+      // 1. Mise à jour Optimiste
+      const today = new Date().toISOString().split('T')[0];
+      const nowIso = new Date().toISOString();
+      let shouldUpdateDb = false;
 
-      const now = new Date();
-      const todayDate = now.toISOString().split('T')[0];
-      const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toISOString().split('T')[0] === todayDate;
-
-      if (!isCompletedToday) {
-          const newStreak = habit.streak + 1;
-          const nowIso = now.toISOString();
-          await supabase.from('habits').update({ streak: newStreak, last_completed_at: nowIso }).eq('id', id);
-          await supabase.from('habit_completions').insert({
-              habit_id: id,
-              user_id: user.id,
-              completed_date: todayDate
-          });
+      const updatedHabits = habits.map(h => {
+          if (h.id === id) {
+              const isAlreadyDone = h.last_completed_at && h.last_completed_at.startsWith(today);
+              if (!isAlreadyDone) {
+                  shouldUpdateDb = true;
+                  return { ...h, streak: h.streak + 1, last_completed_at: nowIso };
+              }
+          }
+          return h;
+      });
+      
+      if (shouldUpdateDb) {
+          setHabits(updatedHabits); // Update UI Immediately
           
-          const { addXp, REWARDS } = await import('./services/gamification');
-          await addXp(user.id, REWARDS.HABIT, player);
+          // 2. Database Update
+          const habit = habits.find(h => h.id === id);
+          if (habit && player && user) {
+              await supabase.from('habits').update({ streak: habit.streak + 1, last_completed_at: nowIso }).eq('id', id);
+              await supabase.from('habit_completions').insert({
+                  habit_id: id,
+                  user_id: user.id,
+                  completed_date: today
+              });
+              
+              const { addXp, REWARDS } = await import('./services/gamification');
+              await addXp(user.id, REWARDS.HABIT, player);
+          }
       }
   };
 
   const toggleTask = async (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
+    
     const newStatus = !task.completed;
+    
+    // Optimistic Update
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: newStatus } : t));
+
     await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
     
     if (newStatus && player && user) {
@@ -286,7 +346,12 @@ const App: React.FC = () => {
   const toggleGoal = async (id: string) => {
      const goal = goals.find(g => g.id === id);
      if (!goal) return;
+     
      const newStatus = !goal.completed;
+     
+     // Optimistic Update
+     setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: newStatus } : g));
+
      await supabase.from('goals').update({ completed: newStatus }).eq('id', id);
      
      if (newStatus && player && user) {
@@ -298,12 +363,14 @@ const App: React.FC = () => {
   // --- RENDER ---
   const renderView = () => {
     if (loading) return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-            <ActivityIndicator size="large" color="#FFF" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }}>
+            <ActivityIndicator size="large" color={isDarkMode ? '#FFF' : '#000'} />
         </View>
     );
 
     if (!session || !user || !player) return <Auth onLogin={() => fetchData(session?.user?.id)} />;
+
+    const commonProps = { isDarkMode };
 
     switch (currentView) {
       case ViewState.TODAY:
@@ -315,6 +382,7 @@ const App: React.FC = () => {
                 openMenu={() => setSidebarVisible(true)}
                 openProfile={() => setProfileVisible(true)}
                 setView={setCurrentView}
+                {...commonProps}
             />
         );
       case ViewState.TASKS: 
@@ -327,6 +395,7 @@ const App: React.FC = () => {
                 userId={user.id} 
                 refreshTasks={() => fetchTasks(user.id)} 
                 openMenu={() => setSidebarVisible(true)}
+                {...commonProps}
             />
           );
       case ViewState.HABITS: 
@@ -337,6 +406,7 @@ const App: React.FC = () => {
                 userId={user.id} 
                 refreshHabits={() => fetchHabits(user.id)}
                 openMenu={() => setSidebarVisible(true)}
+                {...commonProps}
             />
           );
       case ViewState.GOALS:
@@ -349,6 +419,7 @@ const App: React.FC = () => {
                 userId={user.id}
                 refreshGoals={() => fetchGoals(user.id)}
                 openMenu={() => setSidebarVisible(true)}
+                {...commonProps}
              />
           );
       case ViewState.GROWTH:
@@ -361,18 +432,19 @@ const App: React.FC = () => {
                 onAddHabit={aiAddHabit}
                 onAddGoal={aiAddGoal}
                 onStartFocus={aiStartFocus}
+                {...commonProps}
             />
         );
       case ViewState.CYBER_KNIGHT:
-        return <CyberKnight player={player} user={user} quests={quests} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} />;
+        return <CyberKnight player={player} user={user} quests={quests} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} {...commonProps} />;
       case ViewState.REFLECTION:
-        return <ReflectionPage userId={user.id} openMenu={() => setSidebarVisible(true)} />;
+        return <ReflectionPage userId={user.id} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       case ViewState.CALENDAR:
-        return <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={() => setSidebarVisible(true)} />;
+        return <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       case ViewState.FOCUS_MODE:
-        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} />;
+        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} />;
       case ViewState.JOURNAL:
-        return <Journal userId={user.id} openMenu={() => setSidebarVisible(true)} />;
+        return <Journal userId={user.id} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       default:
         return (
             <Dashboard 
@@ -382,17 +454,19 @@ const App: React.FC = () => {
                 openMenu={() => setSidebarVisible(true)}
                 openProfile={() => setProfileVisible(true)}
                 setView={setCurrentView}
+                {...commonProps}
             />
         );
     }
   };
 
   const isFocusMode = currentView === ViewState.FOCUS_MODE;
+  const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
 
   return (
     <SafeAreaProvider>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <SafeAreaView style={[{ flex: 1 }, bgStyle]}>
+        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? "#000000" : "#F2F2F7"} />
         <View style={{ flex: 1 }}>
             {renderView()}
             
@@ -408,13 +482,13 @@ const App: React.FC = () => {
             {user && player && (
                 <Profile 
                     visible={profileVisible} 
-                    onClose={() => setProfileVisible(false)} 
+                    onClose={() => { setProfileVisible(false); fetchSettings(user.id); }} 
                     user={user} player={player} logout={handleLogout} 
                 />
             )}
 
             {session && user && !isFocusMode && (
-                <BottomNav currentView={currentView} setView={setCurrentView} />
+                <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
             )}
 
             {/* LEVEL UP MODAL */}

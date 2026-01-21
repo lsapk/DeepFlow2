@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, Modal, TextInput, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus } from 'react-native';
 import { Play, Pause, X, Clock, List, Plus, Save, Calendar } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
@@ -14,37 +14,80 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 interface FocusProps {
     onExit: () => void;
-    tasks?: Task[]; // To link sessions
+    tasks?: Task[];
+    isDarkMode?: boolean;
 }
 
-const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
+const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true }) => {
   const [viewMode, setViewMode] = useState<'CONFIG' | 'RUNNING' | 'HISTORY'>('CONFIG');
   
-  // Timer State
   const [isActive, setIsActive] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(25);
-  const [customDuration, setCustomDuration] = useState('');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [sessionTitle, setSessionTitle] = useState('');
   const [linkedTaskId, setLinkedTaskId] = useState<string | null>(null);
-
-  // History State
   const [history, setHistory] = useState<FocusSession[]>([]);
-  const [manualModalVisible, setManualModalVisible] = useState(false);
+  
+  // Background Timer State
+  const appState = useRef(AppState.currentState);
+  const backgroundTimestamp = useRef<number | null>(null);
 
-  // Manual Form
-  const [manualTitle, setManualTitle] = useState('');
-  const [manualDuration, setManualDuration] = useState('25');
-  const [manualDate, setManualDate] = useState('');
+  const colors = {
+      bg: isDarkMode ? '#000' : '#F2F2F7',
+      text: isDarkMode ? '#FFF' : '#000',
+      card: isDarkMode ? '#171717' : '#FFF',
+      border: isDarkMode ? '#333' : '#DDD',
+      subText: isDarkMode ? '#888' : '#666'
+  };
 
+  // Timer Effect & Background Handling
   useEffect(() => {
-    let interval: number | undefined;
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    } else if (timeLeft === 0 && isActive) {
-        completeSession();
-    }
-    return () => clearInterval(interval);
+      let interval: any;
+
+      const handleAppStateChange = (nextAppState: AppStateStatus) => {
+          if (appState.current.match(/active/) && nextAppState === 'background') {
+              // App goes to background: save timestamp
+              if (isActive) {
+                  backgroundTimestamp.current = Date.now();
+              }
+          }
+
+          if (appState.current.match(/background/) && nextAppState === 'active') {
+              // App comes to foreground: calculate elapsed time
+              if (isActive && backgroundTimestamp.current) {
+                  const now = Date.now();
+                  const elapsedSeconds = Math.floor((now - backgroundTimestamp.current) / 1000);
+                  setTimeLeft(prev => {
+                      const newValue = prev - elapsedSeconds;
+                      if (newValue <= 0) {
+                          completeSession();
+                          return 0;
+                      }
+                      return newValue;
+                  });
+              }
+          }
+          appState.current = nextAppState;
+      };
+
+      const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+      if (isActive && timeLeft > 0) {
+          interval = setInterval(() => {
+              setTimeLeft((prev) => {
+                  if (prev <= 1) {
+                      completeSession();
+                      return 0;
+                  }
+                  return prev - 1;
+              });
+          }, 1000);
+      }
+
+      return () => {
+          if (interval) clearInterval(interval);
+          subscription.remove();
+      };
   }, [isActive, timeLeft]);
 
   useEffect(() => {
@@ -59,12 +102,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
   };
 
   const startSession = () => {
-      // Use custom duration if set, else preset
-      const minutes = customDuration ? parseInt(customDuration) : durationMinutes;
-      if (minutes <= 0) return;
-      
-      setDurationMinutes(minutes);
-      setTimeLeft(minutes * 60);
+      setTimeLeft(durationMinutes * 60);
       setIsActive(true);
       setViewMode('RUNNING');
   };
@@ -73,16 +111,17 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
       setIsActive(false);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+          const completionTime = new Date().toISOString(); // UTC format for DB
+          
           await supabase.from('focus_sessions').insert({
               user_id: user.id,
               duration: durationMinutes,
-              completed_at: new Date().toISOString(),
+              completed_at: completionTime,
               session_type: 'focus',
               title: sessionTitle || 'Session Focus',
               linked_task_id: linkedTaskId
           });
 
-          // XP REWARD LOGIC
           let xpAmount = REWARDS.FOCUS_SHORT;
           if (durationMinutes >= 45) xpAmount = REWARDS.FOCUS_DEEP;
           else if (durationMinutes >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
@@ -92,38 +131,10 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
               await addXp(user.id, xpAmount, player);
               Alert.alert("Focus Terminé", `Bravo ! +${xpAmount} XP`);
           }
-
           fetchHistory();
       }
-      setViewMode('CONFIG'); 
-      setSessionTitle(''); 
-      setLinkedTaskId(null);
-  };
-
-  const addManualSession = async () => {
-      const dur = parseInt(manualDuration) || 25;
-      const dateStr = manualDate ? new Date(manualDate).toISOString() : new Date().toISOString();
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-          await supabase.from('focus_sessions').insert({
-              user_id: user.id,
-              duration: dur,
-              completed_at: dateStr,
-              session_type: 'focus',
-              title: manualTitle || 'Session Manuelle'
-          });
-          
-          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
-          if (player) {
-               await addXp(user.id, REWARDS.FOCUS_SHORT, player);
-          }
-
-          fetchHistory();
-          setManualModalVisible(false);
-          setManualTitle('');
-          setManualDate('');
-      }
+      setViewMode('CONFIG');
+      setSessionTitle('');
   };
 
   const formatTime = (seconds: number) => {
@@ -136,10 +147,10 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.header}>
              <TouchableOpacity onPress={onExit} style={styles.exitButton}>
-                <X size={24} color="white" />
+                <X size={24} color="#FFF" />
              </TouchableOpacity>
              <View style={styles.modeTabs}>
                  <TouchableOpacity onPress={() => setViewMode('CONFIG')} style={[styles.tab, viewMode === 'CONFIG' && styles.activeTab]}>
@@ -153,58 +164,29 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
 
         {viewMode === 'CONFIG' && (
             <ScrollView contentContainerStyle={styles.configContainer}>
-                <Text style={styles.title}>Configurer la Session</Text>
+                <Text style={[styles.title, {color: colors.text}]}>Configurer la Session</Text>
                 
-                <Text style={styles.label}>TITRE (Optionnel)</Text>
+                <Text style={styles.label}>TITRE</Text>
                 <TextInput 
-                    style={styles.input} 
-                    placeholder="Ex: Lecture Deep Work" 
-                    placeholderTextColor="#666" 
+                    style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]} 
+                    placeholder="Titre..." 
+                    placeholderTextColor={colors.subText}
                     value={sessionTitle}
                     onChangeText={setSessionTitle}
                 />
 
-                <Text style={styles.label}>DURÉE : {customDuration ? customDuration : durationMinutes} min</Text>
+                <Text style={styles.label}>DURÉE : {durationMinutes} min</Text>
                 <View style={styles.presetsRow}>
                     {[15, 25, 45, 60].map(m => (
                         <TouchableOpacity 
                             key={m} 
-                            onPress={() => { setDurationMinutes(m); setCustomDuration(''); }} 
-                            style={[styles.presetBtn, (durationMinutes === m && !customDuration) && styles.presetBtnActive]}
+                            onPress={() => setDurationMinutes(m)} 
+                            style={[styles.presetBtn, { backgroundColor: colors.card, borderColor: colors.border }, durationMinutes === m && styles.presetBtnActive]}
                         >
-                            <Text style={[styles.presetText, (durationMinutes === m && !customDuration) && { color: '#000' }]}>{m}</Text>
+                            <Text style={[styles.presetText, durationMinutes === m ? { color: '#000' } : { color: colors.text }]}>{m}</Text>
                         </TouchableOpacity>
                     ))}
                 </View>
-                
-                <Text style={styles.label}>OU DURÉE PERSONNALISÉE (min)</Text>
-                <TextInput 
-                    style={styles.input} 
-                    placeholder="Ex: 90" 
-                    placeholderTextColor="#666" 
-                    value={customDuration}
-                    onChangeText={setCustomDuration}
-                    keyboardType="numeric"
-                />
-
-                <Text style={styles.label}>LIER TÂCHE (Optionnel)</Text>
-                <ScrollView style={styles.taskPicker} horizontal showsHorizontalScrollIndicator={false}>
-                    <TouchableOpacity 
-                        style={[styles.taskChip, !linkedTaskId && styles.taskChipActive]} 
-                        onPress={() => setLinkedTaskId(null)}
-                    >
-                        <Text style={[styles.taskChipText, !linkedTaskId && {color: '#000'}]}>Aucune</Text>
-                    </TouchableOpacity>
-                    {tasks.filter(t => !t.completed).map(t => (
-                        <TouchableOpacity 
-                            key={t.id} 
-                            style={[styles.taskChip, linkedTaskId === t.id && styles.taskChipActive]} 
-                            onPress={() => setLinkedTaskId(t.id)}
-                        >
-                            <Text style={[styles.taskChipText, linkedTaskId === t.id && {color: '#000'}]}>{t.title}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
 
                 <TouchableOpacity style={styles.startBtn} onPress={startSession}>
                     <Play size={24} color="#000" fill="#000" />
@@ -217,10 +199,10 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
             <View style={styles.content}>
                 <View style={styles.timerContainer}>
                     <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
-                        <Circle cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS} stroke="#1C1C1E" strokeWidth={STROKE_WIDTH} fill="transparent" />
+                        <Circle cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS} stroke={colors.border} strokeWidth={STROKE_WIDTH} fill="transparent" />
                         <Circle
                             cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS}
-                            stroke="#FFF" strokeWidth={STROKE_WIDTH} fill="transparent"
+                            stroke={isDarkMode ? "#FFF" : "#000"} strokeWidth={STROKE_WIDTH} fill="transparent"
                             strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
                             strokeDashoffset={strokeDashoffset}
                             strokeLinecap="round"
@@ -228,14 +210,14 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
                         />
                     </Svg>
                     <View style={styles.timerTextContainer}>
-                        <Text style={styles.timeText}>{formatTime(timeLeft)}</Text>
-                        <Text style={styles.statusText}>{sessionTitle || 'Focus'}</Text>
+                        <Text style={[styles.timeText, { color: colors.text }]}>{formatTime(timeLeft)}</Text>
+                        <Text style={[styles.statusText, { color: colors.subText }]}>{sessionTitle || 'Focus'}</Text>
                     </View>
                 </View>
 
                 <View style={styles.controls}>
                     <TouchableOpacity onPress={() => { setIsActive(false); setViewMode('CONFIG'); }} style={styles.controlBtnSecondary}>
-                        <X size={24} color="#8E8E93" />
+                        <X size={24} color="#FFF" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => setIsActive(!isActive)} style={styles.playBtn}>
                         {isActive ? <Pause size={32} color="black" fill="black" /> : <Play size={32} color="black" fill="black" style={{ marginLeft: 4 }} />}
@@ -246,67 +228,27 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
 
         {viewMode === 'HISTORY' && (
             <View style={styles.historyContainer}>
-                <View style={styles.historyHeader}>
-                    <Text style={styles.historyTitle}>Historique Récent</Text>
-                    <TouchableOpacity style={styles.addManualBtn} onPress={() => setManualModalVisible(true)}>
-                        <Plus size={20} color="#000" />
-                    </TouchableOpacity>
-                </View>
+                <Text style={[styles.historyTitle, {color: colors.text}]}>Historique</Text>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {history.map(session => {
                         const d = session.completed_at ? new Date(session.completed_at) : new Date();
+                        // Format date nicely locally
+                        const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                        const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                        
                         return (
-                            <View key={session.id} style={styles.historyItem}>
+                            <View key={session.id} style={[styles.historyItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
                                 <View>
-                                    <Text style={styles.hTitle}>{session.title || 'Session Focus'}</Text>
-                                    <Text style={styles.hDate}>{d.toLocaleDateString()} {d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                                    <Text style={[styles.hTitle, {color: colors.text}]}>{session.title || 'Session'}</Text>
+                                    <Text style={[styles.hDate, {color: colors.subText}]}>{dateStr} à {timeStr}</Text>
                                 </View>
-                                <View style={styles.hBadge}>
-                                    <Clock size={12} color="#000" />
-                                    <Text style={styles.hDuration}>{session.duration}m</Text>
-                                </View>
+                                <Text style={[styles.hDuration, {color: colors.text}]}>{session.duration}m</Text>
                             </View>
                         );
                     })}
                 </ScrollView>
             </View>
         )}
-
-        {/* MANUAL ENTRY MODAL */}
-        <Modal visible={manualModalVisible} transparent animationType="slide">
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Ajout Manuel</Text>
-                        <TouchableOpacity onPress={() => setManualModalVisible(false)}><X size={24} color="#FFF" /></TouchableOpacity>
-                    </View>
-                    
-                    <Text style={styles.label}>TITRE</Text>
-                    <TextInput style={styles.input} value={manualTitle} onChangeText={setManualTitle} placeholder="Titre..." placeholderTextColor="#666" />
-                    
-                    <Text style={styles.label}>DURÉE (min)</Text>
-                    <TextInput style={styles.input} value={manualDuration} onChangeText={setManualDuration} keyboardType="numeric" placeholder="25" placeholderTextColor="#666" />
-                    
-                    <Text style={styles.label}>DATE (YYYY-MM-DD)</Text>
-                    <View style={styles.inputWithIcon}>
-                        <Calendar size={18} color="#666" style={{marginRight: 10}} />
-                        <TextInput 
-                            style={[styles.input, {borderWidth:0, marginBottom:0, flex:1}]} 
-                            value={manualDate} 
-                            onChangeText={setManualDate} 
-                            placeholder="Aujourd'hui" 
-                            placeholderTextColor="#666" 
-                        />
-                    </View>
-
-                    <TouchableOpacity style={styles.saveBtn} onPress={addManualSession}>
-                        <Save size={20} color="#000" />
-                        <Text style={styles.saveBtnText}>Enregistrer</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </Modal>
-
     </View>
   );
 };
@@ -314,7 +256,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [] }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     paddingTop: 20,
   },
   header: {
@@ -350,7 +291,6 @@ const styles = StyleSheet.create({
   title: {
       fontSize: 28,
       fontWeight: '700',
-      color: '#FFF',
       marginBottom: 30,
   },
   configContainer: {
@@ -359,29 +299,17 @@ const styles = StyleSheet.create({
   },
   label: {
       fontSize: 12,
-      color: '#666',
+      color: '#888',
       fontWeight: '600',
       marginBottom: 10,
       marginTop: 20,
       textTransform: 'uppercase',
   },
   input: {
-      backgroundColor: '#171717',
       borderRadius: 12,
       padding: 16,
-      color: '#FFF',
       fontSize: 16,
       borderWidth: 1,
-      borderColor: '#333',
-  },
-  inputWithIcon: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#171717',
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: '#333',
-      paddingHorizontal: 12,
   },
   presetsRow: {
       flexDirection: 'row',
@@ -391,37 +319,15 @@ const styles = StyleSheet.create({
       width: 60,
       height: 50,
       borderRadius: 10,
-      backgroundColor: '#171717',
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: '#333',
   },
   presetBtnActive: {
       backgroundColor: '#FFF',
   },
   presetText: {
-      color: '#FFF',
       fontWeight: '600',
-  },
-  taskPicker: {
-      flexDirection: 'row',
-      maxHeight: 50,
-  },
-  taskChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      backgroundColor: '#171717',
-      borderRadius: 20,
-      marginRight: 10,
-      borderWidth: 1,
-      borderColor: '#333',
-  },
-  taskChipActive: {
-      backgroundColor: '#FFF',
-  },
-  taskChipText: {
-      color: '#CCC',
   },
   startBtn: {
       backgroundColor: '#FFF',
@@ -438,8 +344,6 @@ const styles = StyleSheet.create({
       fontSize: 18,
       fontWeight: '700',
   },
-  
-  // Timer Running Styles
   content: {
     alignItems: 'center',
     flex: 1,
@@ -447,7 +351,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   timerContainer: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 60,
@@ -463,15 +366,12 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 60,
     fontWeight: '300',
-    color: 'white',
     fontVariant: ['tabular-nums'],
   },
   statusText: {
     fontSize: 16,
     fontWeight: '600',
-    letterSpacing: 1,
     marginTop: 8,
-    color: '#888',
   },
   controls: {
     flexDirection: 'row',
@@ -482,7 +382,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#333',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -494,103 +394,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // History Styles
   historyContainer: {
       flex: 1,
       paddingHorizontal: 20,
   },
-  historyHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 20,
-  },
   historyTitle: {
       fontSize: 20,
       fontWeight: '700',
-      color: '#FFF',
-  },
-  addManualBtn: {
-      backgroundColor: '#FFF',
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
+      marginBottom: 20,
   },
   historyItem: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: 16,
-      backgroundColor: '#171717',
       borderRadius: 12,
       marginBottom: 10,
       borderWidth: 1,
-      borderColor: '#262626',
   },
   hTitle: {
-      color: '#FFF',
       fontSize: 16,
       fontWeight: '600',
   },
   hDate: {
-      color: '#666',
       fontSize: 12,
   },
-  hBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#FFF',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
-      gap: 4,
-  },
   hDuration: {
-      color: '#000',
       fontWeight: '700',
   },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalContent: {
-      backgroundColor: '#171717',
-      borderRadius: 20,
-      padding: 24,
-      borderWidth: 1,
-      borderColor: '#333',
-  },
-  modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 20,
-  },
-  modalTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: '#FFF',
-  },
-  saveBtn: {
-      backgroundColor: '#FFF',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 16,
-      borderRadius: 12,
-      marginTop: 20,
-      gap: 10,
-  },
-  saveBtnText: {
-      fontWeight: '700',
-  }
 });
 
 export default Focus;

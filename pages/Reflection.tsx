@@ -9,19 +9,27 @@ import { generateReflectionQuestion } from '../services/ai';
 interface ReflectionProps {
   userId: string;
   openMenu?: () => void;
+  isDarkMode?: boolean;
 }
 
-const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
+const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMode = true }) => {
   const [reflections, setReflections] = useState<Reflection[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   
-  // State for new entry
   const [question, setQuestion] = useState('Chargement de la question...');
   const [answer, setAnswer] = useState('');
   const [loadingQ, setLoadingQ] = useState(false);
 
+  const colors = {
+      bg: isDarkMode ? '#000' : '#F2F2F7',
+      card: isDarkMode ? '#171717' : '#FFF',
+      text: isDarkMode ? '#FFF' : '#000',
+      subText: isDarkMode ? '#888' : '#666',
+      border: isDarkMode ? '#262626' : '#DDD'
+  };
+
   useEffect(() => {
-      if (userId) fetchReflections();
+      fetchReflections();
   }, [userId]);
 
   const fetchReflections = async () => {
@@ -64,20 +72,20 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
           fetchReflections();
           setModalVisible(false);
       } else {
-          Alert.alert("Erreur", "Impossible de sauvegarder la réflexion.");
+          Alert.alert("Erreur", "Impossible de sauvegarder.");
       }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: colors.bg}]}>
       <View style={styles.header}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
             {openMenu && (
                  <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
-                      <Menu size={24} color="#FFF" />
+                      <Menu size={24} color={colors.text} />
                  </TouchableOpacity>
             )}
-            <Text style={styles.largeTitle}>Réflexion</Text>
+            <Text style={[styles.largeTitle, {color: colors.text}]}>Réflexion</Text>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openNewSession}>
             <Plus size={24} color="#000" />
@@ -87,37 +95,37 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {reflections.length === 0 ? (
               <View style={styles.emptyState}>
-                  <BrainCircuit size={60} color="#333" style={{marginBottom: 20}} />
-                  <Text style={styles.emptyText}>Prenez un moment pour vous.</Text>
+                  <BrainCircuit size={60} color={colors.subText} style={{marginBottom: 20}} />
+                  <Text style={[styles.emptyText, {color: colors.subText}]}>Prenez un moment pour vous.</Text>
                   <TouchableOpacity style={styles.ctaBtn} onPress={openNewSession}>
                       <Text style={styles.ctaText}>Commencer</Text>
                   </TouchableOpacity>
               </View>
           ) : (
               reflections.map((ref) => (
-                  <View key={ref.id} style={styles.card}>
+                  <View key={ref.id} style={[styles.card, {backgroundColor: colors.card, borderColor: colors.border}]}>
                       <View style={styles.cardHeader}>
                           <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
                               <Sparkles size={16} color="#C4B5FD" />
                               <Text style={styles.date}>{new Date(ref.created_at).toLocaleDateString()}</Text>
                           </View>
                       </View>
-                      <Text style={styles.questionText}>{ref.question}</Text>
-                      <View style={styles.divider} />
-                      <Text style={styles.answerText}>{ref.answer}</Text>
+                      <Text style={[styles.questionText, {color: colors.text}]}>{ref.question}</Text>
+                      <View style={[styles.divider, {backgroundColor: colors.border}]} />
+                      <Text style={[styles.answerText, {color: colors.subText}]}>{ref.answer}</Text>
                   </View>
               ))
           )}
       </ScrollView>
 
-      {/* MODAL SIMILAIRE AU JOURNAL */}
+      {/* MODAL */}
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
+          <View style={[styles.modalOverlay, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7'}]}>
               <View style={styles.modalContent}>
                   <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Introspection</Text>
+                      <Text style={[styles.modalTitle, {color: colors.text}]}>Introspection</Text>
                       <TouchableOpacity onPress={() => setModalVisible(false)}>
-                          <X size={24} color="#FFF" />
+                          <X size={24} color={colors.text} />
                       </TouchableOpacity>
                   </View>
 
@@ -138,11 +146,11 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
 
                       <Text style={styles.label}>VOTRE RÉPONSE</Text>
                       <TextInput 
-                          style={styles.input}
+                          style={[styles.input, {backgroundColor: colors.card, color: colors.text, borderColor: colors.border}]}
                           multiline
                           textAlignVertical="top"
-                          placeholder="Écrivez librement ce que vous ressentez..."
-                          placeholderTextColor="#666"
+                          placeholder="Écrivez librement..."
+                          placeholderTextColor="#888"
                           value={answer}
                           onChangeText={setAnswer}
                       />
@@ -162,7 +170,6 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
     paddingTop: 20,
   },
   header: {
@@ -182,7 +189,6 @@ const styles = StyleSheet.create({
   largeTitle: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#FFF',
   },
   addButton: {
     width: 40,
@@ -202,7 +208,6 @@ const styles = StyleSheet.create({
       alignItems: 'center',
   },
   emptyText: {
-      color: '#666',
       fontSize: 16,
       marginBottom: 20,
   },
@@ -217,11 +222,9 @@ const styles = StyleSheet.create({
       fontWeight: '600',
   },
   card: {
-      backgroundColor: '#171717',
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
-      borderColor: '#262626',
   },
   cardHeader: {
       marginBottom: 12,
@@ -232,7 +235,6 @@ const styles = StyleSheet.create({
       fontWeight: '600',
   },
   questionText: {
-      color: '#FFF',
       fontSize: 18,
       fontWeight: '700',
       lineHeight: 24,
@@ -241,19 +243,14 @@ const styles = StyleSheet.create({
   },
   divider: {
       height: 1,
-      backgroundColor: '#333',
       marginVertical: 12,
   },
   answerText: {
-      color: '#CCC',
       fontSize: 15,
       lineHeight: 22,
   },
-  
-  // MODAL
   modalOverlay: {
       flex: 1,
-      backgroundColor: '#000',
   },
   modalContent: {
       flex: 1,
@@ -268,7 +265,6 @@ const styles = StyleSheet.create({
   modalTitle: {
       fontSize: 24,
       fontWeight: '700',
-      color: '#FFF',
   },
   aiBox: {
       backgroundColor: '#C4B5FD',
@@ -317,14 +313,11 @@ const styles = StyleSheet.create({
       textTransform: 'uppercase',
   },
   input: {
-      backgroundColor: '#171717',
       borderRadius: 12,
       padding: 16,
-      color: '#FFF',
       fontSize: 16,
       minHeight: 200,
       borderWidth: 1,
-      borderColor: '#333',
       marginBottom: 30,
   },
   saveBtn: {
