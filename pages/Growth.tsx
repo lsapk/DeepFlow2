@@ -334,7 +334,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
         <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
             <Menu size={24} color={colors.button} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
+        <Text style={[styles.headerTitle, {color: colors.text}]} pointerEvents="none">Évolution</Text>
         <TouchableOpacity onPress={openProfile}>
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 10, 
   },
   headerTitle: {
       fontSize: 22,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       textAlign: 'center',
-      // Removed zIndex: -1
+      // No negative zIndex
   },
   avatar: {
     width: 36,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#333',
-    zIndex: 10, // BUTTONS ON TOP
+    zIndex: 10,
   },
   tabBar: {
       flexDirection: 'row',

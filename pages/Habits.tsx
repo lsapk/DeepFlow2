@@ -141,7 +141,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
               <Menu size={24} color={colors.accent} />
           </TouchableOpacity>
          
-         <View style={styles.headerTitleContainer}>
+         <View style={styles.headerTitleContainer} pointerEvents="none">
              <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
              <Text style={[styles.subtitle, {color: colors.textSub}]}>{showAllDays ? 'Toutes' : 'Aujourd\'hui'}</Text>
          </View>
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       alignItems: 'center',
-      zIndex: -1,
+      // No negative zIndex
   },
   largeTitle: {
     fontSize: 22,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   headerButtons: {
       flexDirection: 'row',
       gap: 12,
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 10,
   },
   iconBtn: {
       width: 40,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
       borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 10,
   },
   addButton: {
     width: 40,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10, // BUTTONS ON TOP
+    zIndex: 10,
   },
   scrollContent: {
     paddingHorizontal: 20,

@@ -126,23 +126,22 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('focus_sessions')
         .select('*')
         .eq('user_id', user.id)
         .order('completed_at', { ascending: false })
-        .limit(20);
-      
-      if (error) {
-          console.error("Error fetching history:", error);
-      }
+        .limit(30); // More history
         
       if (data) {
           setHistory(data);
-          // Only calculate total based on what we fetched? Or should be a separate aggregate query.
-          // For now, let's sum up loaded history as "recent total" or fetch all.
-          // Let's do a separate simple query for total if needed, or just sum current.
-          const total = data.reduce((acc, curr) => acc + (curr.duration || 0), 0);
+          // Calculate global total
+          const { data: allSessions } = await supabase
+            .from('focus_sessions')
+            .select('duration')
+            .eq('user_id', user.id);
+            
+          const total = allSessions?.reduce((acc, curr) => acc + (curr.duration || 0), 0) || 0;
           setTotalTime(total);
       }
   };
@@ -398,7 +397,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               {history.map(session => {
                   let dateStr = 'Date inconnue';
                   let timeStr = '';
-                  
                   if (session.completed_at) {
                       const d = new Date(session.completed_at);
                       dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -431,7 +429,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                 <Menu size={24} color={colors.text} />
             </TouchableOpacity>
             
-            <Text style={[styles.headerTitle, {color: colors.text}]}>Mode Focus</Text>
+            <Text style={[styles.headerTitle, {color: colors.text}]} pointerEvents="none">Mode Focus</Text>
 
              <View style={[styles.modeTabs, {backgroundColor: isDarkMode ? '#1C1C1E' : '#E5E5EA'}]}>
                  <TouchableOpacity onPress={() => changeView('CONFIG')} style={[styles.tab, (viewMode === 'CONFIG' || viewMode === 'MANUAL') && {backgroundColor: colors.card}]}>
@@ -447,8 +445,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         {viewMode === 'RUNNING' && renderRunning()}
         {viewMode === 'MANUAL' && renderManual()}
         {viewMode === 'HISTORY' && renderHistory()}
-        
-        {/* Floating close removed as requested, keeping header close button logic in App.tsx or implicit back not needed if full view logic handles it */}
     </View>
   );
 };
@@ -468,7 +464,7 @@ const styles = StyleSheet.create({
   },
   menuBtn: {
       padding: 8,
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 10, 
   },
   headerTitle: {
       fontSize: 20,
@@ -477,13 +473,13 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
       textAlign: 'center',
-      // Removed zIndex: -1 to ensure visibility
+      // No negative zIndex to ensure visibility
   },
   modeTabs: {
       flexDirection: 'row',
       borderRadius: 12,
       padding: 4,
-      zIndex: 10, // BUTTONS ON TOP
+      zIndex: 10, 
   },
   tab: {
       paddingVertical: 8,

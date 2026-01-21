@@ -95,14 +95,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             <Menu size={24} color={colors.accent} />
         </TouchableOpacity>
         
-        <View style={styles.headerTitleContainer}>
+        <View style={styles.headerTitleContainer} pointerEvents="none">
             <Text style={[styles.dateText, {color: colors.textSub}]}>
                 {today.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }).toUpperCase()}
             </Text>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Aujourd'hui</Text>
         </View>
 
-        <TouchableOpacity onPress={openProfile}>
+        <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
                 style={styles.avatar} 
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
       left: 0, 
       right: 0,
       alignItems: 'center',
-      zIndex: -1,
+      // Removed zIndex: -1 to ensure visibility
   },
   dateText: {
       fontSize: 10,
