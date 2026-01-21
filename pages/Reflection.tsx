@@ -78,8 +78,9 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
 
   const fetchReflections = async () => {
       setLoading(true);
+      // Correction : Utilisation de la table daily_reflections
       const { data } = await supabase
-        .from('reflections')
+        .from('daily_reflections')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -95,8 +96,8 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
 
       setSaving(true);
       
-      // Sauvegarde DB
-      const { error } = await supabase.from('reflections').insert({
+      // Sauvegarde DB - Correction table daily_reflections
+      const { error } = await supabase.from('daily_reflections').insert({
           user_id: userId,
           question: currentQuestion,
           answer: answer.trim(),
@@ -112,7 +113,9 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
           setAnswer("");
           fetchReflections();
           generateRandomQuestion(); // Nouvelle question pour la prochaine fois
+          setViewMode('HISTORY'); // Switch to history to see result
       } else {
+          console.error(error);
           Alert.alert("Erreur", "Impossible de sauvegarder votre réflexion.");
       }
       setSaving(false);
