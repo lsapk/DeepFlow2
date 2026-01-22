@@ -1,8 +1,6 @@
 import { supabase } from './supabase';
 import { GoogleGenAI } from "@google/genai";
 
-// Configuration API Key
-// Note: Idéalement utilisez process.env.API_KEY. Pour le dev, on garde votre clé de secours si nécessaire.
 const API_KEY = process.env.API_KEY || "AIzaSyBRsXHPOaFQVcOH9rCKx39uH8Bsu462uGo";
 
 let ai: GoogleGenAI | null = null;
@@ -12,14 +10,11 @@ if (API_KEY) {
     console.warn("Gemini API Key is missing.");
 }
 
-// Helper pour logger l'utilisation
 async function logAiUsage(type: 'chat' | 'analysis') {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-
         const today = new Date().toISOString().split('T')[0];
-
         const { data: existing } = await supabase
             .from('daily_usage')
             .select('*')
@@ -45,7 +40,6 @@ async function logAiUsage(type: 'chat' | 'analysis') {
     }
 }
 
-// Mode Création : L'IA renvoie du JSON pour agir sur l'app
 export const generateActionableCoaching = async (
   userMessage: string, 
   userContext: any,
@@ -57,31 +51,43 @@ export const generateActionableCoaching = async (
   
   try {
     let prompt = `
-      Tu es DeepFlow, un coach de productivité.
+      Tu es DeepFlow, un coach de productivité expert et empathique. 🧠✨
       
-      CONTEXTE UTILISATEUR:
-      - Tâches en attente: ${userContext.pendingTasks}
-      - Taux de complétion: ${userContext.completionRate}%
+      FORMAT DE RÉPONSE:
+      - Utilise le format **Markdown** pour structurer ta réponse (Gras, Listes, Titres).
+      - Utilise beaucoup d'**emojis** pour rendre la conversation vivante et gamifiée.
+      
+      DONNÉES UTILISATEUR DISPONIBLES (Utilise-les pour personnaliser la réponse):
+      ${JSON.stringify(userContext, null, 2)}
       
       RÈGLES:
       1. Sois concis, motivant et direct.
-      2. Si 'isCreationMode' est TRUE, tu DOIS analyser si l'utilisateur veut créer quelque chose.
+      2. Analyse les données fournies pour donner des conseils pertinents.
     `;
 
     if (isCreationMode) {
         prompt += `
-        IMPORTANT - MODE ACTION ACTIVÉ:
-        Si l'utilisateur demande de créer une tâche, une habitude, un objectif ou lancer un focus, TU DOIS RÉPONDRE UNIQUEMENT AVEC UN JSON VALIDE (pas de markdown, pas de texte avant/après).
+        ⚠️ MODE CRÉATION ACTIVÉ :
+        Si l'utilisateur demande explicitement de créer, ajouter ou planifier quelque chose (Tâche, Habitude, Objectif, Focus), tu DOIS inclure un bloc JSON strict dans ta réponse.
         
-        FORMATS JSON STRICTS:
-        - Tâche: { "action": "CREATE_TASK", "data": { "title": "...", "priority": "high" | "medium" | "low" } }
-        - Habitude: { "action": "CREATE_HABIT", "data": { "title": "...", "frequency": "daily" } }
-        - Objectif: { "action": "CREATE_GOAL", "data": { "title": "..." } }
-        - Focus: { "action": "START_FOCUS", "data": { "minutes": 25 } }
+        FORMAT DU JSON (Doit être valide, sans commentaires):
         
-        Exemple: Utilisateur: "Ajoute Payer loyer en urgent" -> Réponse: { "action": "CREATE_TASK", "data": { "title": "Payer loyer", "priority": "high" } }
+        Pour une Tâche:
+        { "action": "CREATE_TASK", "data": { "title": "Titre précis", "priority": "high" | "medium" | "low" } }
         
-        Si ce n'est pas une action, réponds normalement en texte.
+        Pour une Habitude:
+        { "action": "CREATE_HABIT", "data": { "title": "Titre", "frequency": "daily" } }
+        
+        Pour un Objectif:
+        { "action": "CREATE_GOAL", "data": { "title": "Titre" } }
+        
+        Pour un Focus:
+        { "action": "START_FOCUS", "data": { "minutes": 25 } }
+        
+        Exemple de réponse mixte:
+        "C'est noté ! Je prépare ça pour toi. 🚀
+        { "action": "CREATE_TASK", "data": { "title": "Payer loyer", "priority": "high" } }
+        N'oublie pas de le faire avant ce soir !"
         `;
     }
 
@@ -92,23 +98,28 @@ export const generateActionableCoaching = async (
     
     const responseText = response.text || "";
 
-    // Nettoyage pour parser le JSON si le modèle met des ```json ... ```
-    const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Extraction robuste du JSON via Regex (cherche le premier objet JSON valide dans le texte)
+    const jsonMatch = responseText.match(/\{[\s\S]*"action"[\s\S]*\}/);
+    
+    let actionData = undefined;
+    let cleanText = responseText;
 
-    try {
-        if (cleanText.startsWith('{') && cleanText.endsWith('}')) {
-            const actionData = JSON.parse(cleanText);
-            return { text: "Action identifiée...", action: actionData };
+    if (jsonMatch) {
+        try {
+            actionData = JSON.parse(jsonMatch[0]);
+            // On nettoie le JSON du texte affiché pour ne pas polluer le chat, ou on le laisse si on veut debugger
+            // Ici on le remplace par une icône d'action
+            cleanText = responseText.replace(jsonMatch[0], '\n*(Action en attente de confirmation...)*');
+        } catch (e) {
+            console.warn("AI JSON parse error", e);
         }
-    } catch (e) {
-        // Pas du JSON, c'est une réponse texte normale
     }
 
-    return { text: responseText };
+    return { text: cleanText, action: actionData };
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return { text: "Erreur de connexion à l'IA." };
+    return { text: "⚠️ Erreur de connexion à l'IA. Vérifiez votre réseau." };
   }
 };
 
@@ -124,7 +135,7 @@ export const generateReflectionQuestion = async (): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: "Génère une seule question de développement personnel profonde et originale en Français. Juste la question."
+        contents: "Génère une seule question de développement personnel profonde et originale en Français. Juste la question, sans guillemets."
     });
     return response.text?.trim() || "De quoi êtes-vous le plus reconnaissant aujourd'hui ?";
   } catch (error) {

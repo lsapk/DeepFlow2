@@ -27,7 +27,9 @@
     "expo-haptics": "~14.0.0",
     "react-native-reanimated": "~3.16.1",
     "react-native-gesture-handler": "~2.20.2",
-    "expo-image": "~1.13.0"
+    "expo-image": "~2.0.0",
+    "react-native-markdown-display": "^7.0.2",
+    "expo-build-properties": "~0.13.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

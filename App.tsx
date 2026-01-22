@@ -299,14 +299,11 @@ const App: React.FC = () => {
       const nowIso = new Date().toISOString();
       const isAlreadyDone = habit.last_completed_at && habit.last_completed_at.startsWith(today);
 
-      // Optimistic Update
       const newHabits = habits.map(h => {
           if (h.id === id) {
               if (isAlreadyDone) {
-                  // Undo
-                  return { ...h, streak: Math.max(0, h.streak - 1), last_completed_at: null }; // UI trick: null makes it undone
+                  return { ...h, streak: Math.max(0, h.streak - 1), last_completed_at: null };
               } else {
-                  // Do
                   return { ...h, streak: h.streak + 1, last_completed_at: nowIso };
               }
           }
@@ -315,18 +312,16 @@ const App: React.FC = () => {
       setHabits(newHabits);
 
       if (isAlreadyDone) {
-          // DELETE COMPLETION
           await supabase.from('habit_completions')
             .delete()
             .eq('habit_id', id)
             .eq('completed_date', today);
           
           await supabase.from('habits')
-            .update({ streak: Math.max(0, habit.streak - 1), last_completed_at: null }) // We can't easily know previous last_completed_at without query, so null is safer visually or handle logic deeper
+            .update({ streak: Math.max(0, habit.streak - 1), last_completed_at: null }) 
             .eq('id', id);
             
       } else {
-          // ADD COMPLETION
           await supabase.from('habit_completions').insert({
               habit_id: id,
               user_id: user.id,
@@ -340,22 +335,15 @@ const App: React.FC = () => {
           const { addXp, REWARDS } = await import('./services/gamification');
           await addXp(user.id, REWARDS.HABIT, player);
       }
-      
-      // Refresh to ensure server sync state (especially for correct previous date if undone)
       setTimeout(() => fetchHabits(user.id), 500); 
   };
 
   const toggleTask = async (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-    
     const newStatus = !task.completed;
-    
-    // Optimistic Update
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: newStatus } : t));
-
     await supabase.from('tasks').update({ completed: newStatus }).eq('id', id);
-    
     if (newStatus && player && user) {
         const { addXp, REWARDS } = await import('./services/gamification');
         const reward = task.priority === 'high' ? REWARDS.TASK_HIGH : REWARDS.TASK_MEDIUM;
@@ -366,21 +354,15 @@ const App: React.FC = () => {
   const toggleGoal = async (id: string) => {
      const goal = goals.find(g => g.id === id);
      if (!goal) return;
-     
      const newStatus = !goal.completed;
-     
-     // Optimistic Update
      setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: newStatus } : g));
-
      await supabase.from('goals').update({ completed: newStatus }).eq('id', id);
-     
      if (newStatus && player && user) {
          const { addXp, REWARDS } = await import('./services/gamification');
          await addXp(user.id, REWARDS.GOAL, player);
      }
   };
 
-  // --- RENDER ---
   const renderView = () => {
     if (loading) return (
         <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }}>
@@ -445,7 +427,8 @@ const App: React.FC = () => {
       case ViewState.GROWTH:
         return (
             <Growth 
-                player={player} user={user} tasks={tasks} 
+                player={player} user={user} 
+                tasks={tasks} habits={habits} goals={goals}
                 openMenu={() => setSidebarVisible(true)} 
                 openProfile={() => setProfileVisible(true)}
                 onAddTask={aiAddTask}
@@ -512,7 +495,6 @@ const App: React.FC = () => {
                     <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
                 )}
 
-                {/* LEVEL UP MODAL */}
                 <Modal visible={showLevelUp} transparent animationType="fade">
                     <View style={styles.levelUpOverlay}>
                         <View style={styles.levelUpCard}>

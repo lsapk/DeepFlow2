@@ -1,19 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Switch, Alert, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager } from 'react-native';
-import { PlayerProfile, UserProfile, Task } from '../types';
-import { Send, Menu, TrendingUp, Clock, BarChart2, Activity, Mic, PieChart } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Switch, Alert, KeyboardAvoidingView, Platform, LayoutAnimation } from 'react-native';
+import { PlayerProfile, UserProfile, Task, Habit, Goal } from '../types';
+import { Send, Menu, TrendingUp, Clock, BarChart2, Activity, Mic, PieChart, Lock, Unlock, Brain, Info } from 'lucide-react-native';
 import { generateActionableCoaching } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
-import Svg, { Circle, G } from 'react-native-svg';
-
-// Supression du warning LayoutAnimation
-// if (Platform.OS === 'android') { ... } 
+import Markdown from 'react-native-markdown-display';
 
 interface GrowthProps {
   player: PlayerProfile;
   user: UserProfile;
   tasks: Task[]; 
+  habits?: Habit[];
+  goals?: Goal[];
   openMenu: () => void;
   openProfile: () => void;
   onAddTask: (title: string, priority: string) => void;
@@ -23,7 +22,14 @@ interface GrowthProps {
   isDarkMode?: boolean;
 }
 
-const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProfile, onAddTask, onAddHabit, onAddGoal, onStartFocus, isDarkMode = true }) => {
+interface AiPermissions {
+    tasks: boolean;
+    habits: boolean;
+    goals: boolean;
+    profile: boolean;
+}
+
+const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], openMenu, openProfile, onAddTask, onAddHabit, onAddGoal, onStartFocus, isDarkMode = true }) => {
   const insets = useSafeAreaInsets();
   
   const colors = {
@@ -34,16 +40,36 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
       border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
       inputBg: isDarkMode ? '#000' : '#F2F2F7',
       accent: '#C4B5FD',
-      button: '#007AFF'
+      button: '#007AFF',
+      success: '#4ADE80'
+  };
+
+  const markdownStyles = {
+    body: { color: colors.text, fontSize: 15 },
+    heading1: { color: colors.accent, fontWeight: '700', marginVertical: 10 },
+    heading2: { color: colors.text, fontWeight: '600', marginVertical: 8 },
+    strong: { color: colors.accent, fontWeight: 'bold' },
+    list_item: { marginBottom: 6 },
+    bullet_list: { marginBottom: 10 },
   };
 
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ANALYTICS' | 'AI_COACH'>('OVERVIEW');
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-      { role: 'ai', text: `Bonjour ${user.display_name?.split(' ')[0]}. Active le "Mode Création" pour que je gère tes tâches et focus directement.` }
+      { role: 'ai', text: `Bonjour **${user.display_name?.split(' ')[0]}** ! 👋\n\nJe suis prêt à analyser tes données. Configure mes accès ci-dessus et active le **Mode Création** si tu veux que j'agisse pour toi. 🚀` }
   ]);
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
+  
+  // Permissions AI
+  const [aiPermissions, setAiPermissions] = useState<AiPermissions>({
+      tasks: true,
+      habits: true,
+      goals: true,
+      profile: true
+  });
+  const [showPermissions, setShowPermissions] = useState(false);
+
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Stats State
@@ -129,12 +155,8 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
       setActiveTab(tab);
   };
 
-  const handleVoiceInput = () => {
-      if (isCreationMode) {
-          setChatInput("Crée une tâche 'Préparer la réunion' en urgence");
-      } else {
-          Alert.alert("Info", "Le mode création doit être activé.");
-      }
+  const togglePermission = (key: keyof AiPermissions) => {
+      setAiPermissions(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const sendMessage = async () => {
@@ -144,36 +166,72 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
       setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
       setLoadingAi(true);
       
-      const context = {
-          name: user.display_name,
-          pendingTasks: tasks.filter(t => !t.completed).length,
-          completionRate: taskCompletionRate
-      };
+      // Construction dynamique du contexte selon les permissions
+      const context: any = {};
+      if (aiPermissions.profile) {
+          context.user = { name: user.display_name, level: player.level };
+      }
+      if (aiPermissions.tasks) {
+          context.tasks = {
+              pending: tasks.filter(t => !t.completed).length,
+              topUrgent: tasks.filter(t => t.priority === 'high' && !t.completed).map(t => t.title),
+              completionRate: taskCompletionRate
+          };
+      }
+      if (aiPermissions.habits) {
+          context.habits = habits.map(h => ({ title: h.title, streak: h.streak }));
+      }
+      if (aiPermissions.goals) {
+          context.goals = goals.filter(g => !g.completed).map(g => ({ title: g.title, progress: g.progress }));
+      }
 
       const response = await generateActionableCoaching(userMsg, context, isCreationMode);
+      setLoadingAi(false);
       
       if (response.action) {
-          const { action, data } = response.action;
-          try {
-              if (action === 'CREATE_TASK') {
-                  onAddTask(data.title, data.priority || 'medium');
-                  setMessages(prev => [...prev, { role: 'ai', text: `✅ Action: Tâche "${data.title}" créée.` }]);
-              } else if (action === 'CREATE_HABIT') {
-                  onAddHabit(data.title);
-                  setMessages(prev => [...prev, { role: 'ai', text: `✅ Action: Habitude "${data.title}" ajoutée.` }]);
-              } else if (action === 'CREATE_GOAL') {
-                  onAddGoal(data.title);
-                  setMessages(prev => [...prev, { role: 'ai', text: `✅ Action: Objectif "${data.title}" défini.` }]);
-              } else if (action === 'START_FOCUS') {
-                  onStartFocus(data.minutes || 25);
-              }
-          } catch (e) {
-              setMessages(prev => [...prev, { role: 'ai', text: "❌ Erreur action." }]);
-          }
+          confirmAction(response.action);
       } else {
           setMessages(prev => [...prev, { role: 'ai', text: response.text }]);
       }
-      setLoadingAi(false);
+  };
+
+  const confirmAction = (actionObj: any) => {
+      const { action, data } = actionObj;
+      let title = "Action Requise";
+      let message = "";
+      
+      if (action === 'CREATE_TASK') {
+          message = `Créer la tâche "${data.title}" (Priorité: ${data.priority}) ?`;
+      } else if (action === 'CREATE_HABIT') {
+          message = `Ajouter l'habitude "${data.title}" ?`;
+      } else if (action === 'CREATE_GOAL') {
+          message = `Définir l'objectif "${data.title}" ?`;
+      } else if (action === 'START_FOCUS') {
+          message = `Lancer un focus de ${data.minutes} minutes ?`;
+      }
+
+      Alert.alert(
+          title,
+          message,
+          [
+              { text: "Annuler", style: "cancel", onPress: () => setMessages(prev => [...prev, { role: 'ai', text: "❌ Action annulée." }]) },
+              { 
+                  text: "Confirmer", 
+                  style: "default",
+                  onPress: () => {
+                      try {
+                          if (action === 'CREATE_TASK') onAddTask(data.title, data.priority || 'medium');
+                          else if (action === 'CREATE_HABIT') onAddHabit(data.title);
+                          else if (action === 'CREATE_GOAL') onAddGoal(data.title);
+                          else if (action === 'START_FOCUS') onStartFocus(data.minutes || 25);
+                          setMessages(prev => [...prev, { role: 'ai', text: "✅ C'est fait !" }]);
+                      } catch(e) {
+                          setMessages(prev => [...prev, { role: 'ai', text: "❌ Erreur lors de l'exécution." }]);
+                      }
+                  }
+              }
+          ]
+      );
   };
 
   // --- RENDERERS ---
@@ -197,7 +255,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
               </View>
           </View>
           
-          {/* Simple Circle Chart for Task Distribution */}
           <View style={[styles.analysisCard, {backgroundColor: colors.card, borderColor: colors.border}]}>
                <View style={styles.cardHeader}>
                     <PieChart size={20} color="#FACC15" />
@@ -217,13 +274,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
                        <Text style={{color: colors.text}}>Basse: {taskDistribution.low}</Text>
                    </View>
                </View>
-          </View>
-
-          <View style={[styles.insightBox, {backgroundColor: colors.card}]}>
-             <Text style={styles.insightTitle}>⚡ Analyse de Performance</Text>
-             <Text style={[styles.insightText, {color: colors.subText}]}>
-                 {bestDay !== 'N/A' ? `Vous êtes plus productif le ${bestDay}. Essayez de placer vos tâches complexes ce jour-là.` : "Continuez d'utiliser le mode Focus pour obtenir des insights."}
-             </Text>
           </View>
       </View>
   );
@@ -270,18 +320,44 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={{ flex: 1 }}>
-            <View style={[styles.modeSwitchContainer, { borderColor: colors.border }]}>
-                <View>
-                    <Text style={[styles.modeLabel, isCreationMode && {color: '#4ADE80'}]}>Mode Création</Text>
-                    <Text style={styles.modeSub}>L'IA peut créer des tâches/focus</Text>
-                </View>
-                <Switch 
-                    value={isCreationMode} 
-                    onValueChange={setIsCreationMode}
-                    trackColor={{ false: "#333", true: "#4ADE80" }}
-                    thumbColor="#FFF"
-                />
+            {/* Header Contrôles IA */}
+            <View style={[styles.aiControlsHeader, { borderColor: colors.border }]}>
+                 <TouchableOpacity 
+                    style={[styles.permToggle, {backgroundColor: showPermissions ? colors.accent : (isDarkMode ? '#333' : '#E5E5EA')}]} 
+                    onPress={() => setShowPermissions(!showPermissions)}
+                 >
+                     <Brain size={16} color={showPermissions ? '#000' : colors.text} />
+                     <Text style={[styles.permText, {color: showPermissions ? '#000' : colors.text}]}>Données</Text>
+                 </TouchableOpacity>
+
+                 <View style={styles.modeSwitchWrapper}>
+                    <Text style={[styles.modeLabelMini, isCreationMode && {color: colors.success}]}>Création</Text>
+                    <Switch 
+                        value={isCreationMode} 
+                        onValueChange={setIsCreationMode}
+                        trackColor={{ false: "#333", true: colors.success }}
+                        thumbColor="#FFF"
+                        style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                    />
+                 </View>
             </View>
+
+            {/* Panneau Permissions */}
+            {showPermissions && (
+                <View style={[styles.permissionsPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.permTitle, {color: colors.subText}]}>ACCÈS DONNÉES IA</Text>
+                    <View style={styles.permRow}>
+                        <PermissionChip label="Profil" active={aiPermissions.profile} onPress={() => togglePermission('profile')} colors={colors} />
+                        <PermissionChip label="Tâches" active={aiPermissions.tasks} onPress={() => togglePermission('tasks')} colors={colors} />
+                        <PermissionChip label="Habitudes" active={aiPermissions.habits} onPress={() => togglePermission('habits')} colors={colors} />
+                        <PermissionChip label="Objectifs" active={aiPermissions.goals} onPress={() => togglePermission('goals')} colors={colors} />
+                    </View>
+                    <View style={styles.infoRow}>
+                        <Info size={14} color={colors.subText} />
+                        <Text style={[styles.infoText, {color: colors.subText}]}>Décochez pour priver l'IA de ces données.</Text>
+                    </View>
+                </View>
+            )}
 
             <ScrollView 
                 style={styles.chatScroll}
@@ -291,12 +367,13 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
             >
                 {messages.map((msg, index) => (
                     <View key={index} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : [styles.aiBubble, { backgroundColor: isDarkMode ? '#262626' : '#E5E5EA' }]]}>
-                        <Text style={[
-                            styles.messageText, 
-                            { color: msg.role === 'user' ? '#FFF' : (isDarkMode ? '#FFF' : '#000') }
-                        ]}>
-                            {msg.text}
-                        </Text>
+                        {msg.role === 'ai' ? (
+                            <Markdown style={markdownStyles as any}>
+                                {msg.text}
+                            </Markdown>
+                        ) : (
+                            <Text style={{color: '#FFF', fontSize: 15}}>{msg.text}</Text>
+                        )}
                     </View>
                 ))}
                 {loadingAi && <ActivityIndicator size="small" color={colors.text} style={{alignSelf: 'flex-start', margin: 10}} />}
@@ -306,9 +383,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
                 styles.inputArea, 
                 { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) + 70 }
             ]}>
-                <TouchableOpacity style={[styles.voiceBtn, { backgroundColor: isDarkMode ? '#333' : '#E5E5EA' }]} onPress={handleVoiceInput}>
-                    <Mic size={20} color={isCreationMode ? "#4ADE80" : (isDarkMode ? "#FFF" : "#000")} />
-                </TouchableOpacity>
                 <TextInput 
                     style={[styles.textInput, { backgroundColor: colors.inputBg, color: colors.text }]}
                     placeholder={isCreationMode ? "Ex: Crée une tâche..." : "Discuter avec le coach..."}
@@ -364,6 +438,16 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, openMenu, openProf
     </View>
   );
 };
+
+const PermissionChip = ({ label, active, onPress, colors }: any) => (
+    <TouchableOpacity 
+        style={[styles.chip, { backgroundColor: active ? colors.text : 'transparent', borderColor: colors.text, borderWidth: 1 }]} 
+        onPress={onPress}
+    >
+        {active ? <Unlock size={12} color={colors.bg} /> : <Lock size={12} color={colors.text} />}
+        <Text style={[styles.chipText, { color: active ? colors.bg : colors.text }]}>{label}</Text>
+    </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -447,22 +531,6 @@ const styles = StyleSheet.create({
       fontSize: 11,
       textAlign: 'center',
   },
-  insightBox: {
-      borderRadius: 12,
-      padding: 16,
-      borderLeftWidth: 4,
-      borderLeftColor: '#FACC15',
-  },
-  insightTitle: {
-      color: '#FACC15',
-      fontWeight: '700',
-      fontSize: 14,
-      marginBottom: 4,
-  },
-  insightText: {
-      fontSize: 14,
-      lineHeight: 20,
-  },
   analysisCard: {
       borderRadius: 16,
       padding: 16,
@@ -511,23 +579,77 @@ const styles = StyleSheet.create({
       height: 10,
       borderRadius: 5,
   },
-  modeSwitchContainer: {
+  
+  // AI CONTROLS
+  aiControlsHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: 20,
-      paddingVertical: 10,
+      paddingVertical: 8,
       borderBottomWidth: 1,
   },
-  modeLabel: {
-      color: '#888',
-      fontSize: 14,
+  permToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      gap: 6,
+  },
+  permText: {
+      fontSize: 12,
       fontWeight: '600',
   },
-  modeSub: {
-      color: '#666',
-      fontSize: 12,
+  modeSwitchWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
   },
+  modeLabelMini: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#888',
+  },
+  permissionsPanel: {
+      padding: 16,
+      borderBottomWidth: 1,
+  },
+  permTitle: {
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 1,
+      marginBottom: 12,
+  },
+  permRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 12,
+  },
+  chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 20,
+      gap: 6,
+  },
+  chipText: {
+      fontSize: 11,
+      fontWeight: '600',
+  },
+  infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+  },
+  infoText: {
+      fontSize: 11,
+      fontStyle: 'italic',
+  },
+
+  // CHAT
   chatScroll: {
       flex: 1,
       paddingHorizontal: 20,
@@ -536,7 +658,7 @@ const styles = StyleSheet.create({
   messageBubble: {
       padding: 12,
       borderRadius: 16,
-      maxWidth: '80%',
+      maxWidth: '85%',
       marginBottom: 12,
   },
   userBubble: {
@@ -548,23 +670,12 @@ const styles = StyleSheet.create({
       alignSelf: 'flex-start',
       borderBottomLeftRadius: 4,
   },
-  messageText: {
-      fontSize: 15,
-      lineHeight: 22,
-  },
   inputArea: {
       padding: 16,
       borderTopWidth: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-  },
-  voiceBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
   },
   textInput: {
       flex: 1,
