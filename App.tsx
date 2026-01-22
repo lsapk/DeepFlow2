@@ -17,10 +17,12 @@ import Journal from './pages/Journal';
 import ReflectionPage from './pages/Reflection';
 import CalendarPage from './pages/CalendarPage';
 import Auth from './pages/Auth';
+import Onboarding from './pages/Onboarding';
 import SkeletonDashboard from './components/SkeletonDashboard';
 import { supabase } from './services/supabase';
 import { Trophy, Bell } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configuration Notifications
 Notifications.setNotificationHandler({
@@ -115,16 +117,38 @@ const App: React.FC = () => {
 
   // --- INITIALIZATION ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchData(session.user.id);
-        setupRealtimeSubscription(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
+    checkOnboarding();
+  }, []);
 
+  const checkOnboarding = async () => {
+      const hasOnboarded = await AsyncStorage.getItem('has_onboarded');
+      if (!hasOnboarded) {
+          setCurrentView(ViewState.ONBOARDING);
+          setLoading(false);
+      } else {
+          initAuth();
+      }
+  };
+
+  const finishOnboarding = async () => {
+      await AsyncStorage.setItem('has_onboarded', 'true');
+      initAuth();
+  };
+
+  const initAuth = () => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        if (session) {
+          fetchData(session.user.id);
+          setupRealtimeSubscription(session.user.id);
+        } else {
+          setCurrentView(ViewState.AUTH);
+          setLoading(false);
+        }
+      });
+  };
+
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
@@ -370,6 +394,8 @@ const App: React.FC = () => {
         </View>
     );
 
+    if (currentView === ViewState.ONBOARDING) return <Onboarding onFinish={finishOnboarding} />;
+
     if (!session || !user || !player) return <Auth onLogin={() => fetchData(session?.user?.id)} />;
 
     const commonProps = { isDarkMode };
@@ -464,6 +490,7 @@ const App: React.FC = () => {
   };
 
   const isFocusMode = currentView === ViewState.FOCUS_MODE;
+  const isOnboarding = currentView === ViewState.ONBOARDING;
   const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
 
   return (
@@ -474,16 +501,18 @@ const App: React.FC = () => {
             <View style={{ flex: 1 }}>
                 {renderView()}
                 
-                <Sidebar 
-                    visible={sidebarVisible} 
-                    onClose={() => setSidebarVisible(false)}
-                    user={user}
-                    setView={setCurrentView}
-                    currentView={currentView}
-                    onLogout={handleLogout}
-                />
+                {!isOnboarding && (
+                    <Sidebar 
+                        visible={sidebarVisible} 
+                        onClose={() => setSidebarVisible(false)}
+                        user={user}
+                        setView={setCurrentView}
+                        currentView={currentView}
+                        onLogout={handleLogout}
+                    />
+                )}
 
-                {user && player && (
+                {!isOnboarding && user && player && (
                     <Profile 
                         visible={profileVisible} 
                         onClose={() => { setProfileVisible(false); fetchSettings(user.id); }} 
@@ -491,7 +520,7 @@ const App: React.FC = () => {
                     />
                 )}
 
-                {session && user && !isFocusMode && (
+                {!isOnboarding && session && user && !isFocusMode && (
                     <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
                 )}
 

@@ -170,6 +170,7 @@ export interface CalendarEvent {
 
 export enum ViewState {
   AUTH = 'AUTH',
+  ONBOARDING = 'ONBOARDING', // New State
   TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
   GROWTH = 'GROWTH',    // AI + Stats (Evolution)
   CYBER_KNIGHT = 'CYBER_KNIGHT',  // Gamification hub

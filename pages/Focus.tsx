@@ -6,6 +6,7 @@ import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';
 import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeepAwake } from 'expo-keep-awake';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.70, 280); 
@@ -22,6 +23,8 @@ interface FocusProps {
 
 const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, openMenu }) => {
   const insets = useSafeAreaInsets();
+  useKeepAwake(); // Prevents screen from sleeping
+
   const [viewMode, setViewMode] = useState<'CONFIG' | 'RUNNING' | 'HISTORY' | 'MANUAL'>('CONFIG');
   
   // Timer State
