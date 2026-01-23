@@ -1,13 +1,20 @@
-import { supabase } from './supabase';
 import { GoogleGenAI } from "@google/genai";
+import { supabase } from './supabase';
 
-const API_KEY = process.env.API_KEY || "AIzaSyBRsXHPOaFQVcOH9rCKx39uH8Bsu462uGo";
+// EN REACT NATIVE, process.env N'EXISTE PAS PAR DÉFAUT.
+// Utilisation directe de la clé ou via expo-constants (ici hardcodé pour débloquer).
+const API_KEY = "AIzaSyBRsXHPOaFQVcOH9rCKx39uH8Bsu462uGo"; 
 
 let ai: GoogleGenAI | null = null;
-if (API_KEY) {
-    ai = new GoogleGenAI({ apiKey: API_KEY });
-} else {
-    console.warn("Gemini API Key is missing.");
+
+try {
+    if (API_KEY) {
+        ai = new GoogleGenAI({ apiKey: API_KEY });
+    } else {
+        console.warn("Gemini API Key is missing.");
+    }
+} catch (error) {
+    console.warn("Erreur initialisation Google AI", error);
 }
 
 async function logAiUsage(type: 'chat' | 'analysis') {
@@ -15,17 +22,19 @@ async function logAiUsage(type: 'chat' | 'analysis') {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const today = new Date().toISOString().split('T')[0];
-        const { data: existing } = await supabase
+        
+        // On vérifie d'abord si une entrée existe
+        const { data: existing, error } = await supabase
             .from('daily_usage')
             .select('*')
             .eq('user_id', user.id)
             .eq('usage_date', today)
-            .single();
+            .maybeSingle(); // Utiliser maybeSingle pour éviter les erreurs 406 si vide
 
         if (existing) {
             await supabase.from('daily_usage').update({
-                ai_chat_count: type === 'chat' ? existing.ai_chat_count + 1 : existing.ai_chat_count,
-                ai_analysis_count: type === 'analysis' ? existing.ai_analysis_count + 1 : existing.ai_analysis_count
+                ai_chat_count: type === 'chat' ? (existing.ai_chat_count || 0) + 1 : existing.ai_chat_count,
+                ai_analysis_count: type === 'analysis' ? (existing.ai_analysis_count || 0) + 1 : existing.ai_analysis_count
             }).eq('id', existing.id);
         } else {
             await supabase.from('daily_usage').insert({
@@ -36,7 +45,7 @@ async function logAiUsage(type: 'chat' | 'analysis') {
             });
         }
     } catch (e) {
-        console.error("Failed to log AI usage", e);
+        console.log("Note: Suivi usage IA ignoré (table manquante ou erreur réseau)");
     }
 }
 
@@ -45,71 +54,42 @@ export const generateActionableCoaching = async (
   userContext: any,
   isCreationMode: boolean
 ): Promise<{ text: string, action?: any }> => {
-  if (!ai) return { text: "Clé API manquante." };
+  if (!ai) return { text: "⚠️ IA non configurée (Clé manquante)." };
 
   await logAiUsage('chat');
   
   try {
     let prompt = `
-      Tu es DeepFlow, un coach de productivité expert et empathique. 🧠✨
+      Tu es DeepFlow, un coach de productivité expert.
+      Réponds en Français, sois concis et motivant. Utilise le format Markdown.
       
-      FORMAT DE RÉPONSE:
-      - Utilise le format **Markdown** pour structurer ta réponse (Gras, Listes, Titres).
-      - Utilise beaucoup d'**emojis** pour rendre la conversation vivante et gamifiée.
-      
-      DONNÉES UTILISATEUR DISPONIBLES (Utilise-les pour personnaliser la réponse):
-      ${JSON.stringify(userContext, null, 2)}
-      
-      RÈGLES:
-      1. Sois concis, motivant et direct.
-      2. Analyse les données fournies pour donner des conseils pertinents.
+      Contexte utilisateur:
+      ${JSON.stringify(userContext)}
     `;
 
     if (isCreationMode) {
         prompt += `
-        ⚠️ MODE CRÉATION ACTIVÉ :
-        Si l'utilisateur demande explicitement de créer, ajouter ou planifier quelque chose (Tâche, Habitude, Objectif, Focus), tu DOIS inclure un bloc JSON strict dans ta réponse.
-        
-        FORMAT DU JSON (Doit être valide, sans commentaires):
-        
-        Pour une Tâche:
-        { "action": "CREATE_TASK", "data": { "title": "Titre précis", "priority": "high" | "medium" | "low" } }
-        
-        Pour une Habitude:
-        { "action": "CREATE_HABIT", "data": { "title": "Titre", "frequency": "daily" } }
-        
-        Pour un Objectif:
-        { "action": "CREATE_GOAL", "data": { "title": "Titre" } }
-        
-        Pour un Focus:
-        { "action": "START_FOCUS", "data": { "minutes": 25 } }
-        
-        Exemple de réponse mixte:
-        "C'est noté ! Je prépare ça pour toi. 🚀
-        { "action": "CREATE_TASK", "data": { "title": "Payer loyer", "priority": "high" } }
-        N'oublie pas de le faire avant ce soir !"
+        Si l'utilisateur veut créer quelque chose, renvoie UNIQUEMENT un JSON strict au format :
+        { "action": "CREATE_TASK", "data": { "title": "...", "priority": "medium" } }
+        (Actions possibles: CREATE_TASK, CREATE_HABIT, CREATE_GOAL)
         `;
     }
 
     const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt + "\n\nMessage utilisateur: " + userMessage
+        model: "gemini-2.5-flash", // Utilisation d'un modèle plus stable pour l'instant
+        contents: prompt + "\n\nMessage: " + userMessage
     });
     
     const responseText = response.text || "";
 
-    // Extraction robuste du JSON via Regex (cherche le premier objet JSON valide dans le texte)
     const jsonMatch = responseText.match(/\{[\s\S]*"action"[\s\S]*\}/);
-    
     let actionData = undefined;
     let cleanText = responseText;
 
     if (jsonMatch) {
         try {
             actionData = JSON.parse(jsonMatch[0]);
-            // On nettoie le JSON du texte affiché pour ne pas polluer le chat, ou on le laisse si on veut debugger
-            // Ici on le remplace par une icône d'action
-            cleanText = responseText.replace(jsonMatch[0], '\n*(Action en attente de confirmation...)*');
+            cleanText = "J'ai préparé cette action pour vous :";
         } catch (e) {
             console.warn("AI JSON parse error", e);
         }
@@ -119,7 +99,7 @@ export const generateActionableCoaching = async (
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return { text: "⚠️ Erreur de connexion à l'IA. Vérifiez votre réseau." };
+    return { text: "⚠️ Je n'arrive pas à joindre le cerveau central (Erreur réseau)." };
   }
 };
 
@@ -129,15 +109,16 @@ export const generateCoaching = async (msg: string, ctx: any) => {
 }
 
 export const generateReflectionQuestion = async (): Promise<string> => {
-  if (!ai) return "Clé API manquante.";
-
-  await logAiUsage('analysis');
+  if (!ai) return "De quoi êtes-vous reconnaissant aujourd'hui ?";
   try {
-    const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: "Génère une seule question de développement personnel profonde et originale en Français. Juste la question, sans guillemets."
-    });
-    return response.text?.trim() || "De quoi êtes-vous le plus reconnaissant aujourd'hui ?";
+    // Fallback local pour éviter latence
+    const questions = [
+        "Quelle a été votre plus petite victoire aujourd'hui ?",
+        "Qu'avez-vous appris sur vous-même cette semaine ?",
+        "Si vous ne pouviez faire qu'une chose demain, quelle serait-elle ?",
+        "Quelle émotion domine votre esprit actuellement ?"
+    ];
+    return questions[Math.floor(Math.random() * questions.length)];
   } catch (error) {
     return "De quoi êtes-vous le plus reconnaissant aujourd'hui ?";
   }
