@@ -13,15 +13,18 @@ interface TasksProps {
   tasks: Task[];
   goals: Goal[];
   toggleTask: (id: string) => void;
-  addTask: (title: string, priority: Task['priority'], goalId?: string) => void;
+  addTask: (title: string, priority: Task['priority'], goalId?: string, dueDate?: string) => void;
   deleteTask: (id: string) => void;
+  createSubtask: (taskId: string, title: string) => void;
+  toggleSubtask: (subtaskId: string, taskId: string) => void;
+  deleteSubtask: (subtaskId: string, taskId: string) => void;
   userId: string;
   refreshTasks: () => void;
   openMenu?: () => void; 
   isDarkMode?: boolean;
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
+const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -45,7 +48,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   };
 
   const openCreateModal = () => {
-      playMenuClick();
+      // playMenuClick(); // Reduced for no-friction
       setFormTitle('');
       setFormDesc('');
       setFormPriority('medium');
@@ -56,25 +59,15 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 
   const handleAdd = async () => {
     if (formTitle.trim()) {
-      playSuccess();
-      const max = tasks.length > 0 ? Math.max(...tasks.map(x=>x.sort_order)) : 0;
-      await supabase.from('tasks').insert({
-          user_id: userId,
-          title: formTitle,
-          description: formDesc || null,
-          priority: formPriority,
-          completed: false,
-          sort_order: max + 1,
-          linked_goal_id: formGoalId || null,
-          due_date: formDate ? new Date(formDate).toISOString() : null
-      });
-      refreshTasks();
+      // Optimistic create via Prop
+      const dateIso = formDate ? new Date(formDate).toISOString() : undefined;
+      addTask(formTitle, formPriority, formGoalId || undefined, dateIso);
       setCreateModalVisible(false);
     }
   };
 
   const toggleExpand = (taskId: string) => {
-    playMenuClick();
+    // playMenuClick();
     const newSet = new Set(expandedTaskIds);
     if (newSet.has(taskId)) {
       newSet.delete(taskId);
@@ -85,12 +78,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   };
 
   const onTaskToggle = (id: string) => {
-      playSuccess();
+      // playSuccess(); // handled in App.tsx logic for consistency or remove for zero friction
       toggleTask(id);
   };
 
   const openEditModal = (task: Task) => {
-      playMenuClick();
       setSelectedTask(task);
       setFormTitle(task.title);
       setFormDesc(task.description || '');
@@ -102,7 +94,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 
   const handleUpdateTask = async () => {
       if (!selectedTask) return;
-      playSuccess();
+      // For updates, we can keep using direct supabase or pass up. Keeping direct for now as "creation" was the main issue.
       await supabase.from('tasks').update({ 
           title: formTitle,
           description: formDesc,
@@ -140,7 +132,17 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
             {activeTasks.map((task, index) => (
                 <Animated.View key={task.id} layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut}>
                     <SwipeableRow onSwipeRight={() => onTaskToggle(task.id)} onSwipeLeft={() => deleteTask(task.id)}>
-                        <TaskItem task={task} isExpanded={expandedTaskIds.has(task.id)} onToggle={() => onTaskToggle(task.id)} onToggleExpand={() => toggleExpand(task.id)} onLongPress={() => openEditModal(task)} userId={userId} refreshTasks={refreshTasks} colors={colors} />
+                        <TaskItem 
+                            task={task} 
+                            isExpanded={expandedTaskIds.has(task.id)} 
+                            onToggle={() => onTaskToggle(task.id)} 
+                            onToggleExpand={() => toggleExpand(task.id)} 
+                            onLongPress={() => openEditModal(task)} 
+                            colors={colors} 
+                            createSubtask={createSubtask}
+                            toggleSubtask={toggleSubtask}
+                            deleteSubtask={deleteSubtask}
+                        />
                     </SwipeableRow>
                     {index < activeTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
                 </Animated.View>
@@ -154,7 +156,17 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                     {completedTasks.map((task, index) => (
                         <Animated.View key={task.id} layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut}>
                              <SwipeableRow onSwipeLeft={() => deleteTask(task.id)}>
-                                <TaskItem task={task} isExpanded={expandedTaskIds.has(task.id)} onToggle={() => onTaskToggle(task.id)} onToggleExpand={() => toggleExpand(task.id)} onLongPress={() => openEditModal(task)} userId={userId} refreshTasks={refreshTasks} colors={colors} />
+                                <TaskItem 
+                                    task={task} 
+                                    isExpanded={expandedTaskIds.has(task.id)} 
+                                    onToggle={() => onTaskToggle(task.id)} 
+                                    onToggleExpand={() => toggleExpand(task.id)} 
+                                    onLongPress={() => openEditModal(task)} 
+                                    colors={colors} 
+                                    createSubtask={createSubtask}
+                                    toggleSubtask={toggleSubtask}
+                                    deleteSubtask={deleteSubtask}
+                                />
                              </SwipeableRow>
                             {index < completedTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
                         </Animated.View>
@@ -182,7 +194,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                     <Text style={styles.label}>PRIORITÉ</Text>
                     <View style={styles.priorityRow}>
                          {(['low', 'medium', 'high'] as const).map(p => (
-                             <TouchableOpacity key={p} style={[styles.priorityPill, {backgroundColor: isDarkMode ? '#333' : '#EEE'}, formPriority === p && {backgroundColor: colors.text}]} onPress={() => { playMenuClick(); setFormPriority(p); }}>
+                             <TouchableOpacity key={p} style={[styles.priorityPill, {backgroundColor: isDarkMode ? '#333' : '#EEE'}, formPriority === p && {backgroundColor: colors.text}]} onPress={() => { setFormPriority(p); }}>
                                  <Text style={{color: formPriority === p ? (isDarkMode ? '#000' : '#FFF') : colors.textSub, fontWeight: '600', textTransform: 'capitalize'}}>{p}</Text>
                              </TouchableOpacity>
                          ))}
@@ -233,16 +245,15 @@ interface TaskItemProps {
     onToggle: () => void;
     onToggleExpand: () => void;
     onLongPress: () => void;
-    userId: string;
-    refreshTasks: () => void;
     colors: any;
+    createSubtask: (taskId: string, title: string) => void;
+    toggleSubtask: (subtaskId: string, taskId: string) => void;
+    deleteSubtask: (subtaskId: string, taskId: string) => void;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshTasks, colors }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, colors, createSubtask, toggleSubtask, deleteSubtask }) => {
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
-    const addSubtask = async () => { if (!newSubtaskTitle.trim()) return; await supabase.from('subtasks').insert({ parent_task_id: task.id, user_id: userId, title: newSubtaskTitle, completed: false, sort_order: task.subtasks ? task.subtasks.length : 0 }); setNewSubtaskTitle(''); refreshTasks(); };
-    const toggleSubtask = async (sub: Subtask) => { playMenuClick(); await supabase.from('subtasks').update({ completed: !sub.completed }).eq('id', sub.id); refreshTasks(); };
-    const deleteSubtask = async (id: string) => { await supabase.from('subtasks').delete().eq('id', id); refreshTasks(); };
+    const handleAddSub = () => { if (!newSubtaskTitle.trim()) return; createSubtask(task.id, newSubtaskTitle); setNewSubtaskTitle(''); };
 
     return (
         <View style={{backgroundColor: colors.cardBg}}>
@@ -262,14 +273,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                     {task.description && <Text style={[styles.taskDescPreview, {color: colors.textSub}]}>{task.description}</Text>}
                     {task.subtasks?.map(sub => (
                         <View key={sub.id} style={[styles.subtaskRow, {borderBottomColor: colors.border}]}>
-                            <TouchableOpacity onPress={() => toggleSubtask(sub)} style={[styles.subCheck, {borderColor: colors.textSub}]}>{sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}</TouchableOpacity>
+                            <TouchableOpacity onPress={() => toggleSubtask(sub.id, task.id)} style={[styles.subCheck, {borderColor: colors.textSub}]}>{sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}</TouchableOpacity>
                             <Text style={[styles.subtaskText, {color: colors.text}, sub.completed && styles.subtaskTextDone]}>{sub.title}</Text>
-                            <TouchableOpacity onPress={() => deleteSubtask(sub.id)}><X size={14} color={colors.textSub} /></TouchableOpacity>
+                            <TouchableOpacity onPress={() => deleteSubtask(sub.id, task.id)}><X size={14} color={colors.textSub} /></TouchableOpacity>
                         </View>
                     ))}
                     <View style={styles.addSubtaskRow}>
-                        <TextInput style={[styles.subInput, {color: colors.text}]} placeholder="Ajouter sous-tâche..." placeholderTextColor={colors.textSub} value={newSubtaskTitle} onChangeText={setNewSubtaskTitle} onSubmitEditing={addSubtask} />
-                        <TouchableOpacity onPress={addSubtask}><Plus size={20} color={colors.accent} /></TouchableOpacity>
+                        <TextInput style={[styles.subInput, {color: colors.text}]} placeholder="Ajouter sous-tâche..." placeholderTextColor={colors.textSub} value={newSubtaskTitle} onChangeText={setNewSubtaskTitle} onSubmitEditing={handleAddSub} />
+                        <TouchableOpacity onPress={handleAddSub}><Plus size={20} color={colors.accent} /></TouchableOpacity>
                     </View>
                 </View>
             )}

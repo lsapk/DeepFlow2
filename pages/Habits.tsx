@@ -10,6 +10,9 @@ interface HabitsProps {
   goals: Goal[];
   incrementHabit: (id: string) => void;
   userId: string;
+  createHabit: (habit: Partial<Habit>) => void;
+  archiveHabit: (habit: Habit) => void;
+  deleteHabit: (id: string) => void;
   refreshHabits: () => void;
   openMenu?: () => void;
   isDarkMode?: boolean;
@@ -17,7 +20,7 @@ interface HabitsProps {
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']; // Dimanche to Samedi
 
-const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, refreshHabits, openMenu, isDarkMode = true }) => {
+const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, createHabit, archiveHabit, deleteHabit, refreshHabits, openMenu, isDarkMode = true }) => {
   const [showArchived, setShowArchived] = useState(false);
   const [showAllDays, setShowAllDays] = useState(false); 
   const [modalVisible, setModalVisible] = useState(false);
@@ -56,7 +59,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   };
 
   const openEditModal = (habit: Habit) => {
-      Haptics.selectionAsync();
+      // Haptics.selectionAsync(); // Removed to reduce friction feeling
       setEditingHabit(habit);
       setTitle(habit.title);
       setDescription(habit.description || '');
@@ -79,54 +82,45 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const handleSave = async () => {
       if (!title.trim()) return;
 
-      const maxOrder = habits.length > 0 ? Math.max(...habits.map(h => h.sort_order || 0)) : 0;
-
       const habitData = {
-          user_id: userId,
           title,
           description,
           category,
           frequency,
           target: parseInt(target) || 1,
-          updated_at: new Date().toISOString(),
           days_of_week: selectedDays.length === 0 ? null : selectedDays,
           linked_goal_id: linkedGoalId
       };
 
-      if (editingHabit) {
-          await supabase.from('habits').update(habitData).eq('id', editingHabit.id);
-      } else {
-          await supabase.from('habits').insert({
-              ...habitData,
-              streak: 0,
-              is_archived: false,
-              sort_order: maxOrder + 1 
-          });
-      }
+      setModalVisible(false); // Close immediately for speed
 
-      setModalVisible(false);
-      refreshHabits();
+      if (editingHabit) {
+          // Edit logic (still needs direct supabase or passed function, kept for now)
+          await supabase.from('habits').update(habitData).eq('id', editingHabit.id);
+          refreshHabits();
+      } else {
+          // Create logic - uses Optimistic Update from App.tsx
+          createHabit(habitData);
+      }
   };
 
   const handleArchive = async (habit: Habit) => {
-      await supabase.from('habits').update({ is_archived: !habit.is_archived }).eq('id', habit.id);
       setModalVisible(false);
-      refreshHabits();
+      archiveHabit(habit);
   };
 
   const handleDelete = async (id: string) => {
       Alert.alert("Supprimer", "Cette action est irréversible.", [
           { text: "Annuler", style: "cancel" },
           { text: "Supprimer", style: "destructive", onPress: async () => {
-              await supabase.from('habits').delete().eq('id', id);
               setModalVisible(false);
-              refreshHabits();
+              deleteHabit(id);
           }}
       ]);
   };
 
   const handleIncrement = (id: string) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Haptics removed/reduced for "no friction" feel
       incrementHabit(id);
   }
 
@@ -143,12 +137,13 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      {/* FIXED HEADER LAYOUT */}
       <View style={styles.header}>
          <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
               <Menu size={24} color={colors.accent} />
           </TouchableOpacity>
          
-         <View style={styles.headerTitleContainer} pointerEvents="none">
+         <View style={styles.centerTitle}>
              <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
              <Text style={[styles.subtitle, {color: colors.textSub}]}>{showAllDays ? 'Toutes' : 'Aujourd\'hui'}</Text>
          </View>
@@ -182,7 +177,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                     key={habit.id} 
                     style={[styles.card, {backgroundColor: colors.cardBg}, !isScheduledToday && {opacity: 0.5}]}
                     onLongPress={() => openEditModal(habit)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.9} // Higher opacity for faster feel
                 >
                     <View style={styles.cardHeader}>
                         <View style={styles.headerLeft}>
@@ -310,12 +305,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     height: 50,
   },
-  headerTitleContainer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
+  centerTitle: {
+      flex: 1,
       alignItems: 'center',
-      zIndex: -1,
+      justifyContent: 'center',
   },
   largeTitle: {
     fontSize: 22,
@@ -328,7 +321,6 @@ const styles = StyleSheet.create({
   headerButtons: {
       flexDirection: 'row',
       gap: 12,
-      zIndex: 10, // BUTTONS ON TOP
   },
   iconBtn: {
       width: 40,
@@ -336,7 +328,6 @@ const styles = StyleSheet.create({
       borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10, // BUTTONS ON TOP
   },
   addButton: {
     width: 40,
@@ -344,7 +335,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10, // BUTTONS ON TOP
   },
   scrollContent: {
     paddingHorizontal: 20,

@@ -16,13 +16,16 @@ interface GoalsProps {
   toggleGoal: (id: string) => void;
   addGoal: (title: string) => void;
   deleteGoal: (id: string) => void;
+  createSubObjective: (goalId: string, title: string) => void;
+  toggleSubObjective: (subId: string, goalId: string) => void;
+  deleteSubObjective: (subId: string, goalId: string) => void;
   userId: string;
   refreshGoals: () => void;
   openMenu?: () => void;
   isDarkMode?: boolean;
 }
 
-const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, userId, refreshGoals, openMenu, isDarkMode = true }) => {
+const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, createSubObjective, toggleSubObjective, deleteSubObjective, userId, refreshGoals, openMenu, isDarkMode = true }) => {
   const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   
@@ -143,9 +146,10 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                         onToggle={() => onToggleGoal(goal.id)} 
                         onToggleExpand={() => toggleExpand(goal.id)}
                         onLongPress={() => openEditModal(goal)}
-                        userId={userId}
-                        refreshGoals={refreshGoals}
                         colors={colors}
+                        createSubObjective={createSubObjective}
+                        toggleSubObjective={toggleSubObjective}
+                        deleteSubObjective={deleteSubObjective}
                     />
                     {index < activeGoals.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
                 </View>
@@ -168,9 +172,10 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, u
                             onToggle={() => onToggleGoal(goal.id)} 
                             onToggleExpand={() => toggleExpand(goal.id)}
                             onLongPress={() => openEditModal(goal)}
-                            userId={userId}
-                            refreshGoals={refreshGoals}
                             colors={colors}
+                            createSubObjective={createSubObjective}
+                            toggleSubObjective={toggleSubObjective}
+                            deleteSubObjective={deleteSubObjective}
                         />
                         {index < completedGoals.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
                     </View>
@@ -281,37 +286,20 @@ interface GoalItemProps {
     onToggle: () => void;
     onToggleExpand: () => void;
     onLongPress: () => void;
-    userId: string;
-    refreshGoals: () => void;
     colors: any;
+    createSubObjective: (goalId: string, title: string) => void;
+    toggleSubObjective: (subId: string, goalId: string) => void;
+    deleteSubObjective: (subId: string, goalId: string) => void;
 }
 
-const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggleExpand, onLongPress, userId, refreshGoals, colors }) => {
+const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggleExpand, onLongPress, colors, createSubObjective, toggleSubObjective, deleteSubObjective }) => {
     const [newSubGoalTitle, setNewSubGoalTitle] = useState('');
     
-    const addSubGoal = async () => {
+    const addSubGoal = () => {
         if (!newSubGoalTitle.trim()) return;
-        await supabase.from('subobjectives').insert({
-            parent_goal_id: goal.id,
-            user_id: userId,
-            title: newSubGoalTitle,
-            completed: false,
-            sort_order: goal.subobjectives ? goal.subobjectives.length : 0
-        });
+        createSubObjective(goal.id, newSubGoalTitle);
         setNewSubGoalTitle('');
-        refreshGoals();
     };
-
-    const toggleSubGoal = async (subObjective: SubObjective) => {
-        const newStatus = !subObjective.completed;
-        await supabase.from('subobjectives').update({ completed: newStatus }).eq('id', subObjective.id);
-        refreshGoals(); 
-    };
-
-    const deleteSubGoal = async (id: string) => {
-         await supabase.from('subobjectives').delete().eq('id', id);
-         refreshGoals();
-    }
 
     return (
         <View>
@@ -359,13 +347,13 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
 
                     {goal.subobjectives?.map(subObjective => (
                         <View key={subObjective.id} style={[styles.subtaskRow, { borderBottomColor: colors.border }]}>
-                            <TouchableOpacity onPress={() => toggleSubGoal(subObjective)} style={[styles.subtaskCheckbox, { borderColor: colors.textSub }]}>
+                            <TouchableOpacity onPress={() => toggleSubObjective(subObjective.id, goal.id)} style={[styles.subtaskCheckbox, { borderColor: colors.textSub }]}>
                                 {subObjective.completed && <View style={[styles.subtaskChecked, { backgroundColor: colors.text }]} />}
                             </TouchableOpacity>
                             <Text style={[styles.subtaskTitle, { color: colors.text }, subObjective.completed && styles.subtaskTitleCompleted]}>
                                 {subObjective.title}
                             </Text>
-                            <TouchableOpacity onPress={() => deleteSubGoal(subObjective.id)} style={{marginLeft: 'auto'}}>
+                            <TouchableOpacity onPress={() => deleteSubObjective(subObjective.id, goal.id)} style={{marginLeft: 'auto'}}>
                                 <X size={14} color={colors.textSub} />
                             </TouchableOpacity>
                         </View>

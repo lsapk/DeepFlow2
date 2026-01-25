@@ -49,6 +49,11 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }
       const now = new Date();
       // Format local simplified for input placeholder
       const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+      
+      // Auto Title like "20 janvier 2026"
+      const autoTitle = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      
+      setTitle(autoTitle);
       setDateInput(localIso);
       setModalVisible(true);
   };
@@ -67,30 +72,51 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }
           }
       }
 
-      const { error } = await supabase.from('journal_entries').insert({
+      // 1. CREATE OPTIMISTIC ENTRY
+      const tempId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString();
+      const newEntry: JournalEntry = {
+          id: tempId,
           user_id: userId,
           title,
           content,
           mood,
           tags: tagsArray,
           created_at: finalDate
-      });
+      };
 
-      if (!error) {
-          // XP Reward
+      // 2. UPDATE UI IMMEDIATELY
+      const previousEntries = [...entries];
+      setEntries([newEntry, ...entries]);
+      setModalVisible(false);
+      
+      // Reset Form
+      setTitle('');
+      setContent('');
+      setMood('neutral');
+      setTagsInput('');
+
+      // 3. SEND TO SUPABASE
+      const { data, error } = await supabase.from('journal_entries').insert({
+          user_id: userId,
+          title,
+          content,
+          mood,
+          tags: tagsArray,
+          created_at: finalDate
+      }).select().single();
+
+      if (error) {
+          // 4. REVERT ON ERROR
+          setEntries(previousEntries);
+          Alert.alert("Erreur", "Impossible de sauvegarder l'entrée. Vérifiez votre connexion.");
+      } else {
+          // 5. UPDATE ID WITH REAL ID (AND ADD XP)
+          setEntries(prev => prev.map(e => e.id === tempId ? data : e));
+          
           const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
           if (player) {
               await addXp(userId, REWARDS.JOURNAL, player);
           }
-
-          fetchEntries();
-          setModalVisible(false);
-          setTitle('');
-          setContent('');
-          setMood('neutral');
-          setTagsInput('');
-      } else {
-          Alert.alert("Erreur", "Impossible de sauvegarder l'entrée.");
       }
   };
 

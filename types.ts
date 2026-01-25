@@ -97,6 +97,7 @@ export interface Habit {
   last_completed_at: string | null;
   is_archived?: boolean; 
   sort_order?: number;
+  created_at: string;
   days_of_week?: number[] | null;
   linked_goal_id?: string | null;
 }
@@ -170,14 +171,19 @@ export interface CalendarEvent {
 
 export enum ViewState {
   AUTH = 'AUTH',
-  ONBOARDING = 'ONBOARDING', // New State
-  TODAY = 'TODAY',      // Dashboard + Tasks + Habits + Focus entry
-  GROWTH = 'GROWTH',    // AI + Stats (Evolution)
-  CYBER_KNIGHT = 'CYBER_KNIGHT',  // Gamification hub
-  FOCUS_MODE = 'FOCUS_MODE', // Full screen focus
+  ONBOARDING = 'ONBOARDING',
+  TODAY = 'TODAY',
+  PLANNING = 'PLANNING', // Nouveau : Calendrier + Objectifs
+  INTROSPECTION = 'INTROSPECTION', // Nouveau : Journal + Réflexion
+  EVOLUTION = 'EVOLUTION', // Nouveau : Growth + CyberKnight
+  FOCUS_MODE = 'FOCUS_MODE',
+  
+  // Vues internes (peuvent être accessibles via "Tout voir" ou autre, mais moins prioritaires dans la nav principale)
   TASKS = 'TASKS',
   HABITS = 'HABITS',
-  GOALS = 'GOALS',    // Added Goal view
+  GOALS = 'GOALS',    
+  GROWTH = 'GROWTH',
+  CYBER_KNIGHT = 'CYBER_KNIGHT',
   JOURNAL = 'JOURNAL',
   REFLECTION = 'REFLECTION',
   CALENDAR = 'CALENDAR'
