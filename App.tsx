@@ -24,6 +24,7 @@ import { Trophy } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { addXp, REWARDS } from './services/gamification';
 
 // Configuration Notifications
 Notifications.setNotificationHandler({
@@ -163,9 +164,23 @@ const App: React.FC = () => {
                   if (payload.eventType === 'DELETE') setGoals(prev => prev.filter(g => g.id !== payload.old.id));
               }
           )
+          // Ajout écoute habit_completions pour synchro parfaite avec le web
+          .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'habit_completions', filter: `user_id=eq.${userId}` },
+              () => {
+                  // Si une completion change (coché sur web), on recharge les habitudes pour avoir le bon last_completed_at et streak
+                  refreshHabits(userId);
+              }
+          )
           .subscribe();
 
       realtimeChannel.current = channel;
+  };
+
+  const refreshHabits = async (userId: string) => {
+      const { data } = await supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true });
+      if (data) setHabits(data);
   };
 
   // --- FETCHERS ---
@@ -242,40 +257,99 @@ const App: React.FC = () => {
   
   const toggleHabit = async (id: string) => {
      const habit = habits.find(h => h.id === id);
-     if(habit) {
-         const today = new Date();
-         const lastCompleted = habit.last_completed_at ? new Date(habit.last_completed_at) : null;
+     if(habit && user) {
+         const todayDate = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD strict
          
-         const isDoneToday = lastCompleted && 
-             lastCompleted.getDate() === today.getDate() &&
-             lastCompleted.getMonth() === today.getMonth() &&
-             lastCompleted.getFullYear() === today.getFullYear();
+         // Vérification si déjà fait aujourd'hui basée sur la date ISO
+         const lastCompletedDate = habit.last_completed_at ? habit.last_completed_at.split('T')[0] : null;
+         const isDoneToday = lastCompletedDate === todayDate;
 
-         if (isDoneToday) return; 
+         let newStreak = habit.streak || 0;
+         let newLastCompletedAt = habit.last_completed_at;
 
-         const newStreak = (habit.streak || 0) + 1;
-         const nowISO = new Date().toISOString();
+         if (isDoneToday) {
+             // ACTION: DÉCOCHER (UNDO)
+             newStreak = Math.max(0, newStreak - 1);
+             
+             // On met la date à hier pour simuler l'état "pas fait aujourd'hui" dans habits
+             // ou null si le streak retombe à 0 (optionnel)
+             const yesterday = new Date();
+             yesterday.setDate(yesterday.getDate() - 1);
+             newLastCompletedAt = yesterday.toISOString(); 
 
-         // Optimistic Update
-         setHabits(prev => prev.map(h => h.id === id ? {...h, streak: newStreak, last_completed_at: nowISO} : h));
-         
-         // DB Update
-         await supabase.from('habits').update({ 
-             streak: newStreak, 
-             last_completed_at: nowISO 
-         }).eq('id', id);
+             // 1. Optimistic Update Local
+             setHabits(prev => prev.map(h => h.id === id ? {...h, streak: newStreak, last_completed_at: newLastCompletedAt} : h));
+             
+             // 2. SUPABASE : Supprimer l'entrée dans habit_completions (CRITIQUE pour le Web)
+             await supabase.from('habit_completions')
+                .delete()
+                .eq('habit_id', id)
+                .eq('completed_date', todayDate);
+
+             // 3. SUPABASE : Mettre à jour la table habits
+             await supabase.from('habits').update({ 
+                 streak: newStreak, 
+                 last_completed_at: newLastCompletedAt 
+             }).eq('id', id);
+
+         } else {
+             // ACTION: COCHER (DONE)
+             newStreak = newStreak + 1;
+             newLastCompletedAt = new Date().toISOString();
+
+             // 1. Optimistic Update Local
+             setHabits(prev => prev.map(h => h.id === id ? {...h, streak: newStreak, last_completed_at: newLastCompletedAt} : h));
+             
+             // 2. SUPABASE : Insérer dans habit_completions (CRITIQUE pour le Web)
+             await supabase.from('habit_completions')
+                .insert({
+                    habit_id: id,
+                    user_id: user.id,
+                    completed_date: todayDate
+                });
+
+             // 3. SUPABASE : Mettre à jour habits
+             await supabase.from('habits').update({ 
+                 streak: newStreak, 
+                 last_completed_at: newLastCompletedAt 
+             }).eq('id', id);
+
+             // XP Reward
+             if(player) await addXp(user.id, REWARDS.HABIT, player);
+         }
      }
   };
   
   const toggleTask = async (id: string) => {
      const task = tasks.find(t => t.id === id);
-     if(task) {
+     if(task && user && player) {
          const newVal = !task.completed;
          // Optimistic
          setTasks(prev => prev.map(t => t.id === id ? {...t, completed: newVal} : t));
          // DB
          await supabase.from('tasks').update({ completed: newVal }).eq('id', id);
+         
+         // XP Reward if completing
+         if(newVal) {
+             const reward = task.priority === 'high' ? REWARDS.TASK_HIGH : (task.priority === 'medium' ? REWARDS.TASK_MEDIUM : REWARDS.TASK_LOW);
+             await addXp(user.id, reward, player);
+         }
      }
+  };
+
+  const deleteTask = async (id: string) => {
+      // Optimistic Update
+      setTasks(prev => prev.filter(t => t.id !== id));
+      
+      // DB: IMPORTANT - Supprimer les sous-tâches d'abord pour éviter l'erreur de contrainte Foreign Key
+      await supabase.from('subtasks').delete().eq('parent_task_id', id);
+      // Ensuite supprimer la tâche
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      
+      if(error) {
+          console.error("Delete task error", error);
+          // Revert optimistic if needed (optionnel)
+      }
   };
   
   const toggleGoal = async (id: string) => {
@@ -286,7 +360,18 @@ const App: React.FC = () => {
           setGoals(prev => prev.map(g => g.id === id ? {...g, completed: newVal} : g));
           // DB
           await supabase.from('goals').update({ completed: newVal }).eq('id', id);
+          
+          if(newVal && user && player) {
+              await addXp(user.id, REWARDS.GOAL, player);
+          }
       }
+  };
+
+  const deleteGoal = async (id: string) => {
+      setGoals(prev => prev.filter(g => g.id !== id));
+      // Delete subobjectives first
+      await supabase.from('subobjectives').delete().eq('parent_goal_id', id);
+      await supabase.from('goals').delete().eq('id', id);
   };
 
   const renderView = () => {
@@ -305,11 +390,11 @@ const App: React.FC = () => {
       case ViewState.TODAY:
         return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} {...commonProps} />;
       case ViewState.TASKS: 
-          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={aiAddTask} deleteTask={async(id)=>{}} userId={user.id} refreshTasks={()=>{}} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
+          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={aiAddTask} deleteTask={deleteTask} userId={user.id} refreshTasks={()=>{}} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       case ViewState.HABITS: 
           return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} refreshHabits={()=>{}} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       case ViewState.GOALS:
-          return <Goals goals={goals} toggleGoal={toggleGoal} addGoal={aiAddGoal} deleteGoal={async()=>{}} userId={user.id} refreshGoals={()=>{}} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
+          return <Goals goals={goals} toggleGoal={toggleGoal} addGoal={aiAddGoal} deleteGoal={deleteGoal} userId={user.id} refreshGoals={()=>{}} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
       case ViewState.GROWTH:
         return <Growth player={player} user={user} tasks={tasks} habits={habits} goals={goals} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} onAddTask={aiAddTask} onAddHabit={aiAddHabit} onAddGoal={aiAddGoal} onStartFocus={aiStartFocus} {...commonProps} />;
       case ViewState.CYBER_KNIGHT:
