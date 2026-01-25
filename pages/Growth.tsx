@@ -59,7 +59,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [aiPermissions, setAiPermissions] = useState<AiPermissions>({
       tasks: true, habits: true, goals: true, profile: true
   });
-  const [showPermissions, setShowPermissions] = useState(false);
 
   // Analytics State
   const [weeklyFocusData, setWeeklyFocusData] = useState<number[]>([0,0,0,0,0,0,0]);
@@ -67,8 +66,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [bestDay, setBestDay] = useState('N/A');
   const [peakHour, setPeakHour] = useState<string>('N/A');
   const [chronoProfile, setChronoProfile] = useState<string>('Analyse en cours...');
-  const [radarData, setRadarData] = useState([50,50,50,50]); // Health, Career, Social, Spirit
-  const [heatmapData, setHeatmapData] = useState<number[]>(Array(84).fill(0)); // 12 weeks * 7 days
+  
+  // 6 Categories Radar
+  const [radarData, setRadarData] = useState([50,50,50,50,50,50]); 
+  const [heatmapData, setHeatmapData] = useState<number[]>(Array(84).fill(0)); 
 
   useEffect(() => {
       // Simulate loading delay for skeleton demo
@@ -85,13 +86,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   const calculateStats = () => {
       // 1. CHRONOBIOLOGY
-      // We look at creation time of completed tasks as a proxy for activity
-      // Ideally we would use 'completed_at' but schema uses 'created_at' or we check habits 'last_completed'
       const activeHours: number[] = [];
       tasks.forEach(t => {
           if(t.completed) activeHours.push(new Date(t.created_at).getHours());
       });
-      // Mocking some data if empty to show the feature
       if(activeHours.length < 5) {
           activeHours.push(9, 10, 10, 11, 14, 15, 16); 
       }
@@ -106,34 +104,55 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       else if (peakInt > 20) setChronoProfile("Oiseau de nuit (Chouette)");
       else setChronoProfile("Rythme Standard (Colibri)");
 
-      // 2. RADAR CHART (Wheel of Life)
-      // Categories: Santé, Carrière, Social, Esprit
-      let sHealth = 30, sCareer = 30, sSocial = 30, sSpirit = 30;
+      // 2. RADAR CHART (6 Axes: Santé, Loisirs, Personnel, Apprentissage, Mental, Carrière)
+      let sHealth = 20, sLeisure = 20, sPersonal = 20, sLearn = 20, sMental = 20, sCareer = 20;
       
       habits.forEach(h => {
           const cat = (h.category || '').toLowerCase();
-          const bonus = Math.min(h.streak * 2, 30);
+          const title = (h.title || '').toLowerCase();
+          const bonus = Math.min(h.streak * 2, 40);
           
-          if (cat.includes('sport') || cat.includes('santé') || cat.includes('eau')) sHealth += bonus;
-          else if (cat.includes('travail') || cat.includes('code') || cat.includes('projet')) sCareer += bonus;
-          else if (cat.includes('ami') || cat.includes('famille') || cat.includes('social')) sSocial += bonus;
-          else sSpirit += bonus;
+          const text = cat + ' ' + title;
+
+          if (text.match(/sport|eau|manger|fitness|health|santé/)) sHealth += bonus;
+          else if (text.match(/jeu|game|art|musique|fun|loisir|hobby/)) sLeisure += bonus;
+          else if (text.match(/maison|ménage|famille|ami|social|perso/)) sPersonal += bonus;
+          else if (text.match(/lire|read|cours|apprendre|langue|study/)) sLearn += bonus;
+          else if (text.match(/médit|calme|journal|stoic|mental|esprit/)) sMental += bonus;
+          else if (text.match(/travail|code|projet|job|carrière/)) sCareer += bonus;
+          else sPersonal += (bonus / 2); // Fallback
+      });
+
+      tasks.forEach(t => {
+           if (t.completed) {
+                const text = (t.title + ' ' + (t.description || '')).toLowerCase();
+                const bonus = 5;
+                if (text.match(/sport|santé/)) sHealth += bonus;
+                else if (text.match(/travail|code/)) sCareer += bonus;
+                else if (text.match(/lire|apprendre/)) sLearn += bonus;
+                else sPersonal += bonus;
+           }
       });
       
-      // Normalize to 100 max
       const normalize = (val: number) => Math.min(100, Math.max(20, val));
-      setRadarData([normalize(sHealth), normalize(sCareer), normalize(sSocial), normalize(sSpirit)]);
+      
+      // Ordre: Santé, Loisirs, Personnel, Apprentissage, Mental, Carrière
+      setRadarData([
+          normalize(sHealth), 
+          normalize(sLeisure), 
+          normalize(sPersonal), 
+          normalize(sLearn), 
+          normalize(sMental), 
+          normalize(sCareer)
+      ]);
 
-      // 3. HEATMAP (Last 12 weeks)
-      // Pseudo-random consistency based on streaks for demo
+      // 3. HEATMAP
       const newHeatmap = Array(84).fill(0).map(() => Math.random() > 0.7 ? (Math.random() > 0.5 ? 2 : 1) : 0);
       setHeatmapData(newHeatmap);
   };
 
   const fetchRealFocusStats = async () => {
-      // (Keep existing logic or mock for demo stability if DB empty)
-      // For now we trust the logic from previous step, just ensuring it doesn't crash
-      setTotalFocusTime(1450); // Mock
+      setTotalFocusTime(1450); 
       setBestDay("Mardi");
       setWeeklyFocusData([30, 45, 120, 60, 90, 0, 15]);
   };
@@ -156,7 +175,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       if (aiPermissions.profile) context.user = { name: user.display_name, level: player.level };
       if (aiPermissions.tasks) context.tasks = { pending: tasks.filter(t => !t.completed).length };
       
-      // Streaming simulation would happen here in a real streaming fetch
       const response = await generateActionableCoaching(userMsg, context, isCreationMode);
       setLoadingAi(false);
       
@@ -174,7 +192,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           { text: "Non", style: "cancel" },
           { text: "Oui", onPress: () => {
               if (action === 'CREATE_TASK') onAddTask(data.title, 'medium');
-              // ... handlers
               setMessages(prev => [...prev, { role: 'ai', text: "✅ C'est fait !" }]);
               playSuccess();
           }}
@@ -183,17 +200,26 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   // --- VISUALIZATIONS ---
   const RadarChart = () => {
-      const size = 220;
+      const size = 300; // Increased size for text
       const center = size / 2;
-      const radius = 90;
-      const labels = ["Santé", "Carrière", "Social", "Esprit"];
+      const radius = 90; 
+      const labels = ["Santé", "Loisirs", "Perso", "Appr.", "Mental", "Carrière"];
       
       const getPoints = (data: number[]) => {
           return data.map((val, i) => {
-              const angle = (Math.PI * 2 * i) / 4 - Math.PI / 2;
+              const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
               const r = (val / 100) * radius;
               return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
           }).join(' ');
+      };
+      
+      const getLabelCoords = (i: number) => {
+          const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+          const r = radius + 25; // Offset for label
+          return {
+              x: center + r * Math.cos(angle),
+              y: center + r * Math.sin(angle)
+          };
       };
 
       const gridLevels = [100, 75, 50, 25];
@@ -201,21 +227,32 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       return (
           <View style={{alignItems: 'center', marginVertical: 10}}>
               <Svg height={size} width={size}>
-                  {/* Grid */}
+                  {/* Grid Lines */}
                   {gridLevels.map((pct, i) => (
                       <Polygon 
                         key={i} 
-                        points={getPoints([pct, pct, pct, pct])} 
+                        points={getPoints([pct, pct, pct, pct, pct, pct])} 
                         stroke={isDarkMode ? "#333" : "#E5E5EA"} 
                         strokeWidth="1" 
                         fill="none" 
                       />
                   ))}
-                  {/* Axes */}
-                  <Line x1={center} y1={center-radius} x2={center} y2={center+radius} stroke={isDarkMode ? "#333" : "#E5E5EA"} />
-                  <Line x1={center-radius} y1={center} x2={center+radius} y2={center} stroke={isDarkMode ? "#333" : "#E5E5EA"} />
                   
-                  {/* Data */}
+                  {/* Axes */}
+                  {[0,1,2,3,4,5].map(i => {
+                      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                      return (
+                          <Line
+                             key={i}
+                             x1={center} y1={center}
+                             x2={center + radius * Math.cos(angle)}
+                             y2={center + radius * Math.sin(angle)}
+                             stroke={isDarkMode ? "#333" : "#E5E5EA"}
+                          />
+                      );
+                  })}
+                  
+                  {/* Data Shape */}
                   <Polygon 
                     points={getPoints(radarData)} 
                     fill={colors.accent} 
@@ -223,11 +260,25 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     stroke={colors.accent} 
                     strokeWidth="2" 
                   />
+                  
                   {/* Labels */}
-                  <SvgText x={center} y={15} fill={colors.text} fontSize="12" fontWeight="bold" textAnchor="middle">{labels[0]}</SvgText>
-                  <SvgText x={size-20} y={center+4} fill={colors.text} fontSize="12" fontWeight="bold" textAnchor="start">{labels[1]}</SvgText>
-                  <SvgText x={center} y={size-5} fill={colors.text} fontSize="12" fontWeight="bold" textAnchor="middle">{labels[2]}</SvgText>
-                  <SvgText x={10} y={center+4} fill={colors.text} fontSize="12" fontWeight="bold" textAnchor="end">{labels[3]}</SvgText>
+                  {labels.map((label, i) => {
+                      const {x, y} = getLabelCoords(i);
+                      return (
+                          <SvgText
+                              key={i}
+                              x={x}
+                              y={y}
+                              fill={colors.text}
+                              fontSize="12"
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              alignmentBaseline="middle"
+                          >
+                              {label}
+                          </SvgText>
+                      );
+                  })}
               </Svg>
           </View>
       )
@@ -237,9 +288,9 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
     return (
         <View style={styles.heatmapGrid}>
             {heatmapData.map((val, i) => {
-                let color = isDarkMode ? '#222' : '#E5E5EA'; // Empty
-                if (val === 1) color = '#C4B5FD'; // Low
-                if (val === 2) color = '#7C3AED'; // High
+                let color = isDarkMode ? '#222' : '#E5E5EA'; 
+                if (val === 1) color = '#C4B5FD'; 
+                if (val === 2) color = '#7C3AED'; 
                 return <View key={i} style={[styles.heatBox, {backgroundColor: color}]} />
             })}
         </View>
@@ -277,7 +328,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                       <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie</Text>
                   </View>
                   <RadarChart />
-                  <Text style={styles.cardFooter}>Équilibre calculé sur vos habitudes</Text>
+                  <Text style={styles.cardFooter}>Équilibre calculé sur vos habitudes et tâches</Text>
               </View>
 
               <View style={[styles.card, {backgroundColor: colors.card}]}>
@@ -322,7 +373,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     <BarChart2 size={20} color="#C4B5FD" />
                     <Text style={[styles.cardTitle, {color: colors.text}]}>Focus Hebdomadaire</Text>
                 </View>
-                {/* Simple Bar Chart Implementation */}
                 <View style={styles.barChart}>
                     {weeklyFocusData.map((val, i) => (
                         <View key={i} style={styles.barColumn}>

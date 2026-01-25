@@ -126,7 +126,6 @@ const App: React.FC = () => {
   }, []);
 
   // --- FETCHERS ---
-  // Simplifié pour éviter les erreurs en cascade
   const fetchData = async (userId: string) => {
     setLoading(true);
     try {
@@ -194,12 +193,35 @@ const App: React.FC = () => {
   const aiStartFocus = (minutes: number) => setCurrentView(ViewState.FOCUS_MODE);
   
   const toggleHabit = async (id: string) => {
-     // Optimistic update logic simplified
      const habit = habits.find(h => h.id === id);
      if(habit) {
-         const newStreak = habit.streak + 1;
-         setHabits(prev => prev.map(h => h.id === id ? {...h, streak: newStreak, last_completed_at: new Date().toISOString()} : h));
-         await supabase.from('habits').update({ streak: newStreak, last_completed_at: new Date().toISOString() }).eq('id', id);
+         // Vérifier si déjà complété aujourd'hui (Local Time)
+         const today = new Date();
+         const lastCompleted = habit.last_completed_at ? new Date(habit.last_completed_at) : null;
+         
+         const isDoneToday = lastCompleted && 
+             lastCompleted.getDate() === today.getDate() &&
+             lastCompleted.getMonth() === today.getMonth() &&
+             lastCompleted.getFullYear() === today.getFullYear();
+
+         if (isDoneToday) {
+             // Si déjà fait, on ne fait rien pour l'instant (éviter le spam de clic), 
+             // ou on pourrait implémenter le "undo" si besoin.
+             // Pour l'instant on retourne juste pour éviter l'incrémentation infinie.
+             return; 
+         }
+
+         const newStreak = (habit.streak || 0) + 1;
+         const nowISO = new Date().toISOString();
+
+         // Optimistic Update
+         setHabits(prev => prev.map(h => h.id === id ? {...h, streak: newStreak, last_completed_at: nowISO} : h));
+         
+         // DB Update
+         await supabase.from('habits').update({ 
+             streak: newStreak, 
+             last_completed_at: nowISO 
+         }).eq('id', id);
      }
   };
   
