@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, Menu } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, Circle } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { BlurView } from 'expo-blur';
-import { playMenuClick, playSuccess, playError } from '../services/sound';
 
 interface TasksProps {
   tasks: Task[];
@@ -48,7 +47,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   };
 
   const openCreateModal = () => {
-      // playMenuClick(); // Reduced for no-friction
       setFormTitle('');
       setFormDesc('');
       setFormPriority('medium');
@@ -59,7 +57,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 
   const handleAdd = async () => {
     if (formTitle.trim()) {
-      // Optimistic create via Prop
       const dateIso = formDate ? new Date(formDate).toISOString() : undefined;
       addTask(formTitle, formPriority, formGoalId || undefined, dateIso);
       setCreateModalVisible(false);
@@ -67,7 +64,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   };
 
   const toggleExpand = (taskId: string) => {
-    // playMenuClick();
     const newSet = new Set(expandedTaskIds);
     if (newSet.has(taskId)) {
       newSet.delete(taskId);
@@ -78,7 +74,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   };
 
   const onTaskToggle = (id: string) => {
-      // playSuccess(); // handled in App.tsx logic for consistency or remove for zero friction
       toggleTask(id);
   };
 
@@ -94,7 +89,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 
   const handleUpdateTask = async () => {
       if (!selectedTask) return;
-      // For updates, we can keep using direct supabase or pass up. Keeping direct for now as "creation" was the main issue.
       await supabase.from('tasks').update({ 
           title: formTitle,
           description: formDesc,
@@ -112,12 +106,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      {/* APPLE STYLE HEADER */}
       <View style={styles.header}>
-          <View style={styles.headerTitleContainer}>
-              <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
-          </View>
-          <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-                <Plus size={24} color={colors.accent} />
+          <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
+          <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
+                <Plus size={20} color="#FFF" strokeWidth={3} />
           </TouchableOpacity>
       </View>
 
@@ -255,15 +248,21 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
     return (
         <View style={{backgroundColor: colors.cardBg}}>
             <TouchableOpacity style={styles.taskItem} onPress={onToggleExpand} onLongPress={onLongPress} activeOpacity={0.7}>
-                <View style={[styles.priorityIndicator, { backgroundColor: task.priority === 'high' ? colors.danger : (task.priority === 'medium' ? colors.orange : 'transparent') }]} />
-                <TouchableOpacity onPress={onToggle} style={[styles.checkbox, { borderColor: colors.textSub }, task.completed && { backgroundColor: colors.success, borderColor: colors.success }]}>
-                    {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
+                <View style={[styles.priorityIndicator, { backgroundColor: task.priority === 'high' ? colors.danger : (task.priority === 'medium' ? '#FF9500' : 'transparent') }]} />
+                <TouchableOpacity onPress={onToggle} style={styles.checkboxContainer}>
+                    {task.completed ? (
+                        <View style={[styles.checkbox, { backgroundColor: colors.success, borderColor: colors.success }]}>
+                            <Check size={12} color="#FFF" strokeWidth={4} />
+                        </View>
+                    ) : (
+                        <View style={[styles.checkbox, { borderColor: colors.textSub }]} />
+                    )}
                 </TouchableOpacity>
                 <View style={styles.taskContent}>
                     <Text style={[styles.taskTitle, {color: colors.text}, task.completed && styles.taskTitleCompleted]}>{task.title}</Text>
                     {task.due_date && <Text style={[styles.dateText, {color: colors.textSub}]}>{new Date(task.due_date).toLocaleDateString()}</Text>}
                 </View>
-                <TouchableOpacity onPress={onToggleExpand} style={styles.expandBtn}>{isExpanded ? <ChevronUp size={20} color={colors.textSub} /> : <ChevronDown size={20} color={colors.textSub} />}</TouchableOpacity>
+                {/* Chevron removed for cleaner look, padding handles expansion */}
             </TouchableOpacity>
             {isExpanded && (
                 <View style={[styles.subtaskList, {backgroundColor: colors.cardBg, borderTopColor: colors.border}]}>
@@ -287,10 +286,26 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
-  header: { paddingHorizontal: 20, marginBottom: 20, marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 50 },
-  largeTitle: { fontSize: 22, fontWeight: '700', textAlign: 'left' },
-  headerTitleContainer: { flex: 1, justifyContent: 'center' },
-  addButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  header: { 
+      paddingHorizontal: 20, 
+      marginBottom: 16, 
+      marginTop: 20, 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center', 
+  },
+  largeTitle: { 
+      fontSize: 34, 
+      fontWeight: '700', 
+      letterSpacing: 0.37 
+  },
+  addButton: { 
+      width: 36, 
+      height: 36, 
+      borderRadius: 18, 
+      alignItems: 'center', 
+      justifyContent: 'center',
+  },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 150 },
   listGroup: { borderRadius: 14, overflow: 'hidden' },
   completedGroup: { marginTop: 30 },
@@ -299,12 +314,12 @@ const styles = StyleSheet.create({
   taskItem: { flexDirection: 'row', alignItems: 'center', padding: 16, minHeight: 60 },
   priorityIndicator: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
   separator: { height: 1, marginLeft: 56 },
-  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, marginRight: 16, alignItems: 'center', justifyContent: 'center' },
+  checkboxContainer: { marginRight: 16 },
+  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   taskContent: { flex: 1 },
   taskTitle: { fontSize: 17, fontWeight: '500' },
   dateText: { fontSize: 12, marginTop: 2 },
   taskTitleCompleted: { opacity: 0.5, textDecorationLine: 'line-through' },
-  expandBtn: { padding: 8 },
   subtaskList: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1 },
   taskDescPreview: { fontSize: 14, marginBottom: 12, marginTop: 8, marginLeft: 40 },
   subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginLeft: 40, borderBottomWidth: 0.5 },

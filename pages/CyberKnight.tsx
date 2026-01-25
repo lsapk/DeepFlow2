@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, LayoutAnimation } from 'react-native';
 import { PlayerProfile, UserProfile, Quest, UnlockedAchievement } from '../types';
 import { Shield, Zap, Target, Menu, Gamepad2, ShoppingBag, Trophy, Gift, CheckCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,6 +58,11 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       if (data) {
           setUnlockedAchievements(new Set(data.map(d => d.achievement_id)));
       }
+  };
+
+  const switchTab = (tab: any) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setActiveTab(tab);
   };
 
   const handleBuy = async (item: typeof SHOP_ITEMS[0]) => {
@@ -194,27 +199,21 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
-      {/* UNIFORM HEADER */}
+      
       <View style={styles.header}>
-        <View style={styles.headerTitleContainer}>
-            <Text style={[styles.largeTitle, {color: colors.text}]}>Cyber Knight</Text>
-        </View>
-
-        <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
-            <Image 
-                source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
-                style={styles.avatar} 
-            />
-        </TouchableOpacity>
+            <View style={{width: 40}} /> 
+            <Text style={[styles.headerTitle, {color: colors.text}]}>Cyber Knight</Text>
+            <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
+                <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
+            </TouchableOpacity>
       </View>
       
-      {/* TABS */}
-      <View style={[styles.tabContainer, {borderBottomColor: colors.border}]}>
+      <View style={[styles.tabBar, {borderColor: colors.border}]}>
           {(['STATUS', 'SHOP', 'ACHIEVEMENTS'] as const).map(tab => (
               <TouchableOpacity 
                 key={tab} 
-                style={[styles.tab, activeTab === tab && {borderBottomColor: colors.accent}]}
-                onPress={() => setActiveTab(tab)}
+                onPress={() => switchTab(tab)} 
+                style={[styles.tabItem, activeTab === tab && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}
               >
                   <Text style={[styles.tabText, activeTab === tab && {color: colors.text}]}>
                       {tab === 'STATUS' ? 'QG' : tab === 'SHOP' ? 'BOUTIQUE' : 'SUCCÈS'}
@@ -236,30 +235,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    marginTop: 10,
-    marginBottom: 10,
+  header: { 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center', 
+      paddingHorizontal: 20, 
+      paddingVertical: 15 
   },
-  iconBtn: {
-      width: 40,
-      height: 40,
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50,
+  iconBtn: { 
+      width: 40, 
+      height: 40, 
+      alignItems: 'center', 
+      justifyContent: 'center' 
   },
-  headerTitleContainer: {
-      flex: 1,
-      justifyContent: 'center',
-  },
-  largeTitle: {
-      fontSize: 22,
-      fontWeight: '700',
-      textAlign: 'left',
+  headerTitle: { 
+      fontSize: 20, 
+      fontWeight: '700' 
   },
   avatar: {
     width: 36,
@@ -267,24 +258,22 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#333',
-    zIndex: 50,
   },
-  tabContainer: {
-      flexDirection: 'row',
-      paddingHorizontal: 20,
-      marginBottom: 20,
-      borderBottomWidth: 1,
+  tabBar: { 
+      flexDirection: 'row', 
+      borderBottomWidth: 1, 
+      marginBottom: 10 
   },
-  tab: {
-      paddingVertical: 12,
-      marginRight: 24,
-      borderBottomWidth: 2,
-      borderBottomColor: 'transparent',
+  tabItem: { 
+      flex: 1, 
+      alignItems: 'center', 
+      paddingVertical: 14 
   },
-  tabText: {
+  tabText: { 
       color: '#8E8E93',
-      fontWeight: '700',
-      fontSize: 12,
+      fontSize: 12, 
+      fontWeight: '700', 
+      letterSpacing: 0.5 
   },
   scrollContent: {
       paddingBottom: 120,

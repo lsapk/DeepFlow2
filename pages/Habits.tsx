@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { Habit, Goal } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Menu } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 
@@ -25,7 +25,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const [showAllDays, setShowAllDays] = useState(false); 
   const [modalVisible, setModalVisible] = useState(false);
   
-  // Form State
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -59,7 +58,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   };
 
   const openEditModal = (habit: Habit) => {
-      // Haptics.selectionAsync(); // Removed to reduce friction feeling
       setEditingHabit(habit);
       setTitle(habit.title);
       setDescription(habit.description || '');
@@ -92,14 +90,12 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
           linked_goal_id: linkedGoalId
       };
 
-      setModalVisible(false); // Close immediately for speed
+      setModalVisible(false);
 
       if (editingHabit) {
-          // Edit logic (still needs direct supabase or passed function, kept for now)
           await supabase.from('habits').update(habitData).eq('id', editingHabit.id);
           refreshHabits();
       } else {
-          // Create logic - uses Optimistic Update from App.tsx
           createHabit(habitData);
       }
   };
@@ -120,7 +116,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   };
 
   const handleIncrement = (id: string) => {
-      // Haptics removed/reduced for "no friction" feel
       incrementHabit(id);
   }
 
@@ -129,7 +124,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const displayedHabits = habits.filter(h => {
       if (showArchived) return !!h.is_archived;
       if (h.is_archived) return false;
-      
       if (showAllDays) return true;
       if (!h.days_of_week || h.days_of_week.length === 0) return true;
       return h.days_of_week.includes(todayIndex);
@@ -137,26 +131,17 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* FIXED HEADER LAYOUT */}
+      {/* HEADER iOS Style */}
       <View style={styles.header}>
-         
-         <View style={styles.centerTitle}>
-             <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
-             <Text style={[styles.subtitle, {color: colors.textSub}]}>{showAllDays ? 'Toutes' : 'Aujourd\'hui'}</Text>
+         <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
+         <View style={styles.headerRight}>
+             <TouchableOpacity style={[styles.iconButton, showAllDays && { backgroundColor: colors.border }]} onPress={() => setShowAllDays(!showAllDays)}>
+                 <Filter size={20} color={colors.accent} />
+             </TouchableOpacity>
+             <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
+                <Plus size={20} color="#FFF" strokeWidth={3} />
+             </TouchableOpacity>
          </View>
-
-        <View style={styles.headerButtons}>
-            <TouchableOpacity 
-                style={[styles.iconBtn, {backgroundColor: colors.cardBg}, showAllDays && {backgroundColor: colors.border}]} 
-                onPress={() => setShowAllDays(!showAllDays)}
-            >
-                <Filter size={20} color={colors.text} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-                <Plus size={24} color={colors.accent} />
-            </TouchableOpacity>
-        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -174,7 +159,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                     key={habit.id} 
                     style={[styles.card, {backgroundColor: colors.cardBg}, !isScheduledToday && {opacity: 0.5}]}
                     onLongPress={() => openEditModal(habit)}
-                    activeOpacity={0.9} // Higher opacity for faster feel
+                    activeOpacity={0.9} 
                 >
                     <View style={styles.cardHeader}>
                         <View style={styles.headerLeft}>
@@ -299,37 +284,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 16,
-    marginTop: 10,
-    height: 50,
-  },
-  centerTitle: {
-      flex: 1,
-      alignItems: 'flex-start',
-      justifyContent: 'center',
+    marginTop: 20,
   },
   largeTitle: {
-    fontSize: 22,
+    fontSize: 34,
     fontWeight: '700',
+    letterSpacing: 0.37,
   },
-  subtitle: {
-      fontSize: 10,
-      letterSpacing: 1,
-  },
-  headerButtons: {
+  headerRight: {
       flexDirection: 'row',
       gap: 12,
   },
-  iconBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+  iconButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
   },
   addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

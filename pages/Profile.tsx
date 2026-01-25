@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, Clock, Settings, User } from 'lucide-react-native';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface ProfileProps {
   user: UserProfile;
@@ -15,6 +16,7 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose }) => {
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
   const [settings, setSettings] = useState<UserSettings>({
       id: user.id,
       theme: 'dark',
@@ -24,9 +26,20 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       focus_mode: false,
       clock_format: '24h'
   });
+  
+  // Stats Data
+  const [stats, setStats] = useState({
+      tasksCompleted: 0,
+      habitsStreak: 0,
+      goalsAchieved: 0,
+      focusMinutes: 0
+  });
 
   useEffect(() => {
-      if (visible) fetchSettings();
+      if (visible) {
+          fetchSettings();
+          fetchStats();
+      }
   }, [visible]);
 
   const fetchSettings = async () => {
@@ -35,7 +48,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       if (data) {
           setSettings(data);
       } else {
-          // Init settings if missing
           const defaultSettings = { 
               id: user.id, 
               theme: 'dark', 
@@ -51,69 +63,203 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       setLoading(false);
   };
 
+  const fetchStats = async () => {
+      // Parallel fetch for speed
+      const [tRes, hRes, gRes, fRes] = await Promise.all([
+          supabase.from('tasks').select('id', { count: 'exact' }).eq('user_id', user.id).eq('completed', true),
+          supabase.from('habits').select('streak').eq('user_id', user.id),
+          supabase.from('goals').select('id', { count: 'exact' }).eq('user_id', user.id).eq('completed', true),
+          supabase.from('focus_sessions').select('duration').eq('user_id', user.id)
+      ]);
+
+      const maxStreak = hRes.data ? Math.max(0, ...hRes.data.map(h => h.streak)) : 0;
+      const totalFocus = fRes.data ? fRes.data.reduce((acc, curr) => acc + curr.duration, 0) : 0;
+
+      setStats({
+          tasksCompleted: tRes.count || 0,
+          habitsStreak: maxStreak,
+          goalsAchieved: gRes.count || 0,
+          focusMinutes: totalFocus
+      });
+  };
+
   const updateSetting = async (key: keyof UserSettings, value: any) => {
       const newSettings = { ...settings, [key]: value };
       setSettings(newSettings); 
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const { error } = await supabase.from('user_settings').update({ [key]: value }).eq('id', user.id);
       if (error) setSettings(settings); // Revert
   };
 
+  const switchTab = (tab: any) => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setActiveTab(tab);
+  };
+
+  const renderProfileTab = () => (
+      <View style={styles.tabContent}>
+          <View style={styles.profileHeader}>
+              <View style={styles.avatarContainer}>
+                  <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
+                  <View style={styles.levelBadge}>
+                      <Text style={styles.levelBadgeText}>{player.level}</Text>
+                  </View>
+              </View>
+              <Text style={styles.name}>{user.display_name}</Text>
+              <Text style={styles.email}>{user.email}</Text>
+              <Text style={styles.rankText}>{player.avatar_type.toUpperCase()}</Text>
+          </View>
+
+          <View style={styles.xpCard}>
+              <View style={styles.xpRow}>
+                  <Text style={styles.xpLabel}>Progression XP</Text>
+                  <Text style={styles.xpValue}>{player.experience_points} / {player.level * 100 * player.level}</Text>
+              </View>
+              <View style={styles.xpBarBg}>
+                  <View style={[styles.xpBarFill, { width: `${(player.experience_points % 1000) / 10}%` }]} />
+              </View>
+          </View>
+
+          <LinearGradient
+              colors={['#4F46E5', '#9333EA']}
+              start={{x:0, y:0}} end={{x:1, y:1}}
+              style={styles.premiumCard}
+          >
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <View>
+                      <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                          <Crown size={20} color="#FACC15" fill="#FACC15" />
+                          <Text style={styles.premiumTitle}>DeepFlow Premium</Text>
+                      </View>
+                      <Text style={styles.premiumDesc}>IA illimitée & stats avancées</Text>
+                  </View>
+                  <TouchableOpacity style={styles.upgradeBtn}>
+                      <Text style={styles.upgradeText}>UPGRADE</Text>
+                  </TouchableOpacity>
+              </View>
+          </LinearGradient>
+
+          <TouchableOpacity style={styles.editProfileBtn}>
+              <Text style={styles.editProfileText}>Modifier le profil</Text>
+          </TouchableOpacity>
+      </View>
+  );
+
+  const renderSettingsTab = () => (
+      <View style={styles.tabContent}>
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>APPARENCE</Text>
+              <View style={styles.card}>
+                  <SettingItem icon={settings.theme === 'dark' ? Moon : Sun} label="Mode Sombre" iconColor="#5856D6" isSwitch value={settings.theme === 'dark'} onToggle={(val: boolean) => updateSetting('theme', val ? 'dark' : 'light')} />
+              </View>
+          </View>
+
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>NOTIFICATIONS & SONS</Text>
+              <View style={styles.card}>
+                  <SettingItem icon={Bell} label="Push Notifications" iconColor="#EF4444" isSwitch value={settings.notifications_enabled} onToggle={(val: boolean) => updateSetting('notifications_enabled', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Volume2} label="Effets Sonores" iconColor="#F59E0B" isSwitch value={settings.sound_enabled} onToggle={(val: boolean) => updateSetting('sound_enabled', val)} />
+              </View>
+          </View>
+
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>PRODUCTIVITÉ</Text>
+              <View style={styles.card}>
+                  <SettingItem icon={Zap} label="Mode Focus (Ne pas déranger)" iconColor="#10B981" isSwitch value={settings.focus_mode} onToggle={(val: boolean) => updateSetting('focus_mode', val)} />
+              </View>
+          </View>
+
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>COMPTE</Text>
+              <View style={styles.card}>
+                  <SettingItem icon={Shield} label="Confidentialité" iconColor="#8B5CF6" onPress={() => {}} />
+                  <View style={styles.separator} />
+                  <TouchableOpacity style={styles.item} onPress={logout}>
+                        <View style={styles.itemLeft}>
+                            <View style={[styles.iconBox, { backgroundColor: '#EF4444' }]}>
+                                <LogOut size={18} color="white" />
+                            </View>
+                            <Text style={[styles.label, {color: '#EF4444'}]}>Se déconnecter</Text>
+                        </View>
+                  </TouchableOpacity>
+              </View>
+          </View>
+      </View>
+  );
+
+  const renderStatsTab = () => (
+      <View style={styles.tabContent}>
+          <View style={styles.statsGrid}>
+              <StatCard label="Tâches Complétées" value={stats.tasksCompleted} icon={CheckCircle} color="#34C759" />
+              <StatCard label="Meilleur Streak" value={stats.habitsStreak} icon={Zap} color="#FF9500" />
+              <StatCard label="Objectifs Atteints" value={stats.goalsAchieved} icon={Star} color="#FACC15" />
+              <StatCard label="Heures Focus" value={Math.round(stats.focusMinutes / 60)} icon={Clock} color="#5856D6" />
+          </View>
+
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>GAMIFICATION</Text>
+              <View style={styles.card}>
+                  <View style={styles.statRow}>
+                      <Text style={styles.statRowLabel}>Niveau Actuel</Text>
+                      <Text style={[styles.statRowValue, {color: '#FFF'}]}>{player.level}</Text>
+                  </View>
+                  <View style={styles.separator} />
+                  <View style={styles.statRow}>
+                      <Text style={styles.statRowLabel}>XP Total</Text>
+                      <Text style={[styles.statRowValue, {color: '#C4B5FD'}]}>{player.experience_points}</Text>
+                  </View>
+                  <View style={styles.separator} />
+                  <View style={styles.statRow}>
+                      <Text style={styles.statRowLabel}>Crédits IA</Text>
+                      <Text style={[styles.statRowValue, {color: '#FACC15'}]}>{player.credits}</Text>
+                  </View>
+              </View>
+          </View>
+      </View>
+  );
+
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-        <BlurView intensity={30} tint="dark" style={styles.blurContainer}>
-            <View style={styles.modalContent}>
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Mon Profil</Text>
-                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                        <X size={24} color="#FFF" />
-                    </TouchableOpacity>
-                </View>
-
-                {loading ? (
-                    <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-                        <ActivityIndicator size="large" color="#FFF" />
-                    </View>
-                ) : (
-                    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                        {/* User Card */}
-                        <View style={styles.profileHeader}>
-                            <View style={styles.avatarContainer}>
-                                <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
-                                <View style={styles.editBadge}><Settings size={12} color="#000" /></View>
-                            </View>
-                            <Text style={styles.name}>{user.display_name}</Text>
-                            <Text style={styles.email}>{user.email}</Text>
-                            
-                            <View style={styles.levelTag}>
-                                <Text style={styles.levelText}>Niveau {player.level} • {player.avatar_type.replace('_', ' ')}</Text>
-                            </View>
-                        </View>
-
-                        {/* Preferences */}
-                        <View style={styles.section}>
-                            <Text style={styles.sectionHeader}>PARAMÈTRES</Text>
-                            <View style={styles.card}>
-                                <SettingItem icon={settings.theme === 'dark' ? Moon : Sun} label="Mode Sombre" iconColor="#5856D6" isSwitch value={settings.theme === 'dark'} onToggle={(val: boolean) => updateSetting('theme', val ? 'dark' : 'light')} />
-                                <View style={styles.separator} />
-                                <SettingItem icon={Bell} label="Notifications" iconColor="#EF4444" isSwitch value={settings.notifications_enabled} onToggle={(val: boolean) => updateSetting('notifications_enabled', val)} />
-                                <View style={styles.separator} />
-                                <SettingItem icon={Volume2} label="Sons & Effets" iconColor="#F59E0B" isSwitch value={settings.sound_enabled} onToggle={(val: boolean) => updateSetting('sound_enabled', val)} />
-                            </View>
-                        </View>
-
-                        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-                            <LogOut size={20} color="#EF4444" style={{marginRight: 10}} />
-                            <Text style={styles.logoutText}>Se déconnecter</Text>
-                        </TouchableOpacity>
-                        
-                    </ScrollView>
-                )}
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Mon Espace</Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                    <Text style={styles.closeText}>Fermer</Text>
+                </TouchableOpacity>
             </View>
-        </BlurView>
+
+            <View style={styles.tabBar}>
+                {(['PROFILE', 'SETTINGS', 'STATS'] as const).map(tab => (
+                    <TouchableOpacity 
+                        key={tab} 
+                        style={[styles.tabItem, activeTab === tab && styles.activeTabItem]} 
+                        onPress={() => switchTab(tab)}
+                    >
+                        <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                            {tab === 'PROFILE' ? 'Profil' : tab === 'SETTINGS' ? 'Préférences' : 'Statistiques'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#FFF" />
+                </View>
+            ) : (
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {activeTab === 'PROFILE' && renderProfileTab()}
+                    {activeTab === 'SETTINGS' && renderSettingsTab()}
+                    {activeTab === 'STATS' && renderStatsTab()}
+                </ScrollView>
+            )}
+        </View>
     </Modal>
   );
 };
 
+// Helper Components
 const SettingItem = ({ icon: Icon, label, isSwitch, value, onToggle, iconColor, onPress }: any) => (
     <TouchableOpacity style={styles.item} activeOpacity={isSwitch ? 1 : 0.7} onPress={onPress}>
         <View style={styles.itemLeft}>
@@ -130,38 +276,78 @@ const SettingItem = ({ icon: Icon, label, isSwitch, value, onToggle, iconColor, 
     </TouchableOpacity>
 );
 
+const StatCard = ({ label, value, icon: Icon, color }: any) => (
+    <View style={styles.statCard}>
+        <Icon size={24} color={color} style={{marginBottom: 8}} />
+        <Text style={styles.statCardValue}>{value}</Text>
+        <Text style={styles.statCardLabel}>{label}</Text>
+    </View>
+);
+
+import { CheckCircle, Clock } from 'lucide-react-native'; // Missing imports
+
 const styles = StyleSheet.create({
-  blurContainer: { flex: 1, justifyContent: 'flex-end' },
-  modalContent: {
-      backgroundColor: '#090909',
-      borderTopLeftRadius: 30,
-      borderTopRightRadius: 30,
-      height: '90%',
-      paddingTop: 20,
-      overflow: 'hidden'
-  },
-  header: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#222' },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: '#FFF' },
-  closeBtn: { position: 'absolute', right: 20, top: 0 },
-  scrollContent: { paddingBottom: 60 },
-  profileHeader: { alignItems: 'center', marginVertical: 30 },
-  avatarContainer: { position: 'relative', marginBottom: 16 },
-  avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: '#222' },
-  editBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#FFF', padding: 6, borderRadius: 15 },
-  name: { fontSize: 24, fontWeight: '700', color: '#FFF', marginBottom: 4 },
-  email: { fontSize: 15, color: '#888', marginBottom: 16 },
-  levelTag: { backgroundColor: 'rgba(196, 181, 253, 0.1)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(196, 181, 253, 0.3)' },
-  levelText: { fontSize: 13, fontWeight: '600', color: '#C4B5FD', textTransform: 'capitalize' },
-  section: { marginBottom: 24, paddingHorizontal: 16 },
-  sectionHeader: { fontSize: 13, color: '#666', marginBottom: 8, marginLeft: 8, fontWeight: '600', textTransform: 'uppercase' },
-  card: { backgroundColor: '#171717', borderRadius: 14, overflow: 'hidden' },
+  container: { flex: 1, backgroundColor: '#000' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 20, marginTop: 10 },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: '#FFF' },
+  closeBtn: {},
+  closeText: { color: '#007AFF', fontSize: 17, fontWeight: '600' },
+  
+  tabBar: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#262626' },
+  tabItem: { paddingVertical: 12, marginRight: 24, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  activeTabItem: { borderBottomColor: '#FFF' },
+  tabText: { color: '#888', fontWeight: '600', fontSize: 14 },
+  activeTabText: { color: '#FFF' },
+
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { paddingBottom: 60, paddingHorizontal: 20 },
+  tabContent: { gap: 24 },
+
+  // Profile Tab
+  profileHeader: { alignItems: 'center', marginBottom: 10 },
+  avatarContainer: { marginBottom: 16 },
+  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: '#1C1C1E' },
+  levelBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#007AFF', width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
+  levelBadgeText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
+  name: { fontSize: 22, fontWeight: '700', color: '#FFF', marginBottom: 4 },
+  email: { fontSize: 14, color: '#888', marginBottom: 8 },
+  rankText: { fontSize: 12, fontWeight: '700', color: '#C4B5FD', letterSpacing: 1 },
+  
+  xpCard: { backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16 },
+  xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  xpLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
+  xpValue: { color: '#FFF', fontSize: 12, fontWeight: '600' },
+  xpBarBg: { height: 8, backgroundColor: '#333', borderRadius: 4, overflow: 'hidden' },
+  xpBarFill: { height: '100%', backgroundColor: '#007AFF' },
+
+  premiumCard: { borderRadius: 16, padding: 20 },
+  premiumTitle: { color: '#FFF', fontSize: 18, fontWeight: '700' },
+  premiumDesc: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 4 },
+  upgradeBtn: { backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  upgradeText: { color: '#4F46E5', fontWeight: '700', fontSize: 12 },
+
+  editProfileBtn: { backgroundColor: '#1C1C1E', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  editProfileText: { color: '#FFF', fontWeight: '600' },
+
+  // Settings Tab
+  section: { marginBottom: 10 },
+  sectionHeader: { fontSize: 12, color: '#666', marginBottom: 8, marginLeft: 4, fontWeight: '600', textTransform: 'uppercase' },
+  card: { backgroundColor: '#1C1C1E', borderRadius: 14, overflow: 'hidden' },
   item: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, minHeight: 56 },
   separator: { height: 1, backgroundColor: '#262626', marginLeft: 56 },
   itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   iconBox: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 16, color: '#FFF', fontWeight: '500' },
-  logoutBtn: { marginHorizontal: 16, backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 16, borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
-  logoutText: { color: '#EF4444', fontSize: 17, fontWeight: '600' }
+
+  // Stats Tab
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  statCard: { width: '48%', backgroundColor: '#1C1C1E', padding: 16, borderRadius: 16, alignItems: 'center' },
+  statCardValue: { color: '#FFF', fontSize: 24, fontWeight: '700', marginBottom: 4 },
+  statCardLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
+  
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 16 },
+  statRowLabel: { color: '#FFF', fontSize: 16 },
+  statRowValue: { fontSize: 16, fontWeight: '700' },
 });
 
 export default Profile;

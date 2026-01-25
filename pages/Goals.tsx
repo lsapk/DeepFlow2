@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, AlignLeft, Calendar, Save, Minus, Menu, Target } from 'lucide-react-native';
+import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, Minus } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 
@@ -32,7 +32,6 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   
-  // Edit State
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
@@ -67,7 +66,6 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   };
 
   const toggleExpand = (goalId: string) => {
-    Haptics.selectionAsync();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const newSet = new Set(expandedGoalIds);
     if (newSet.has(goalId)) {
@@ -79,7 +77,6 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   };
 
   const openEditModal = (goal: Goal) => {
-      Haptics.selectionAsync();
       setSelectedGoal(goal);
       setFormTitle(goal.title);
       setFormDesc(goal.description || '');
@@ -103,12 +100,10 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
 
   const changeProgress = (delta: number) => {
       const newVal = Math.max(0, Math.min(100, formProgress + delta));
-      if (newVal !== formProgress) Haptics.selectionAsync();
       setFormProgress(newVal);
   };
 
   const onToggleGoal = (id: string) => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       toggleGoal(id);
   }
 
@@ -117,12 +112,11 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      {/* HEADER */}
       <View style={styles.header}>
-          <View style={styles.headerTitleContainer}>
-              <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
-          </View>
-          <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
-                <Plus size={24} color={colors.accent} />
+          <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
+          <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
+                <Plus size={20} color="#FFF" strokeWidth={3} />
           </TouchableOpacity>
       </View>
 
@@ -321,7 +315,6 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
                     <Text style={[styles.taskTitle, { color: colors.text }, goal.completed && styles.taskTitleCompleted]}>
                         {goal.title}
                     </Text>
-                    {/* Progress Bar Mini */}
                     {!goal.completed && (goal.progress || 0) > 0 && (
                         <View style={[styles.miniProgressBg, { backgroundColor: colors.border }]}>
                             <View style={[styles.miniProgressFill, { width: `${goal.progress}%`, backgroundColor: colors.accent }]} />
@@ -337,7 +330,6 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
                 </View>
             </TouchableOpacity>
 
-            {/* EXPANDED SECTION */}
             {isExpanded && (
                 <View style={[styles.expandedSection, { borderTopColor: colors.border }]}>
                     {goal.description && <Text style={[styles.descText, { color: colors.textSub }]}>{goal.description}</Text>}
@@ -383,35 +375,22 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     marginBottom: 16,
-    marginTop: 10,
+    marginTop: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: 50,
   },
   largeTitle: {
-    fontSize: 22,
+    fontSize: 34,
     fontWeight: '700',
-    textAlign: 'left',
-  },
-  headerTitleContainer: {
-      flex: 1,
-      justifyContent: 'center',
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 50,
+    letterSpacing: 0.37,
   },
   addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 50,
   },
   scrollContent: {
     paddingHorizontal: 20,
