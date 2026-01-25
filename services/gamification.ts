@@ -6,6 +6,14 @@ export const getXpForNextLevel = (level: number) => {
     return 100 * Math.pow(level, 2);
 };
 
+export const getRankName = (level: number) => {
+    if (level >= 50) return "Légende 🏆";
+    if (level >= 25) return "Maître 👑";
+    if (level >= 10) return "Expert ⭐";
+    if (level >= 5) return "Adepte 🔥";
+    return "Novice 🌱";
+};
+
 export const REWARDS = {
     TASK_LOW: 10,
     TASK_MEDIUM: 10,

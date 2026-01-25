@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } fr
 import { PlayerProfile, UserProfile, Quest, UnlockedAchievement } from '../types';
 import { Shield, Zap, Target, Menu, Gamepad2, ShoppingBag, Trophy, Gift, CheckCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getXpForNextLevel } from '../services/gamification';
+import { getXpForNextLevel, getRankName } from '../services/gamification';
 import { supabase } from '../services/supabase';
 
 interface CyberKnightProps {
@@ -37,6 +37,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   // Formula: 100 * level^2
   const xpRequired = getXpForNextLevel(player.level);
   const xpProgress = (player.experience_points / xpRequired) * 100;
+  const rankName = getRankName(player.level);
   
   const colors = {
       bg: isDarkMode ? '#000000' : '#F2F2F7',
@@ -94,7 +95,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
                      <Gamepad2 size={60} color="#000" />
                 </View>
             </View>
-            <Text style={[styles.heroRank, {color: colors.text}]}>{player.avatar_type.toUpperCase().replace('_', ' ')}</Text>
+            <Text style={[styles.heroRank, {color: colors.text}]}>{rankName.toUpperCase()}</Text>
             <View style={[styles.heroLevelBadge, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}]}>
                 <Text style={[styles.heroLevelText, {color: colors.text}]}>NIVEAU {player.level}</Text>
             </View>

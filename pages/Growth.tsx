@@ -300,118 +300,126 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   if (loading) return <SkeletonAnalysis />;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-            <Menu size={24} color={colors.button} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
-        <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
-            <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
-        </TouchableOpacity>
-      </View>
+    <KeyboardAvoidingView 
+        style={{flex: 1}} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
+        <View style={styles.header}>
+            <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+                <Menu size={24} color={colors.button} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
+            <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
+                <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
+            </TouchableOpacity>
+        </View>
 
-      <View style={[styles.tabBar, {borderColor: colors.border}]}>
-          {(['OVERVIEW', 'ANALYTICS', 'AI_COACH'] as const).map(tab => (
-              <TouchableOpacity key={tab} onPress={() => switchTab(tab)} style={[styles.tabItem, activeTab === tab && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
-                  <Text style={[styles.tabText, activeTab === tab && {color: colors.text}]}>{tab === 'AI_COACH' ? 'COACH IA' : tab}</Text>
-              </TouchableOpacity>
-          ))}
-      </View>
+        <View style={[styles.tabBar, {borderColor: colors.border}]}>
+            {(['OVERVIEW', 'ANALYTICS', 'AI_COACH'] as const).map(tab => (
+                <TouchableOpacity key={tab} onPress={() => switchTab(tab)} style={[styles.tabItem, activeTab === tab && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
+                    <Text style={[styles.tabText, activeTab === tab && {color: colors.text}]}>{tab === 'AI_COACH' ? 'COACH IA' : tab}</Text>
+                </TouchableOpacity>
+            ))}
+        </View>
 
-      {activeTab === 'OVERVIEW' && (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-              
-              <View style={[styles.card, {backgroundColor: colors.card}]}>
-                  <View style={styles.cardHeader}>
-                      <Hexagon size={20} color={colors.accent} />
-                      <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie</Text>
-                  </View>
-                  <RadarChart />
-                  <Text style={styles.cardFooter}>Équilibre calculé sur vos habitudes et tâches</Text>
-              </View>
-
-              <View style={[styles.card, {backgroundColor: colors.card}]}>
-                  <View style={styles.cardHeader}>
-                      <Grid size={20} color={colors.success} />
-                      <Text style={[styles.cardTitle, {color: colors.text}]}>Heatmap de Consistance</Text>
-                  </View>
-                  <Heatmap />
-                  <View style={styles.legend}>
-                      <Text style={styles.legendText}>Moins</Text>
-                      <View style={[styles.heatBox, {backgroundColor: isDarkMode ? '#222' : '#E5E5EA'}]} />
-                      <View style={[styles.heatBox, {backgroundColor: '#C4B5FD'}]} />
-                      <View style={[styles.heatBox, {backgroundColor: '#7C3AED'}]} />
-                      <Text style={styles.legendText}>Plus</Text>
-                  </View>
-              </View>
-
-              <View style={[styles.card, {backgroundColor: colors.card}]}>
-                  <View style={styles.cardHeader}>
-                      <Clock size={20} color="#FACC15" />
-                      <Text style={[styles.cardTitle, {color: colors.text}]}>Chronobiologie</Text>
-                  </View>
-                  <View style={styles.chronoContainer}>
-                      <View>
-                          <Text style={styles.label}>PROFIL</Text>
-                          <Text style={[styles.value, {color: colors.text}]}>{chronoProfile}</Text>
-                      </View>
-                      <View>
-                          <Text style={styles.label}>PIC D'ÉNERGIE</Text>
-                          <Text style={[styles.value, {color: colors.text}]}>{peakHour}</Text>
-                      </View>
-                  </View>
-                  <Text style={styles.cardFooter}>Basé sur vos heures de complétion</Text>
-              </View>
-          </ScrollView>
-      )}
-
-      {activeTab === 'ANALYTICS' && (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-             <View style={[styles.card, {backgroundColor: colors.card}]}>
-                <View style={styles.cardHeader}>
-                    <BarChart2 size={20} color="#C4B5FD" />
-                    <Text style={[styles.cardTitle, {color: colors.text}]}>Focus Hebdomadaire</Text>
+        {activeTab === 'OVERVIEW' && (
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                
+                <View style={[styles.card, {backgroundColor: colors.card}]}>
+                    <View style={styles.cardHeader}>
+                        <Hexagon size={20} color={colors.accent} />
+                        <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie</Text>
+                    </View>
+                    <RadarChart />
+                    <Text style={styles.cardFooter}>Équilibre calculé sur vos habitudes et tâches</Text>
                 </View>
-                <View style={styles.barChart}>
-                    {weeklyFocusData.map((val, i) => (
-                        <View key={i} style={styles.barColumn}>
-                             <View style={[styles.barFill, {height: Math.min(100, val), backgroundColor: i===6 ? colors.accent : (isDarkMode ? '#333' : '#CCC')}]} />
-                             <Text style={styles.barLabel}>{['D','L','M','M','J','V','S'][i]}</Text>
+
+                <View style={[styles.card, {backgroundColor: colors.card}]}>
+                    <View style={styles.cardHeader}>
+                        <Grid size={20} color={colors.success} />
+                        <Text style={[styles.cardTitle, {color: colors.text}]}>Heatmap de Consistance</Text>
+                    </View>
+                    <Heatmap />
+                    <View style={styles.legend}>
+                        <Text style={styles.legendText}>Moins</Text>
+                        <View style={[styles.heatBox, {backgroundColor: isDarkMode ? '#222' : '#E5E5EA'}]} />
+                        <View style={[styles.heatBox, {backgroundColor: '#C4B5FD'}]} />
+                        <View style={[styles.heatBox, {backgroundColor: '#7C3AED'}]} />
+                        <Text style={styles.legendText}>Plus</Text>
+                    </View>
+                </View>
+
+                <View style={[styles.card, {backgroundColor: colors.card}]}>
+                    <View style={styles.cardHeader}>
+                        <Clock size={20} color="#FACC15" />
+                        <Text style={[styles.cardTitle, {color: colors.text}]}>Chronobiologie</Text>
+                    </View>
+                    <View style={styles.chronoContainer}>
+                        <View>
+                            <Text style={styles.label}>PROFIL</Text>
+                            <Text style={[styles.value, {color: colors.text}]}>{chronoProfile}</Text>
+                        </View>
+                        <View>
+                            <Text style={styles.label}>PIC D'ÉNERGIE</Text>
+                            <Text style={[styles.value, {color: colors.text}]}>{peakHour}</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.cardFooter}>Basé sur vos heures de complétion</Text>
+                </View>
+            </ScrollView>
+        )}
+
+        {activeTab === 'ANALYTICS' && (
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                <View style={[styles.card, {backgroundColor: colors.card}]}>
+                    <View style={styles.cardHeader}>
+                        <BarChart2 size={20} color="#C4B5FD" />
+                        <Text style={[styles.cardTitle, {color: colors.text}]}>Focus Hebdomadaire</Text>
+                    </View>
+                    <View style={styles.barChart}>
+                        {weeklyFocusData.map((val, i) => (
+                            <View key={i} style={styles.barColumn}>
+                                <View style={[styles.barFill, {height: Math.min(100, val), backgroundColor: i===6 ? colors.accent : (isDarkMode ? '#333' : '#CCC')}]} />
+                                <Text style={styles.barLabel}>{['D','L','M','M','J','V','S'][i]}</Text>
+                            </View>
+                        ))}
+                    </View>
+                    <Text style={[styles.cardFooter, {marginTop: 20}]}>Total cette semaine: {Math.floor(totalFocusTime/60)}h</Text>
+                </View>
+            </ScrollView>
+        )}
+
+        {activeTab === 'AI_COACH' && (
+            <>
+                <ScrollView 
+                    style={styles.chatContainer} 
+                    contentContainerStyle={{paddingBottom: 20}}
+                >
+                    {messages.map((m, i) => (
+                        <View key={i} style={[styles.bubble, m.role === 'user' ? styles.bubbleUser : [styles.bubbleAi, {backgroundColor: isDarkMode ? '#262626' : '#E5E5EA'}]]}>
+                            {m.role === 'ai' ? <Markdown style={{body: {color: colors.text}} as any}>{m.text}</Markdown> : <Text style={{color: '#FFF'}}>{m.text}</Text>}
                         </View>
                     ))}
+                    {loadingAi && <ActivityIndicator style={{margin: 20, alignSelf: 'flex-start'}} />}
+                </ScrollView>
+                <View style={[styles.inputContainer, {backgroundColor: colors.card, borderTopColor: colors.border}]}>
+                    <TextInput 
+                        style={[styles.input, {backgroundColor: colors.inputBg, color: colors.text}]} 
+                        value={chatInput} 
+                        onChangeText={setChatInput} 
+                        placeholder="Posez une question..." 
+                        placeholderTextColor="#888"
+                    />
+                    <TouchableOpacity onPress={sendMessage} style={[styles.sendBtn, {backgroundColor: colors.button}]}>
+                        <Send size={20} color="#FFF" />
+                    </TouchableOpacity>
                 </View>
-                <Text style={[styles.cardFooter, {marginTop: 20}]}>Total cette semaine: {Math.floor(totalFocusTime/60)}h</Text>
-             </View>
-          </ScrollView>
-      )}
+            </>
+        )}
 
-      {activeTab === 'AI_COACH' && (
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}} keyboardVerticalOffset={100}>
-              <ScrollView style={styles.chatContainer} contentContainerStyle={{paddingBottom: 20}}>
-                  {messages.map((m, i) => (
-                      <View key={i} style={[styles.bubble, m.role === 'user' ? styles.bubbleUser : [styles.bubbleAi, {backgroundColor: isDarkMode ? '#262626' : '#E5E5EA'}]]}>
-                          {m.role === 'ai' ? <Markdown style={{body: {color: colors.text}} as any}>{m.text}</Markdown> : <Text style={{color: '#FFF'}}>{m.text}</Text>}
-                      </View>
-                  ))}
-                  {loadingAi && <ActivityIndicator style={{margin: 20, alignSelf: 'flex-start'}} />}
-              </ScrollView>
-              <View style={[styles.inputContainer, {backgroundColor: colors.card, borderTopColor: colors.border}]}>
-                  <TextInput 
-                    style={[styles.input, {backgroundColor: colors.inputBg, color: colors.text}]} 
-                    value={chatInput} 
-                    onChangeText={setChatInput} 
-                    placeholder="Posez une question..." 
-                    placeholderTextColor="#888"
-                  />
-                  <TouchableOpacity onPress={sendMessage} style={[styles.sendBtn, {backgroundColor: colors.button}]}>
-                      <Send size={20} color="#FFF" />
-                  </TouchableOpacity>
-              </View>
-          </KeyboardAvoidingView>
-      )}
-
-    </View>
+        </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -452,7 +460,7 @@ const styles = StyleSheet.create({
   bubble: { padding: 12, borderRadius: 16, marginBottom: 10, maxWidth: '85%' },
   bubbleUser: { backgroundColor: '#007AFF', alignSelf: 'flex-end' },
   bubbleAi: { alignSelf: 'flex-start' },
-  inputContainer: { padding: 16, borderTopWidth: 1, flexDirection: 'row', gap: 10, paddingBottom: 40 },
+  inputContainer: { padding: 16, borderTopWidth: 1, flexDirection: 'row', gap: 10, paddingBottom: 20 },
   input: { flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }
 });

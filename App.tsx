@@ -23,6 +23,7 @@ import { supabase } from './services/supabase';
 import { Trophy } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 // Configuration Notifications
 Notifications.setNotificationHandler({
@@ -54,9 +55,8 @@ const App: React.FC = () => {
   // Settings & Theme
   const [isDarkMode, setIsDarkMode] = useState(true);
   
-  // Level Up State
-  const [showLevelUp, setShowLevelUp] = useState(false);
-  const prevLevelRef = useRef<number | null>(null);
+  // Realtime Subscription Ref
+  const realtimeChannel = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
       registerForPushNotificationsAsync();
@@ -102,6 +102,7 @@ const App: React.FC = () => {
         setSession(session);
         if (session) {
           fetchData(session.user.id);
+          setupRealtimeSubscription(session.user.id);
         } else {
           setCurrentView(ViewState.AUTH);
           setLoading(false);
@@ -114,16 +115,58 @@ const App: React.FC = () => {
       setSession(session);
       if (session) {
         fetchData(session.user.id);
+        setupRealtimeSubscription(session.user.id);
       } else {
         setUser(null);
         setPlayer(null);
+        if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
         setCurrentView(ViewState.AUTH);
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+        subscription.unsubscribe();
+        if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
+    };
   }, []);
+
+  // --- REALTIME SYNC ---
+  const setupRealtimeSubscription = (userId: string) => {
+      if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
+
+      const channel = supabase.channel('db_changes')
+          .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` },
+              (payload) => {
+                  if (payload.eventType === 'INSERT') setTasks(prev => [payload.new as Task, ...prev]);
+                  if (payload.eventType === 'UPDATE') setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new as Task : t));
+                  if (payload.eventType === 'DELETE') setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+              }
+          )
+          .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` },
+              (payload) => {
+                  if (payload.eventType === 'INSERT') setHabits(prev => [...prev, payload.new as Habit]);
+                  if (payload.eventType === 'UPDATE') setHabits(prev => prev.map(h => h.id === payload.new.id ? payload.new as Habit : h));
+                  if (payload.eventType === 'DELETE') setHabits(prev => prev.filter(h => h.id !== payload.old.id));
+              }
+          )
+          .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${userId}` },
+              (payload) => {
+                  if (payload.eventType === 'INSERT') setGoals(prev => [...prev, payload.new as Goal]);
+                  if (payload.eventType === 'UPDATE') setGoals(prev => prev.map(g => g.id === payload.new.id ? payload.new as Goal : g));
+                  if (payload.eventType === 'DELETE') setGoals(prev => prev.filter(g => g.id !== payload.old.id));
+              }
+          )
+          .subscribe();
+
+      realtimeChannel.current = channel;
+  };
 
   // --- FETCHERS ---
   const fetchData = async (userId: string) => {
@@ -170,7 +213,9 @@ const App: React.FC = () => {
       if (habitsRes.data) setHabits(habitsRes.data);
       if (goalsRes.data) setGoals(goalsRes.data);
 
-      setCurrentView(ViewState.TODAY);
+      if (currentView === ViewState.AUTH) {
+          setCurrentView(ViewState.TODAY);
+      }
 
     } catch (error) {
       console.error("CRITICAL FETCH ERROR:", error);
@@ -181,13 +226,16 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
     setProfileVisible(false);
     setSidebarVisible(false);
     await supabase.auth.signOut();
   };
 
-  // --- PLACEHOLDERS FOR ACTIONS ---
-  const aiAddTask = async (title: string, priority: string) => {};
+  // --- ACTIONS (Optimistic Update + DB Call) ---
+  const aiAddTask = async (title: string, priority: string) => {
+      // Logic handled in component mostly, or we could lift state here
+  };
   const aiAddHabit = async (title: string) => {};
   const aiAddGoal = async (title: string) => {};
   const aiStartFocus = (minutes: number) => setCurrentView(ViewState.FOCUS_MODE);
@@ -195,7 +243,6 @@ const App: React.FC = () => {
   const toggleHabit = async (id: string) => {
      const habit = habits.find(h => h.id === id);
      if(habit) {
-         // Vérifier si déjà complété aujourd'hui (Local Time)
          const today = new Date();
          const lastCompleted = habit.last_completed_at ? new Date(habit.last_completed_at) : null;
          
@@ -204,12 +251,7 @@ const App: React.FC = () => {
              lastCompleted.getMonth() === today.getMonth() &&
              lastCompleted.getFullYear() === today.getFullYear();
 
-         if (isDoneToday) {
-             // Si déjà fait, on ne fait rien pour l'instant (éviter le spam de clic), 
-             // ou on pourrait implémenter le "undo" si besoin.
-             // Pour l'instant on retourne juste pour éviter l'incrémentation infinie.
-             return; 
-         }
+         if (isDoneToday) return; 
 
          const newStreak = (habit.streak || 0) + 1;
          const nowISO = new Date().toISOString();
@@ -229,7 +271,9 @@ const App: React.FC = () => {
      const task = tasks.find(t => t.id === id);
      if(task) {
          const newVal = !task.completed;
+         // Optimistic
          setTasks(prev => prev.map(t => t.id === id ? {...t, completed: newVal} : t));
+         // DB
          await supabase.from('tasks').update({ completed: newVal }).eq('id', id);
      }
   };
@@ -238,7 +282,9 @@ const App: React.FC = () => {
       const goal = goals.find(g => g.id === id);
       if(goal) {
           const newVal = !goal.completed;
+          // Optimistic
           setGoals(prev => prev.map(g => g.id === id ? {...g, completed: newVal} : g));
+          // DB
           await supabase.from('goals').update({ completed: newVal }).eq('id', id);
       }
   };
