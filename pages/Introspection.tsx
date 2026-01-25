@@ -45,13 +45,13 @@ const Introspection: React.FC<IntrospectionProps> = (props) => {
                 {view === 'JOURNAL' ? (
                     <Journal 
                         userId={props.userId} 
-                        openMenu={props.openMenu} 
+                        openMenu={() => {}} 
                         isDarkMode={props.isDarkMode} 
                     />
                 ) : (
                     <ReflectionPage 
                         userId={props.userId} 
-                        openMenu={props.openMenu} 
+                        openMenu={() => {}} 
                         isDarkMode={props.isDarkMode} 
                     />
                 )}

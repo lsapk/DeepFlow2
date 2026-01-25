@@ -427,11 +427,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <View style={styles.header}>
-            <TouchableOpacity onPress={openMenu} style={styles.menuBtn}>
-                <Menu size={24} color={colors.text} />
-            </TouchableOpacity>
-            
-            <View style={styles.headerTitleContainer} pointerEvents="none">
+            <View style={styles.headerTitleContainer}>
                 <Text style={[styles.headerTitle, {color: colors.text}]}>Mode Focus</Text>
             </View>
 
@@ -468,20 +464,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     height: 60,
   },
-  menuBtn: {
-      padding: 8,
-      zIndex: 50,
-  },
   headerTitleContainer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
   },
   headerTitle: {
       fontSize: 20,
       fontWeight: '700',
-      textAlign: 'center',
+      textAlign: 'left',
   },
   modeTabs: {
       flexDirection: 'row',
@@ -501,7 +491,7 @@ const styles = StyleSheet.create({
   },
   configScroll: {
       paddingHorizontal: 20,
-      paddingBottom: 50,
+      paddingBottom: 150,
   },
   section: {
       marginBottom: 24,

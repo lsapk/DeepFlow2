@@ -207,11 +207,7 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
     <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: insets.top}]}>
       {/* Header Styled Apple */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-            <Menu size={24} color={colors.button} />
-        </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer} pointerEvents="none">
+        <View style={styles.headerTitleContainer}>
             <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
         </View>
 
@@ -255,23 +251,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 50,
-  },
   headerTitleContainer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
   },
   headerTitle: {
       fontSize: 22,
       fontWeight: '700',
-      textAlign: 'center',
+      textAlign: 'left',
   },
   toggleBtn: {
       flexDirection: 'row',

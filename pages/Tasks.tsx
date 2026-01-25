@@ -113,10 +113,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-          <TouchableOpacity style={styles.menuButton} onPress={openMenu}>
-              <Menu size={24} color={colors.accent} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer} pointerEvents="none">
+          <View style={styles.headerTitleContainer}>
               <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
@@ -291,10 +288,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
   header: { paddingHorizontal: 20, marginBottom: 20, marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 50 },
-  largeTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  headerTitleContainer: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  largeTitle: { fontSize: 22, fontWeight: '700', textAlign: 'left' },
+  headerTitleContainer: { flex: 1, justifyContent: 'center' },
   addButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  menuButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 150 },
   listGroup: { borderRadius: 14, overflow: 'hidden' },
   completedGroup: { marginTop: 30 },

@@ -139,9 +139,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* FIXED HEADER LAYOUT */}
       <View style={styles.header}>
-         <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-              <Menu size={24} color={colors.accent} />
-          </TouchableOpacity>
          
          <View style={styles.centerTitle}>
              <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
@@ -307,7 +304,7 @@ const styles = StyleSheet.create({
   },
   centerTitle: {
       flex: 1,
-      alignItems: 'center',
+      alignItems: 'flex-start',
       justifyContent: 'center',
   },
   largeTitle: {

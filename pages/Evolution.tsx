@@ -60,7 +60,7 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         tasks={props.tasks}
                         habits={props.habits}
                         goals={props.goals}
-                        openMenu={props.openMenu}
+                        openMenu={() => {}}
                         openProfile={props.openProfile}
                         onAddTask={props.onAddTask}
                         onAddHabit={props.onAddHabit}
@@ -73,7 +73,7 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         player={props.player}
                         user={props.user}
                         quests={props.quests}
-                        openMenu={props.openMenu}
+                        openMenu={() => {}}
                         openProfile={props.openProfile}
                         isDarkMode={props.isDarkMode}
                     />

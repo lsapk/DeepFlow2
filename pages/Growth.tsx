@@ -306,9 +306,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
     >
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
         <View style={styles.header}>
-            <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                <Menu size={24} color={colors.button} />
-            </TouchableOpacity>
+            <View style={{width: 40}} /> 
             <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
             <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
                 <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />

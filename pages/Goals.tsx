@@ -118,10 +118,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-          <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-              <Menu size={24} color={colors.accent} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer} pointerEvents="none">
+          <View style={styles.headerTitleContainer}>
               <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={openCreateModal}>
@@ -395,13 +392,11 @@ const styles = StyleSheet.create({
   largeTitle: {
     fontSize: 22,
     fontWeight: '700',
-    textAlign: 'center',
+    textAlign: 'left',
   },
   headerTitleContainer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
   },
   iconBtn: {
     width: 40,

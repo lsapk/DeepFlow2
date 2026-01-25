@@ -62,7 +62,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                         habits={props.habits} 
                         toggleTask={props.toggleTask} 
                         toggleHabit={props.toggleHabit} 
-                        openMenu={props.openMenu} 
+                        openMenu={() => {}} 
                     />
                 ) : (
                     <Goals 
@@ -75,7 +75,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                         deleteSubObjective={props.deleteSubObjective}
                         userId={props.userId}
                         refreshGoals={props.refreshGoals}
-                        openMenu={props.openMenu}
+                        openMenu={() => {}}
                         isDarkMode={props.isDarkMode}
                     />
                 )}

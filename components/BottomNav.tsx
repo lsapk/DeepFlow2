@@ -8,9 +8,10 @@ import * as Haptics from 'expo-haptics';
 interface BottomNavProps {
   currentView: ViewState;
   setView: (view: ViewState) => void;
+  isDarkMode?: boolean;
 }
 
-const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode = true }) => {
   const insets = useSafeAreaInsets();
   
   const navItems = [
@@ -26,19 +27,23 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
       setView(view);
   };
 
+  const backgroundColor = isDarkMode ? 'rgba(28, 28, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const borderTopColor = isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const activeColor = '#007AFF';
+  const inactiveColor = isDarkMode ? '#8E8E93' : '#999999';
+
   return (
     <View style={[
         styles.container, 
         { 
+            backgroundColor: backgroundColor,
+            borderTopColor: borderTopColor,
             paddingBottom: Math.max(insets.bottom, 20),
             height: 80 + Math.max(insets.bottom, 0) 
         }
     ]}>
       {navItems.map((item) => {
         const Icon = item.icon;
-        
-        // La logique "isActive" doit prendre en compte les sous-vues si nécessaire, 
-        // mais ici on se base sur les vues principales.
         const isActive = currentView === item.view;
 
         if (item.isSpecial) {
@@ -65,10 +70,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
           >
             <Icon 
                 size={24} 
-                color={isActive ? '#007AFF' : '#8E8E93'} 
+                color={isActive ? activeColor : inactiveColor} 
                 strokeWidth={isActive ? 2.5 : 2}
             />
-            <Text style={[styles.label, { color: isActive ? '#007AFF' : '#8E8E93' }]}>
+            <Text style={[styles.label, { color: isActive ? activeColor : inactiveColor }]}>
                 {item.label}
             </Text>
           </TouchableOpacity>
@@ -81,9 +86,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.95)', // Glassmorphism light default
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(0,0,0,0.1)',
     paddingHorizontal: 10,
     paddingTop: 10,
     justifyContent: 'space-between',
@@ -93,12 +96,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
-    // Shadow for elevation
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 10,
   },
   tab: {
     alignItems: 'center',

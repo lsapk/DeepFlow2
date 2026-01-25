@@ -3,7 +3,6 @@ import { SafeAreaView, StatusBar, View, Modal, Text, StyleSheet, TouchableOpacit
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomNav from './components/BottomNav';
-import Sidebar from './components/Sidebar';
 import LevelUpModal from './components/LevelUpModal';
 import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal, Quest, Subtask, SubObjective } from './types';
 import Dashboard from './pages/Dashboard';
@@ -44,7 +43,6 @@ Notifications.setNotificationHandler({
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.AUTH);
   const [profileVisible, setProfileVisible] = useState(false);
-  const [sidebarVisible, setSidebarVisible] = useState(false);
   
   // Level Up State
   const [levelUpVisible, setLevelUpVisible] = useState(false);
@@ -265,7 +263,6 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
     setProfileVisible(false);
-    setSidebarVisible(false);
     await supabase.auth.signOut();
   };
 
@@ -689,7 +686,7 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case ViewState.TODAY:
-        return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} {...commonProps} />;
+        return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} {...commonProps} />;
       
       // Nouvelle structure :
       case ViewState.PLANNING:
@@ -707,11 +704,11 @@ const App: React.FC = () => {
             deleteSubObjective={deleteSubObjective} 
             userId={user.id} 
             refreshGoals={()=>{}} 
-            openMenu={() => setSidebarVisible(true)} 
+            openMenu={() => {}} 
             isDarkMode={isDarkMode} 
         />;
       case ViewState.INTROSPECTION:
-        return <Introspection userId={user.id} openMenu={() => setSidebarVisible(true)} isDarkMode={isDarkMode} />;
+        return <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} />;
       case ViewState.EVOLUTION:
         return <Evolution 
             player={player} 
@@ -720,7 +717,7 @@ const App: React.FC = () => {
             habits={habits} 
             goals={goals} 
             quests={quests} 
-            openMenu={() => setSidebarVisible(true)} 
+            openMenu={() => {}} 
             openProfile={() => setProfileVisible(true)} 
             onAddTask={(t, p) => createTask(t, p as any)} 
             onAddHabit={(t) => createHabit({title: t})} 
@@ -731,24 +728,24 @@ const App: React.FC = () => {
       
       // Vues maintenues pour compatibilité ou accès direct si besoin
       case ViewState.TASKS: 
-          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={()=>{}} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
+          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={()=>{}} openMenu={() => {}} {...commonProps} />;
       case ViewState.HABITS: 
-          return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={archiveHabit} deleteHabit={deleteHabit} refreshHabits={()=>{}} openMenu={() => setSidebarVisible(true)} {...commonProps} />;
+          return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={archiveHabit} deleteHabit={deleteHabit} refreshHabits={()=>{}} openMenu={() => {}} {...commonProps} />;
       case ViewState.GOALS:
           return <Planning 
-            tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={toggleGoal} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={()=>{}} openMenu={() => setSidebarVisible(true)} isDarkMode={isDarkMode} 
+            tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={toggleGoal} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={()=>{}} openMenu={() => {}} isDarkMode={isDarkMode} 
           />; // Redirection vers Planning pour garder la cohérence
       
       case ViewState.FOCUS_MODE:
-        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={() => setSidebarVisible(true)} />;
+        return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={() => {}} />;
       
       case ViewState.CALENDAR: // Redirige aussi vers Planning
         return <Planning 
-            tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={toggleGoal} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={()=>{}} openMenu={() => setSidebarVisible(true)} isDarkMode={isDarkMode} 
+            tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={toggleGoal} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={()=>{}} openMenu={() => {}} isDarkMode={isDarkMode} 
         />;
 
       default:
-        return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openMenu={() => setSidebarVisible(true)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} {...commonProps} />;
+        return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} {...commonProps} />;
     }
   };
 
@@ -771,17 +768,6 @@ const App: React.FC = () => {
                     />
                 )}
 
-                {currentView !== ViewState.ONBOARDING && (
-                    <Sidebar 
-                        visible={sidebarVisible} 
-                        onClose={() => setSidebarVisible(false)}
-                        user={user}
-                        setView={setCurrentView}
-                        currentView={currentView}
-                        onLogout={handleLogout}
-                    />
-                )}
-
                 {currentView !== ViewState.ONBOARDING && user && player && (
                     <Profile 
                         visible={profileVisible} 
@@ -790,8 +776,8 @@ const App: React.FC = () => {
                     />
                 )}
 
-                {currentView !== ViewState.ONBOARDING && session && user && currentView !== ViewState.FOCUS_MODE && (
-                    <BottomNav currentView={currentView} setView={setCurrentView} />
+                {currentView !== ViewState.ONBOARDING && session && user && (
+                    <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
                 )}
             </View>
             </SafeAreaView>

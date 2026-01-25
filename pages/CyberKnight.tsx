@@ -196,11 +196,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       {/* UNIFORM HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-            <Menu size={24} color={colors.button} />
-        </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer} pointerEvents="none">
+        <View style={styles.headerTitleContainer}>
             <Text style={[styles.largeTitle, {color: colors.text}]}>Cyber Knight</Text>
         </View>
 
@@ -257,15 +253,13 @@ const styles = StyleSheet.create({
       zIndex: 50,
   },
   headerTitleContainer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
   },
   largeTitle: {
       fontSize: 22,
       fontWeight: '700',
-      textAlign: 'center',
+      textAlign: 'left',
   },
   avatar: {
     width: 36,

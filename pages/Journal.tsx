@@ -135,10 +135,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.header}>
-            <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
-                <Menu size={24} color={colors.accent} />
-            </TouchableOpacity>
-            <View style={styles.headerTitleContainer} pointerEvents="none">
+            <View style={styles.headerTitleContainer}>
                 <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
             </View>
             <TouchableOpacity onPress={openModal} style={styles.addButton}>
@@ -272,15 +269,13 @@ const styles = StyleSheet.create({
       zIndex: 50, // BUTTONS ON TOP
   },
   headerTitleContainer: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
   },
   largeTitle: {
     fontSize: 22,
     fontWeight: '700',
-    textAlign: 'center',
+    textAlign: 'left',
   },
   addButton: {
       width: 40,
@@ -407,7 +402,7 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 16,
+      paddingVertical: 16,
       borderRadius: 12,
       marginBottom: 40,
   },
