@@ -63,127 +63,206 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   // Analytics State
   const [weeklyFocusData, setWeeklyFocusData] = useState<number[]>([0,0,0,0,0,0,0]);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
-  const [bestDay, setBestDay] = useState('N/A');
-  const [peakHour, setPeakHour] = useState<string>('N/A');
-  const [chronoProfile, setChronoProfile] = useState<string>('Analyse en cours...');
+  const [peakHour, setPeakHour] = useState<string>('En attente de données');
+  const [chronoProfile, setChronoProfile] = useState<string>('N/A');
   
   // 6 Categories Radar
-  const [radarData, setRadarData] = useState([50,50,50,50,50,50]); 
-  const [heatmapData, setHeatmapData] = useState<number[]>(Array(84).fill(0)); 
+  const [radarData, setRadarData] = useState([20,20,20,20,20,20]); // Base value visible
+  const [heatmapData, setHeatmapData] = useState<number[]>(Array(90).fill(0)); 
 
   useEffect(() => {
-      // Fetch Real Focus Data for Analytics
-      fetchRealFocusStats();
+      // Parallel fetch for robust stats
+      const initData = async () => {
+          await Promise.all([
+            fetchFocusStats(),
+            fetchHeatmapData()
+          ]);
+          calculateLifeWheel();
+          setLoading(false);
+      };
+      
+      initData();
       
       const timer = setTimeout(() => {
-          setLoading(false);
-          setMessages([{ role: 'ai', text: `Bonjour **${user.display_name?.split(' ')[0]}** ! 👋\n\nL'analyse de tes données est prête. Je peux t'aider à optimiser ta routine.` }]);
+          if (messages.length === 0) {
+              setMessages([{ role: 'ai', text: `Bonjour **${user.display_name?.split(' ')[0]}** ! 👋\n\nJ'ai analysé vos données réelles. Demandez-moi des conseils pour améliorer votre productivité.` }]);
+          }
       }, 1000);
       
-      calculateStats();
-      
       return () => clearTimeout(timer);
-  }, [tasks, habits]);
+  }, [tasks, habits, goals]);
 
-  const calculateStats = () => {
-      // 1. CHRONOBIOLOGY
-      const activeHours: number[] = [];
-      tasks.forEach(t => {
-          if(t.completed) activeHours.push(new Date(t.created_at).getHours());
-      });
-      if(activeHours.length < 5) {
-          activeHours.push(9, 10, 10, 11, 14, 15, 16); 
-      }
-      
-      const counts: Record<number, number> = {};
-      activeHours.forEach(h => counts[h] = (counts[h] || 0) + 1);
-      const peak = Object.keys(counts).reduce((a, b) => counts[parseInt(a)] > counts[parseInt(b)] ? a : b, "10");
-      const peakInt = parseInt(peak);
-      
-      setPeakHour(`${peakInt}h00 - ${peakInt+1}h00`);
-      if (peakInt < 10) setChronoProfile("Lève-tôt (Alouette)");
-      else if (peakInt > 20) setChronoProfile("Oiseau de nuit (Chouette)");
-      else setChronoProfile("Rythme Standard (Colibri)");
+  // 1. CALCUL REAL WHEEL OF LIFE (Based on Keywords)
+  const calculateLifeWheel = () => {
+      // Dictionnaire de mots clés (sommaire pour la démo, extensible)
+      const CATEGORIES: Record<string, string[]> = {
+          health: ['sport', 'run', 'gym', 'manger', 'eau', 'sleep', 'santé', 'medit', 'yoga', 'marche', 'fitness'],
+          leisure: ['jeu', 'game', 'play', 'art', 'music', 'fun', 'film', 'série', 'lire', 'hobby', 'loisir', 'vacances'],
+          personal: ['famille', 'ami', 'maison', 'clean', 'menage', 'appel', 'social', 'courses', 'chat', 'chien'],
+          learning: ['apprendre', 'learn', 'cours', 'study', 'etude', 'livre', 'langue', 'skill', 'tuto'],
+          mental: ['journal', 'reflec', 'penser', 'stoic', 'calme', 'focus', 'log', 'plan'],
+          career: ['work', 'travail', 'boulot', 'code', 'dev', 'email', 'réunion', 'meet', 'projet', 'client']
+      };
 
-      // 2. RADAR CHART (6 Axes: Santé, Loisirs, Personnel, Apprentissage, Mental, Carrière)
-      let sHealth = 20, sLeisure = 20, sPersonal = 20, sLearn = 20, sMental = 20, sCareer = 20;
-      
+      const scores = { health: 0, leisure: 0, personal: 0, learning: 0, mental: 0, career: 0 };
+
+      // Helper to classify text
+      const classify = (text: string, points: number) => {
+          const lower = text.toLowerCase();
+          let found = false;
+          for (const [cat, keywords] of Object.entries(CATEGORIES)) {
+              if (keywords.some((k: string) => lower.includes(k))) {
+                  scores[cat as keyof typeof scores] += points;
+                  found = true;
+                  break; // Count once
+              }
+          }
+          // If not found, assign to Personal or Career based on context? Default to Personal slightly
+          if (!found) scores.personal += (points * 0.5); 
+      };
+
+      // Analyze Habits (Weighted by streak)
       habits.forEach(h => {
-          const cat = (h.category || '').toLowerCase();
-          const title = (h.title || '').toLowerCase();
-          const bonus = Math.min(h.streak * 2, 40);
-          
-          const text = cat + ' ' + title;
-
-          if (text.match(/sport|eau|manger|fitness|health|santé/)) sHealth += bonus;
-          else if (text.match(/jeu|game|art|musique|fun|loisir|hobby/)) sLeisure += bonus;
-          else if (text.match(/maison|ménage|famille|ami|social|perso/)) sPersonal += bonus;
-          else if (text.match(/lire|read|cours|apprendre|langue|study/)) sLearn += bonus;
-          else if (text.match(/médit|calme|journal|stoic|mental|esprit/)) sMental += bonus;
-          else if (text.match(/travail|code|projet|job|carrière/)) sCareer += bonus;
-          else sPersonal += (bonus / 2); // Fallback
+          if (h.streak > 0) {
+              const points = Math.min(50, 10 + h.streak); // Max 50 per habit
+              classify(h.title + ' ' + (h.category || ''), points);
+          }
       });
 
-      tasks.forEach(t => {
-           if (t.completed) {
-                const text = (t.title + ' ' + (t.description || '')).toLowerCase();
-                const bonus = 5;
-                if (text.match(/sport|santé/)) sHealth += bonus;
-                else if (text.match(/travail|code/)) sCareer += bonus;
-                else if (text.match(/lire|apprendre/)) sLearn += bonus;
-                else sPersonal += bonus;
-           }
+      // Analyze Completed Tasks (Fixed weight)
+      tasks.filter(t => t.completed).forEach(t => {
+          classify(t.title, 10);
       });
-      
-      const normalize = (val: number) => Math.min(100, Math.max(20, val));
-      
-      // Ordre: Santé, Loisirs, Personnel, Apprentissage, Mental, Carrière
-      setRadarData([
-          normalize(sHealth), 
-          normalize(sLeisure), 
-          normalize(sPersonal), 
-          normalize(sLearn), 
-          normalize(sMental), 
-          normalize(sCareer)
-      ]);
 
-      // 3. HEATMAP
-      const newHeatmap = Array(84).fill(0).map(() => Math.random() > 0.7 ? (Math.random() > 0.5 ? 2 : 1) : 0);
-      setHeatmapData(newHeatmap);
+      // Analyze Goals (Big weight)
+      goals.forEach(g => {
+          if (g.completed) classify(g.title, 50);
+          else if ((g.progress || 0) > 0) classify(g.title, 20);
+      });
+
+      // Normalize to 0-100 (Relative to max score found or fixed ceiling)
+      // To ensure the chart looks good, we cap at 100 but allow small values to show.
+      const data = [
+          scores.health, scores.leisure, scores.personal, 
+          scores.learning, scores.mental, scores.career
+      ].map(val => Math.min(100, Math.max(10, val))); // Min 10 to show a dot
+
+      setRadarData(data);
   };
 
-  const fetchRealFocusStats = async () => {
-      // Get last 7 days focus sessions
+  // 2. FETCH REAL CHRONOBIOLOGY
+  const fetchFocusStats = async () => {
       const today = new Date();
-      const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      // Last 30 days for robust patterns
+      const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const { data: sessions } = await supabase
         .from('focus_sessions')
-        .select('duration, completed_at')
+        .select('duration, started_at, completed_at')
         .eq('user_id', user.id)
-        .gte('completed_at', lastWeek);
+        .gte('completed_at', lastMonth);
 
-      if (sessions) {
-          const weeklyData = [0, 0, 0, 0, 0, 0, 0];
+      if (sessions && sessions.length > 0) {
+          // Weekly Chart Data
+          const weekly = [0,0,0,0,0,0,0];
           let total = 0;
+          
+          // Peak Hour Data
+          const hourCounts: Record<number, number> = {};
 
-          sessions.forEach(session => {
-              if (session.completed_at) {
-                  const day = new Date(session.completed_at).getDay(); // 0 = Sunday
-                  weeklyData[day] += (session.duration || 0);
-                  total += (session.duration || 0);
+          sessions.forEach(s => {
+              // Weekly
+              if (s.completed_at) {
+                  const day = new Date(s.completed_at).getDay();
+                  weekly[day] += (s.duration || 0);
+                  total += (s.duration || 0);
+              }
+              
+              // Peak Hour (start time is better indicator of intent)
+              if (s.started_at) {
+                  const h = new Date(s.started_at).getHours();
+                  hourCounts[h] = (hourCounts[h] || 0) + 1;
               }
           });
 
-          setWeeklyFocusData(weeklyData);
+          setWeeklyFocusData(weekly);
           setTotalFocusTime(total);
 
-          // Best Day
-          const maxVal = Math.max(...weeklyData);
-          const maxIdx = weeklyData.indexOf(maxVal);
-          const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-          setBestDay(maxVal > 0 ? days[maxIdx] : 'N/A');
+          // Find Peak
+          let maxCount = 0;
+          let bestHour = -1;
+          for (const [h, count] of Object.entries(hourCounts)) {
+              if (count > maxCount) {
+                  maxCount = count;
+                  bestHour = parseInt(h);
+              }
+          }
+
+          if (bestHour !== -1) {
+              setPeakHour(`${bestHour}h00 - ${bestHour + 1}h00`);
+              if (bestHour < 10) setChronoProfile("Lève-tôt (Alouette)");
+              else if (bestHour >= 21) setChronoProfile("Oiseau de Nuit");
+              else setChronoProfile("Rythme Standard");
+          } else {
+              setPeakHour("Pas assez de données");
+              setChronoProfile("Inconnu");
+          }
+      } else {
+          setPeakHour("Aucune session");
+          setChronoProfile("Inconnu");
       }
+  };
+
+  // 3. REAL HEATMAP (90 Days)
+  const fetchHeatmapData = async () => {
+      // Map of "YYYY-MM-DD" -> intensity (0-4)
+      const activityMap: Record<string, number> = {};
+      const today = new Date();
+      
+      // Init last 90 days with 0
+      for(let i=0; i<90; i++) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          const key = d.toISOString().split('T')[0];
+          activityMap[key] = 0;
+      }
+
+      // Add Task Completions (Approx via created_at if no completed_at, 
+      // but ideally we should track completed_at in DB. Assuming created_at for now as proxy or if completed=true)
+      // *Correction*: We only have created_at in the frontend type, checking DB logic...
+      // Let's assume for this component we fetch `tasks` filtered by completed. 
+      // In a real app, we'd query a `completed_at` column. 
+      // Fallback: Use Focus Sessions + Habit Completions which have dates.
+
+      // 1. Habits
+      const { data: habitLogs } = await supabase
+          .from('habit_completions')
+          .select('completed_date')
+          .eq('user_id', user.id)
+          .gte('completed_date', Object.keys(activityMap)[89]); // Oldest date
+      
+      habitLogs?.forEach(log => {
+          if (activityMap[log.completed_date] !== undefined) activityMap[log.completed_date] += 1;
+      });
+
+      // 2. Focus Sessions
+      const { data: focusLogs } = await supabase
+        .from('focus_sessions')
+        .select('completed_at')
+        .eq('user_id', user.id)
+        .gte('completed_at', Object.keys(activityMap)[89]);
+      
+      focusLogs?.forEach(log => {
+          const k = log.completed_at.split('T')[0];
+          if (activityMap[k] !== undefined) activityMap[k] += 2; // Focus counts double
+      });
+
+      // Convert map to array (Oldest to Newest)
+      const result = Object.entries(activityMap)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([_, val]) => Math.min(4, val)); // Cap at 4
+
+      setHeatmapData(result);
   };
 
   const switchTab = (tab: any) => {
@@ -202,7 +281,8 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       
       const context: any = {};
       if (aiPermissions.profile) context.user = { name: user.display_name, level: player.level };
-      if (aiPermissions.tasks) context.tasks = { pending: tasks.filter(t => !t.completed).length };
+      if (aiPermissions.tasks) context.tasks = { pending: tasks.filter(t => !t.completed).length, total: tasks.length };
+      if (aiPermissions.goals) context.goals = { active: goals.filter(g => !g.completed).map(g => g.title) };
       
       const response = await generateActionableCoaching(userMsg, context, isCreationMode);
       setLoadingAi(false);
@@ -229,7 +309,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   // --- VISUALIZATIONS ---
   const RadarChart = () => {
-      const size = 300; // Increased size for text
+      const size = 300; 
       const center = size / 2;
       const radius = 90; 
       const labels = ["Santé", "Loisirs", "Perso", "Appr.", "Mental", "Carrière"];
@@ -244,7 +324,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       
       const getLabelCoords = (i: number) => {
           const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
-          const r = radius + 25; // Offset for label
+          const r = radius + 25; 
           return {
               x: center + r * Math.cos(angle),
               y: center + r * Math.sin(angle)
@@ -314,14 +394,20 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const Heatmap = () => {
+    // Determine colors based on intensity
+    const getColor = (val: number) => {
+        if (val === 0) return isDarkMode ? '#222' : '#E5E5EA';
+        if (val === 1) return '#E9D5FF'; // Very light purple
+        if (val === 2) return '#C4B5FD'; // Light purple
+        if (val === 3) return '#8B5CF6'; // Medium purple
+        return '#7C3AED'; // Dark purple
+    };
+
     return (
         <View style={styles.heatmapGrid}>
-            {heatmapData.map((val, i) => {
-                let color = isDarkMode ? '#222' : '#E5E5EA'; 
-                if (val === 1) color = '#C4B5FD'; 
-                if (val === 2) color = '#7C3AED'; 
-                return <View key={i} style={[styles.heatBox, {backgroundColor: color}]} />
-            })}
+            {heatmapData.map((val, i) => (
+                <View key={i} style={[styles.heatBox, {backgroundColor: getColor(val)}]} />
+            ))}
         </View>
     );
   };
@@ -332,7 +418,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
     <KeyboardAvoidingView 
         style={{flex: 1}} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={80} // Offset for BottomNav
+        keyboardVerticalOffset={80} 
     >
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
         <View style={styles.header}>
@@ -360,21 +446,21 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                         <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie</Text>
                     </View>
                     <RadarChart />
-                    <Text style={styles.cardFooter}>Équilibre calculé sur vos habitudes et tâches</Text>
+                    <Text style={styles.cardFooter}>Calculé via mots-clés de vos tâches & habitudes</Text>
                 </View>
 
                 <View style={[styles.card, {backgroundColor: colors.card}]}>
                     <View style={styles.cardHeader}>
                         <Grid size={20} color={colors.success} />
-                        <Text style={[styles.cardTitle, {color: colors.text}]}>Heatmap de Consistance</Text>
+                        <Text style={[styles.cardTitle, {color: colors.text}]}>Heatmap (90 Jours)</Text>
                     </View>
                     <Heatmap />
                     <View style={styles.legend}>
-                        <Text style={styles.legendText}>Moins</Text>
+                        <Text style={styles.legendText}>Rien</Text>
                         <View style={[styles.heatBox, {backgroundColor: isDarkMode ? '#222' : '#E5E5EA'}]} />
                         <View style={[styles.heatBox, {backgroundColor: '#C4B5FD'}]} />
                         <View style={[styles.heatBox, {backgroundColor: '#7C3AED'}]} />
-                        <Text style={styles.legendText}>Plus</Text>
+                        <Text style={styles.legendText}>Intense</Text>
                     </View>
                 </View>
 
@@ -393,7 +479,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             <Text style={[styles.value, {color: colors.text}]}>{peakHour}</Text>
                         </View>
                     </View>
-                    <Text style={styles.cardFooter}>Basé sur vos heures de complétion</Text>
+                    <Text style={styles.cardFooter}>Analysé sur vos sessions Focus des 30 derniers jours</Text>
                 </View>
             </ScrollView>
         )}
@@ -414,6 +500,27 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                         ))}
                     </View>
                     <Text style={[styles.cardFooter, {marginTop: 20}]}>Total cette semaine: {Math.floor(totalFocusTime/60)}h {totalFocusTime % 60}m</Text>
+                </View>
+
+                <View style={[styles.card, {backgroundColor: colors.card}]}>
+                    <View style={styles.cardHeader}>
+                        <Activity size={20} color={colors.success} />
+                        <Text style={[styles.cardTitle, {color: colors.text}]}>KPIs Gloabux</Text>
+                    </View>
+                    <View style={styles.kpiGrid}>
+                        <View style={styles.kpiItem}>
+                            <Text style={[styles.kpiValue, {color: colors.text}]}>{tasks.filter(t => t.completed).length}</Text>
+                            <Text style={styles.kpiLabel}>Tâches Finies</Text>
+                        </View>
+                        <View style={styles.kpiItem}>
+                            <Text style={[styles.kpiValue, {color: colors.text}]}>{habits.filter(h => h.streak > 3).length}</Text>
+                            <Text style={styles.kpiLabel}>Habitudes Solides</Text>
+                        </View>
+                        <View style={styles.kpiItem}>
+                            <Text style={[styles.kpiValue, {color: colors.text}]}>{goals.filter(g => g.completed).length}</Text>
+                            <Text style={styles.kpiLabel}>Objectifs Atteints</Text>
+                        </View>
+                    </View>
                 </View>
             </ScrollView>
         )}
@@ -467,8 +574,8 @@ const styles = StyleSheet.create({
   cardFooter: { fontSize: 11, textAlign: 'center', color: '#888', marginTop: 10, fontStyle: 'italic' },
   
   // Heatmap
-  heatmapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center' },
-  heatBox: { width: 12, height: 12, borderRadius: 2 },
+  heatmapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center' },
+  heatBox: { width: 9, height: 9, borderRadius: 2 },
   legend: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 10 },
   legendText: { fontSize: 10, color: '#888' },
 
@@ -482,6 +589,12 @@ const styles = StyleSheet.create({
   barColumn: { alignItems: 'center', gap: 6 },
   barFill: { width: 8, borderRadius: 4 },
   barLabel: { fontSize: 10, color: '#888' },
+  
+  // KPIs
+  kpiGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  kpiItem: { alignItems: 'center', flex: 1 },
+  kpiValue: { fontSize: 24, fontWeight: '700' },
+  kpiLabel: { fontSize: 10, color: '#888', marginTop: 4 },
 
   // Chat
   chatContainer: { flex: 1, paddingHorizontal: 20 },

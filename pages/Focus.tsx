@@ -127,12 +127,20 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         .from('focus_sessions')
         .select('*')
         .eq('user_id', user.id)
-        .order('completed_at', { ascending: false })
-        .limit(30);
+        .order('completed_at', { ascending: false }) // Tri SQL primaire
+        .limit(50);
         
       if (data) {
-          setHistory(data);
-          const total = data.reduce((acc, curr) => acc + (curr.duration || 0), 0);
+          // Tri Client secondaire pour garantir l'ordre : Récents -> Anciens -> Sans date
+          const sortedData = data.sort((a, b) => {
+              if (!a.completed_at && !b.completed_at) return 0;
+              if (!a.completed_at) return 1; // a (null) à la fin
+              if (!b.completed_at) return -1; // b (null) à la fin
+              return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
+          });
+
+          setHistory(sortedData);
+          const total = sortedData.reduce((acc, curr) => acc + (curr.duration || 0), 0);
           setTotalTime(total);
       }
   };
@@ -485,6 +493,7 @@ const styles = StyleSheet.create({
   headerTitleContainer: {
       flex: 1,
       justifyContent: 'center',
+      paddingLeft: 40, // Offset back button
   },
   headerTitle: {
       fontSize: 20,

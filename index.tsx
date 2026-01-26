@@ -16,10 +16,10 @@ interface ErrorBoundaryState {
 
 // Composant de secours en cas de crash total
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+  state: ErrorBoundaryState = {
+    hasError: false,
+    error: null
+  };
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
