@@ -238,6 +238,12 @@ const App: React.FC = () => {
           previousLevelRef.current = playerData.level; // Init prev level
       }
 
+      // Fetch user settings to set theme
+      const { data: settingsData } = await supabase.from('user_settings').select('theme').eq('id', userId).single();
+      if (settingsData && settingsData.theme) {
+          setIsDarkMode(settingsData.theme === 'dark');
+      }
+
       const [tasksRes, habitsRes, goalsRes] = await Promise.all([
           supabase.from('tasks').select('*, subtasks(*)').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
@@ -773,6 +779,7 @@ const App: React.FC = () => {
                         visible={profileVisible} 
                         onClose={() => setProfileVisible(false)} 
                         user={user} player={player} logout={handleLogout} 
+                        onThemeChange={setIsDarkMode}
                     />
                 )}
 

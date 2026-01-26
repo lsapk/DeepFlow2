@@ -161,11 +161,14 @@ export interface Reflection {
 export interface CalendarEvent {
     id: string;
     title: string;
-    start_time?: string;
-    end_time?: string;
+    start_time?: string; // ISO String
+    end_time?: string;   // ISO String
     is_all_day: boolean;
     type: 'task' | 'habit' | 'google';
     status: 'pending' | 'completed';
+    color?: string;
+    description?: string;
+    location?: string;
     meta?: any;
 }
 

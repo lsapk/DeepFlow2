@@ -72,13 +72,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [heatmapData, setHeatmapData] = useState<number[]>(Array(84).fill(0)); 
 
   useEffect(() => {
-      // Simulate loading delay for skeleton demo
+      // Fetch Real Focus Data for Analytics
+      fetchRealFocusStats();
+      
       const timer = setTimeout(() => {
           setLoading(false);
           setMessages([{ role: 'ai', text: `Bonjour **${user.display_name?.split(' ')[0]}** ! 👋\n\nL'analyse de tes données est prête. Je peux t'aider à optimiser ta routine.` }]);
       }, 1000);
       
-      fetchRealFocusStats();
       calculateStats();
       
       return () => clearTimeout(timer);
@@ -152,9 +153,37 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const fetchRealFocusStats = async () => {
-      setTotalFocusTime(1450); 
-      setBestDay("Mardi");
-      setWeeklyFocusData([30, 45, 120, 60, 90, 0, 15]);
+      // Get last 7 days focus sessions
+      const today = new Date();
+      const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const { data: sessions } = await supabase
+        .from('focus_sessions')
+        .select('duration, completed_at')
+        .eq('user_id', user.id)
+        .gte('completed_at', lastWeek);
+
+      if (sessions) {
+          const weeklyData = [0, 0, 0, 0, 0, 0, 0];
+          let total = 0;
+
+          sessions.forEach(session => {
+              if (session.completed_at) {
+                  const day = new Date(session.completed_at).getDay(); // 0 = Sunday
+                  weeklyData[day] += (session.duration || 0);
+                  total += (session.duration || 0);
+              }
+          });
+
+          setWeeklyFocusData(weeklyData);
+          setTotalFocusTime(total);
+
+          // Best Day
+          const maxVal = Math.max(...weeklyData);
+          const maxIdx = weeklyData.indexOf(maxVal);
+          const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+          setBestDay(maxVal > 0 ? days[maxIdx] : 'N/A');
+      }
   };
 
   const switchTab = (tab: any) => {
@@ -303,6 +332,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
     <KeyboardAvoidingView 
         style={{flex: 1}} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={80} // Offset for BottomNav
     >
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
         <View style={styles.header}>
@@ -378,12 +408,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     <View style={styles.barChart}>
                         {weeklyFocusData.map((val, i) => (
                             <View key={i} style={styles.barColumn}>
-                                <View style={[styles.barFill, {height: Math.min(100, val), backgroundColor: i===6 ? colors.accent : (isDarkMode ? '#333' : '#CCC')}]} />
+                                <View style={[styles.barFill, {height: Math.min(100, (val / 120) * 100), backgroundColor: i===(new Date().getDay()) ? colors.accent : (isDarkMode ? '#333' : '#CCC')}]} />
                                 <Text style={styles.barLabel}>{['D','L','M','M','J','V','S'][i]}</Text>
                             </View>
                         ))}
                     </View>
-                    <Text style={[styles.cardFooter, {marginTop: 20}]}>Total cette semaine: {Math.floor(totalFocusTime/60)}h</Text>
+                    <Text style={[styles.cardFooter, {marginTop: 20}]}>Total cette semaine: {Math.floor(totalFocusTime/60)}h {totalFocusTime % 60}m</Text>
                 </View>
             </ScrollView>
         )}
@@ -401,7 +431,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     ))}
                     {loadingAi && <ActivityIndicator style={{margin: 20, alignSelf: 'flex-start'}} />}
                 </ScrollView>
-                <View style={[styles.inputContainer, {backgroundColor: colors.card, borderTopColor: colors.border}]}>
+                <View style={[styles.inputContainer, {backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: 100}]}>
                     <TextInput 
                         style={[styles.input, {backgroundColor: colors.inputBg, color: colors.text}]} 
                         value={chatInput} 
@@ -458,7 +488,7 @@ const styles = StyleSheet.create({
   bubble: { padding: 12, borderRadius: 16, marginBottom: 10, maxWidth: '85%' },
   bubbleUser: { backgroundColor: '#007AFF', alignSelf: 'flex-end' },
   bubbleAi: { alignSelf: 'flex-start' },
-  inputContainer: { padding: 16, borderTopWidth: 1, flexDirection: 'row', gap: 10, paddingBottom: 20 },
+  inputContainer: { padding: 16, borderTopWidth: 1, flexDirection: 'row', gap: 10 },
   input: { flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }
 });

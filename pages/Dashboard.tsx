@@ -55,9 +55,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
   const firstName = user.display_name?.split(' ')[0] || 'Voyageur';
 
-  // Logic Habits
+  // Logic Habits: Filter out archived and ensure day match
   const todaysHabits = habits.filter(h => {
-      if (!h.days_of_week || h.days_of_week.length === 0) return true;
+      if (h.is_archived) return false; // Important: Exclude archived
+      if (!h.days_of_week || h.days_of_week.length === 0) return true; // Daily default
       return h.days_of_week.includes(dayOfWeek);
   });
   
@@ -186,7 +187,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScroll}>
                 {sortedHabits.length === 0 && (
-                    <Text style={{color: colors.textSub, fontStyle: 'italic', paddingLeft: 4}}>Rien de prévu.</Text>
+                    <Text style={{color: colors.textSub, fontStyle: 'italic', paddingLeft: 4}}>Rien de prévu aujourd'hui.</Text>
                 )}
                 {sortedHabits.map((habit) => {
                     const isDone = habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), today);

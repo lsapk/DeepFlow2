@@ -123,7 +123,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('focus_sessions')
         .select('*')
         .eq('user_id', user.id)
@@ -132,8 +132,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         
       if (data) {
           setHistory(data);
-          // Simple client-side sum of loaded data for recent total
-          // Ideally use a .sum() aggregate in supabase or rpc
           const total = data.reduce((acc, curr) => acc + (curr.duration || 0), 0);
           setTotalTime(total);
       }
@@ -201,21 +199,30 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           // Gérer le format de date manuel simple ou ISO
           let completedAt;
           try {
+              // Ensure we have a valid ISO string date
               completedAt = new Date(manualDate);
-              if (isNaN(completedAt.getTime())) throw new Error();
+              if (isNaN(completedAt.getTime())) {
+                  // Fallback to now if manual date is invalid
+                  completedAt = new Date(); 
+              }
           } catch(e) {
               completedAt = new Date();
           }
           
           const startedAt = new Date(completedAt.getTime() - duration * 60000);
 
-          await supabase.from('focus_sessions').insert({
+          const { error } = await supabase.from('focus_sessions').insert({
               user_id: user.id,
               duration: duration,
               completed_at: completedAt.toISOString(),
               started_at: startedAt.toISOString(),
               title: manualTitle
           });
+
+          if (error) {
+              Alert.alert("Erreur", "Impossible de sauvegarder : " + error.message);
+              return;
+          }
 
           const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
           if (player) await addXp(user.id, Math.floor(duration / 2), player); 
@@ -360,11 +367,13 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               keyboardType="numeric"
           />
 
-          <Text style={[styles.label, {color: colors.subText}]}>DATE (YYYY-MM-DD)</Text>
+          <Text style={[styles.label, {color: colors.subText}]}>DATE (YYYY-MM-DDTHH:MM:SS)</Text>
           <TextInput 
               style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
               value={manualDate}
               onChangeText={setManualDate}
+              placeholder="Ex: 2024-03-20T14:00:00"
+              placeholderTextColor={colors.subText}
           />
 
           <TouchableOpacity style={[styles.startBtn, {backgroundColor: colors.accent}]} onPress={saveManualSession}>
@@ -401,21 +410,22 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                   
                   if (session.completed_at) {
                       const d = new Date(session.completed_at);
-                      dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                      timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                      // Affichage complet de la date et heure réelle
+                      dateStr = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
+                      timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                   }
                   
                   return (
                       <View key={session.id} style={[styles.historyItem, { backgroundColor: colors.card }]}>
                           <View style={{flex: 1}}>
-                              <Text style={[styles.hTitle, {color: colors.text}]}>{session.title || 'Session'}</Text>
+                              <Text style={[styles.hTitle, {color: colors.text}]}>{session.title || 'Session Focus'}</Text>
                               <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
                                 <Calendar size={12} color={colors.subText} />
                                 <Text style={[styles.hDate, {color: colors.subText}]}>{dateStr} à {timeStr}</Text>
                               </View>
                           </View>
                           <View style={[styles.hDurationBadge, {backgroundColor: colors.border}]}>
-                              <Text style={[styles.hDuration, {color: colors.text}]}>{session.duration}m</Text>
+                              <Text style={[styles.hDuration, {color: colors.text}]}>{session.duration} min</Text>
                           </View>
                       </View>
                   );
@@ -441,12 +451,14 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
              </View>
         </View>
 
+        <TouchableOpacity onPress={onExit} style={styles.backButton}>
+            <Text style={{color: colors.subText, fontSize: 14}}>Fermer</Text>
+        </TouchableOpacity>
+
         {viewMode === 'CONFIG' && renderConfig()}
         {viewMode === 'RUNNING' && renderRunning()}
         {viewMode === 'MANUAL' && renderManual()}
         {viewMode === 'HISTORY' && renderHistory()}
-        
-        {/* Floating cross removed */}
     </View>
   );
 };
@@ -461,8 +473,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    marginBottom: 10,
+    marginBottom: 0,
     height: 60,
+  },
+  backButton: {
+      position: 'absolute',
+      top: 20, 
+      left: 20,
+      zIndex: 10
   },
   headerTitleContainer: {
       flex: 1,

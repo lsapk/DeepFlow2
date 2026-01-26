@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown } from 'lucide-react-native';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2 } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,9 +12,10 @@ interface ProfileProps {
   logout: () => void;
   visible: boolean;
   onClose: () => void;
+  onThemeChange?: (isDark: boolean) => void;
 }
 
-const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose }) => {
+const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
   const [settings, setSettings] = useState<UserSettings>({
@@ -27,6 +28,11 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       clock_format: '24h'
   });
   
+  // Edit Profile State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(user.display_name || '');
+  const [editBio, setEditBio] = useState(user.bio || '');
+
   // Stats Data
   const [stats, setStats] = useState({
       tasksCompleted: 0,
@@ -86,9 +92,35 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const updateSetting = async (key: keyof UserSettings, value: any) => {
       const newSettings = { ...settings, [key]: value };
       setSettings(newSettings); 
+      
+      // Update global theme if applicable
+      if (key === 'theme' && onThemeChange) {
+          onThemeChange(value === 'dark');
+      }
+
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const { error } = await supabase.from('user_settings').update({ [key]: value }).eq('id', user.id);
-      if (error) setSettings(settings); // Revert
+      if (error) {
+          setSettings(settings); // Revert
+          Alert.alert("Erreur", "Impossible de sauvegarder le réglage.");
+      }
+  };
+
+  const saveProfile = async () => {
+      setLoading(true);
+      const { error } = await supabase.from('user_profiles').update({
+          display_name: editName,
+          bio: editBio
+      }).eq('id', user.id);
+
+      if (error) {
+          Alert.alert("Erreur", "Impossible de mettre à jour le profil.");
+      } else {
+          user.display_name = editName; // Local optimistic update
+          user.bio = editBio;
+          setIsEditing(false);
+      }
+      setLoading(false);
   };
 
   const switchTab = (tab: any) => {
@@ -105,9 +137,40 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                       <Text style={styles.levelBadgeText}>{player.level}</Text>
                   </View>
               </View>
-              <Text style={styles.name}>{user.display_name}</Text>
-              <Text style={styles.email}>{user.email}</Text>
-              <Text style={styles.rankText}>{player.avatar_type.toUpperCase()}</Text>
+              
+              {isEditing ? (
+                  <View style={{width: '100%', alignItems: 'center', marginBottom: 10}}>
+                      <TextInput 
+                          style={[styles.editInput, {fontSize: 20, fontWeight: '700', textAlign: 'center'}]}
+                          value={editName}
+                          onChangeText={setEditName}
+                          placeholder="Nom d'affichage"
+                          placeholderTextColor="#666"
+                      />
+                      <TextInput 
+                          style={[styles.editInput, {fontSize: 14, textAlign: 'center', marginTop: 8, minWidth: 200}]}
+                          value={editBio}
+                          onChangeText={setEditBio}
+                          placeholder="Votre bio..."
+                          placeholderTextColor="#666"
+                      />
+                      <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
+                          <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
+                              <X size={20} color="#FFF" />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={saveProfile} style={styles.confirmBtn}>
+                              <Check size={20} color="#FFF" />
+                          </TouchableOpacity>
+                      </View>
+                  </View>
+              ) : (
+                  <>
+                    <Text style={styles.name}>{user.display_name}</Text>
+                    <Text style={styles.email}>{user.email}</Text>
+                    {user.bio && <Text style={styles.bio}>{user.bio}</Text>}
+                    <Text style={styles.rankText}>{player.avatar_type.toUpperCase()}</Text>
+                  </>
+              )}
           </View>
 
           <View style={styles.xpCard}>
@@ -139,9 +202,12 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
               </View>
           </LinearGradient>
 
-          <TouchableOpacity style={styles.editProfileBtn}>
-              <Text style={styles.editProfileText}>Modifier le profil</Text>
-          </TouchableOpacity>
+          {!isEditing && (
+              <TouchableOpacity style={styles.editProfileBtn} onPress={() => setIsEditing(true)}>
+                  <Edit2 size={16} color="#FFF" style={{marginRight: 8}} />
+                  <Text style={styles.editProfileText}>Modifier le profil</Text>
+              </TouchableOpacity>
+          )}
       </View>
   );
 
@@ -173,9 +239,9 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>COMPTE</Text>
               <View style={styles.card}>
-                  <SettingItem icon={Shield} label="Confidentialité" iconColor="#8B5CF6" onPress={() => {}} />
+                  <SettingItem icon={Shield} label="Confidentialité" iconColor="#8B5CF6" onPress={() => Alert.alert("Confidentialité", "Vos données sont stockées de manière sécurisée et cryptée. Nous ne partageons aucune information avec des tiers.")} />
                   <View style={styles.separator} />
-                  <TouchableOpacity style={styles.item} onPress={logout}>
+                  <TouchableOpacity style={styles.item} onPress={() => Alert.alert("Déconnexion", "Voulez-vous vraiment vous déconnecter ?", [{text: "Annuler"}, {text: "Oui", style: 'destructive', onPress: logout}])}>
                         <View style={styles.itemLeft}>
                             <View style={[styles.iconBox, { backgroundColor: '#EF4444' }]}>
                                 <LogOut size={18} color="white" />
@@ -284,7 +350,7 @@ const StatCard = ({ label, value, icon: Icon, color }: any) => (
     </View>
 );
 
-import { CheckCircle, Clock } from 'lucide-react-native'; // Missing imports
+import { CheckCircle, Clock } from 'lucide-react-native'; 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
@@ -311,8 +377,19 @@ const styles = StyleSheet.create({
   levelBadgeText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
   name: { fontSize: 22, fontWeight: '700', color: '#FFF', marginBottom: 4 },
   email: { fontSize: 14, color: '#888', marginBottom: 8 },
+  bio: { fontSize: 14, color: '#CCC', marginBottom: 8, textAlign: 'center', paddingHorizontal: 20, fontStyle: 'italic' },
   rankText: { fontSize: 12, fontWeight: '700', color: '#C4B5FD', letterSpacing: 1 },
   
+  editInput: {
+      backgroundColor: '#1C1C1E',
+      color: '#FFF',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 8,
+  },
+  cancelBtn: { backgroundColor: '#333', padding: 10, borderRadius: 20 },
+  confirmBtn: { backgroundColor: '#34C759', padding: 10, borderRadius: 20 },
+
   xpCard: { backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16 },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   xpLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
@@ -326,7 +403,7 @@ const styles = StyleSheet.create({
   upgradeBtn: { backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   upgradeText: { color: '#4F46E5', fontWeight: '700', fontSize: 12 },
 
-  editProfileBtn: { backgroundColor: '#1C1C1E', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  editProfileBtn: { backgroundColor: '#1C1C1E', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   editProfileText: { color: '#FFF', fontWeight: '600' },
 
   // Settings Tab
