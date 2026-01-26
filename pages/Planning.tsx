@@ -63,6 +63,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                         toggleTask={props.toggleTask} 
                         toggleHabit={props.toggleHabit} 
                         openMenu={() => {}} 
+                        isDarkMode={props.isDarkMode}
                     />
                 ) : (
                     <Goals 

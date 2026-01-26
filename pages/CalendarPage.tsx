@@ -11,10 +11,11 @@ import Animated, { FadeIn, LayoutAnimationConfig } from 'react-native-reanimated
 WebBrowser.maybeCompleteAuthSession();
 
 // --- GOOGLE CONFIG ---
-// NOTE: Remplacez ces IDs par vos propres identifiants Google Cloud Console
 const GOOGLE_CONFIG = {
+    // ID Client Android fourni par l'utilisateur
+    androidClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
+    // Placeholder pour iOS/Web (à remplacer si nécessaire)
     iosClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com',
     webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
 };
 
@@ -24,11 +25,29 @@ interface CalendarPageProps {
     toggleTask: (id: string) => void;
     toggleHabit: (id: string) => void;
     openMenu?: () => void;
+    isDarkMode?: boolean;
 }
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, toggleHabit, openMenu }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, toggleHabit, openMenu, isDarkMode = true }) => {
     const insets = useSafeAreaInsets();
     
+    // Theme Colors
+    const colors = {
+        bg: isDarkMode ? '#000000' : '#F2F2F7',
+        text: isDarkMode ? '#FFFFFF' : '#000000',
+        textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
+        card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+        border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
+        toggleBg: isDarkMode ? '#1C1C1E' : '#E5E5EA',
+        toggleActive: isDarkMode ? '#3A3A3C' : '#FFFFFF',
+        daySelectedBg: isDarkMode ? '#FFFFFF' : '#000000',
+        daySelectedText: isDarkMode ? '#000000' : '#FFFFFF',
+        weekStripItem: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+        agendaBg: isDarkMode ? '#171717' : '#FFFFFF',
+        accent: '#007AFF',
+        googleRed: '#EA4335'
+    };
+
     // View State
     const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK'>('MONTH');
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -143,8 +162,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
             if (isForToday && !habit.is_archived) {
                 const isToday = isSameDay(selectedDate, new Date());
                 const isCompleted = habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), new Date());
-                // Pour les jours passés, on vérifie si c'était complété ce jour là (approximatif ici car on stocke que last_completed_at dans ce schéma simple)
-                // Dans une app complète, on checkerait la table 'habit_completions'
                 
                 events.push({
                     id: habit.id,
@@ -190,16 +207,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     };
 
     const hasEventsOnDay = (date: Date) => {
+        const dayOfWeek = date.getDay();
         // Check Google
         const hasGoogle = googleEvents.some(ev => isSameDay(new Date(ev.start_time!), date));
-        if (hasGoogle) return { has: true, color: '#EA4335' };
+        if (hasGoogle) return { has: true, color: colors.googleRed };
 
         // Check Task
         const hasTask = tasks.some(t => t.due_date && isSameDay(new Date(t.due_date), date));
-        if (hasTask) return { has: true, color: '#007AFF' };
+        if (hasTask) return { has: true, color: colors.accent };
 
-        // Check Habit (Simplified: show dot if scheduled)
-        const dayOfWeek = date.getDay();
+        // Check Habit
         const hasHabit = habits.some(h => !h.is_archived && (!h.days_of_week || h.days_of_week.includes(dayOfWeek)));
         if (hasHabit) return { has: true, color: '#FF9500' };
 
@@ -231,10 +248,14 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                     return (
                         <TouchableOpacity 
                             key={index} 
-                            style={[styles.dayCell, isSelected && styles.dayCellSelected]} 
+                            style={[styles.dayCell, isSelected && { backgroundColor: colors.daySelectedBg }]} 
                             onPress={() => { playMenuClick(); setSelectedDate(date); }}
                         >
-                            <Text style={[styles.dayNum, isSelected && { color: '#000', fontWeight: '700' }, isToday && !isSelected && { color: '#007AFF' }]}>
+                            <Text style={[
+                                styles.dayNum, 
+                                { color: isSelected ? colors.daySelectedText : colors.text },
+                                isToday && !isSelected && { color: colors.accent, fontWeight: '700' }
+                            ]}>
                                 {date.getDate()}
                             </Text>
                             {eventInfo.has && !isSelected && (
@@ -268,13 +289,21 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                     return (
                         <TouchableOpacity 
                             key={index} 
-                            style={[styles.weekDayItem, isSelected && styles.weekDaySelected]}
+                            style={[
+                                styles.weekDayItem, 
+                                { backgroundColor: colors.weekStripItem },
+                                isSelected && { backgroundColor: colors.accent }
+                            ]}
                             onPress={() => { playMenuClick(); setSelectedDate(date); }}
                         >
-                            <Text style={[styles.weekDayName, isSelected && {color: '#FFF'}]}>
+                            <Text style={[styles.weekDayName, { color: isSelected ? '#FFF' : colors.textSub }]}>
                                 {['D','L','M','M','J','V','S'][date.getDay()]}
                             </Text>
-                            <Text style={[styles.weekDayNum, isSelected && {color: '#FFF'}, isToday && !isSelected && {color: '#007AFF'}]}>
+                            <Text style={[
+                                styles.weekDayNum, 
+                                { color: isSelected ? '#FFF' : colors.text },
+                                isToday && !isSelected && { color: colors.accent }
+                            ]}>
                                 {date.getDate()}
                             </Text>
                             {eventInfo.has && !isSelected && (
@@ -294,11 +323,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     };
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
             {/* TOP BAR */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                    <Text style={styles.headerTitle}>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>
                         {viewMode === 'MONTH' 
                             ? currentMonthCursor.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()
                             : selectedDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()
@@ -308,16 +337,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 
                 <View style={styles.headerControls}>
                     {!googleToken && (
-                        <TouchableOpacity onPress={handleGoogleConnect} style={styles.googleBtn} disabled={isLoadingGoogle}>
-                            {isLoadingGoogle ? <ActivityIndicator size="small" color="#EA4335" /> : <CalendarIcon size={20} color="#EA4335" />}
+                        <TouchableOpacity onPress={handleGoogleConnect} style={[styles.googleBtn, { backgroundColor: 'rgba(234, 67, 53, 0.1)' }]} disabled={isLoadingGoogle}>
+                            {isLoadingGoogle ? <ActivityIndicator size="small" color={colors.googleRed} /> : <CalendarIcon size={20} color={colors.googleRed} />}
                         </TouchableOpacity>
                     )}
-                    <View style={styles.viewToggle}>
-                        <TouchableOpacity onPress={() => setViewMode('MONTH')} style={[styles.toggleItem, viewMode === 'MONTH' && styles.toggleActive]}>
-                            <Text style={[styles.toggleText, viewMode === 'MONTH' && styles.toggleTextActive]}>Mois</Text>
+                    <View style={[styles.viewToggle, { backgroundColor: colors.toggleBg }]}>
+                        <TouchableOpacity onPress={() => setViewMode('MONTH')} style={[styles.toggleItem, viewMode === 'MONTH' && { backgroundColor: colors.toggleActive }]}>
+                            <Text style={[styles.toggleText, { color: colors.textSub }, viewMode === 'MONTH' && { color: colors.text, fontWeight: '700' }]}>Mois</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setViewMode('WEEK')} style={[styles.toggleItem, viewMode === 'WEEK' && styles.toggleActive]}>
-                            <Text style={[styles.toggleText, viewMode === 'WEEK' && styles.toggleTextActive]}>Semaine</Text>
+                        <TouchableOpacity onPress={() => setViewMode('WEEK')} style={[styles.toggleItem, viewMode === 'WEEK' && { backgroundColor: colors.toggleActive }]}>
+                            <Text style={[styles.toggleText, { color: colors.textSub }, viewMode === 'WEEK' && { color: colors.text, fontWeight: '700' }]}>Semaine</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -326,16 +355,22 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
             {/* NAVIGATION & CALENDAR */}
             <View style={styles.calendarSection}>
                 <View style={styles.navRow}>
-                    <TouchableOpacity onPress={() => changePeriod(-1)} style={styles.navBtn}><ChevronLeft size={24} color="#FFF" /></TouchableOpacity>
-                    <Text style={styles.navLabel}>
+                    <TouchableOpacity onPress={() => changePeriod(-1)} style={styles.navBtn}>
+                        <ChevronLeft size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={[styles.navLabel, { color: colors.textSub }]}>
                         {viewMode === 'MONTH' ? 'Changer mois' : 'Changer semaine'}
                     </Text>
-                    <TouchableOpacity onPress={() => changePeriod(1)} style={styles.navBtn}><ChevronRight size={24} color="#FFF" /></TouchableOpacity>
+                    <TouchableOpacity onPress={() => changePeriod(1)} style={styles.navBtn}>
+                        <ChevronRight size={24} color={colors.text} />
+                    </TouchableOpacity>
                 </View>
 
                 {viewMode === 'MONTH' && (
                     <View style={styles.gridHeader}>
-                        {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d,i) => <Text key={i} style={styles.weekDayLabel}>{d}</Text>)}
+                        {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d,i) => (
+                            <Text key={i} style={[styles.weekDayLabel, { color: colors.textSub }]}>{d}</Text>
+                        ))}
                     </View>
                 )}
 
@@ -343,29 +378,29 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
             </View>
 
             {/* AGENDA LIST */}
-            <View style={styles.agendaContainer}>
+            <View style={[styles.agendaContainer, { backgroundColor: colors.agendaBg }]}>
                 <View style={styles.agendaHeader}>
-                    <Text style={styles.agendaDate}>
+                    <Text style={[styles.agendaDate, { color: colors.text }]}>
                         {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                     </Text>
-                    <TouchableOpacity onPress={() => setSelectedDate(new Date())} style={styles.todayBtn}>
-                        <Text style={styles.todayText}>Aujourd'hui</Text>
+                    <TouchableOpacity onPress={() => setSelectedDate(new Date())} style={[styles.todayBtn, { backgroundColor: isDarkMode ? '#333' : '#E5E5EA' }]}>
+                        <Text style={[styles.todayText, { color: colors.text }]}>Aujourd'hui</Text>
                     </TouchableOpacity>
                 </View>
 
                 <ScrollView contentContainerStyle={styles.eventsList} showsVerticalScrollIndicator={false}>
                     {mergedEvents.length === 0 ? (
                         <View style={styles.emptyState}>
-                            <Text style={styles.emptyText}>Rien de prévu pour ce jour.</Text>
+                            <Text style={[styles.emptyText, { color: colors.textSub }]}>Rien de prévu pour ce jour.</Text>
                             <TouchableOpacity style={styles.addEventHint}>
-                                <Text style={{color: '#007AFF'}}>+ Ajouter un objectif</Text>
+                                <Text style={{color: colors.accent}}>+ Ajouter un objectif</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
                         mergedEvents.map((event, index) => (
                             <Animated.View entering={FadeIn.delay(index * 50)} key={`${event.type}-${event.id}-${index}`}>
                                 <TouchableOpacity 
-                                    style={[styles.eventCard, { borderLeftColor: event.color }]} 
+                                    style={[styles.eventCard, { backgroundColor: colors.card, borderLeftColor: event.color }]} 
                                     activeOpacity={0.8} 
                                     onPress={() => {
                                         if (event.type === 'task') toggleTask(event.id);
@@ -373,27 +408,29 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                                         if (event.type === 'google') Alert.alert("Google Calendar", event.title);
                                     }}
                                 >
-                                    <View style={styles.timeColumn}>
+                                    <View style={[styles.timeColumn, { borderRightColor: colors.border }]}>
                                         {event.is_all_day ? (
-                                            <Text style={styles.timeText}>Journée</Text>
+                                            <Text style={[styles.timeText, { color: colors.text }]}>Journée</Text>
                                         ) : (
                                             <>
-                                                <Text style={styles.timeText}>{formatTime(event.start_time)}</Text>
-                                                <Text style={styles.endTimeText}>{formatTime(event.end_time)}</Text>
+                                                <Text style={[styles.timeText, { color: colors.text }]}>{formatTime(event.start_time)}</Text>
+                                                <Text style={[styles.endTimeText, { color: colors.textSub }]}>{formatTime(event.end_time)}</Text>
                                             </>
                                         )}
                                     </View>
                                     
                                     <View style={styles.eventContent}>
                                         <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-                                            <Text style={[styles.eventTitle, event.status === 'completed' && styles.textDone]} numberOfLines={1}>{event.title}</Text>
+                                            <Text style={[styles.eventTitle, { color: colors.text }, event.status === 'completed' && { textDecorationLine: 'line-through', color: colors.textSub }]} numberOfLines={1}>
+                                                {event.title}
+                                            </Text>
                                             {event.status === 'completed' ? <CheckCircle2 size={16} color="#4ADE80" /> : null}
                                         </View>
                                         
                                         {event.location && (
                                             <View style={styles.metaRow}>
-                                                <MapPin size={12} color="#888" />
-                                                <Text style={styles.metaText} numberOfLines={1}>{event.location}</Text>
+                                                <MapPin size={12} color={colors.textSub} />
+                                                <Text style={[styles.metaText, { color: colors.textSub }]} numberOfLines={1}>{event.location}</Text>
                                             </View>
                                         )}
                                         
@@ -415,7 +452,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#000' },
+    container: { flex: 1 },
     
     // Header
     header: { 
@@ -426,16 +463,14 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
     },
     headerLeft: { flex: 1 },
-    headerTitle: { fontSize: 18, fontWeight: '800', color: '#FFF' },
+    headerTitle: { fontSize: 18, fontWeight: '800' },
     headerControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     googleBtn: {
         padding: 8,
-        backgroundColor: 'rgba(234, 67, 53, 0.1)',
         borderRadius: 8,
     },
     viewToggle: {
         flexDirection: 'row',
-        backgroundColor: '#1C1C1E',
         borderRadius: 8,
         padding: 2,
     },
@@ -444,16 +479,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderRadius: 6,
     },
-    toggleActive: {
-        backgroundColor: '#3A3A3C',
-    },
     toggleText: {
-        color: '#8E8E93',
         fontSize: 12,
         fontWeight: '600',
-    },
-    toggleTextActive: {
-        color: '#FFF',
     },
 
     // Calendar Section
@@ -468,7 +496,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     navBtn: { padding: 4 },
-    navLabel: { color: '#666', fontSize: 12 },
+    navLabel: { fontSize: 12 },
     
     gridHeader: {
         flexDirection: 'row',
@@ -478,7 +506,6 @@ const styles = StyleSheet.create({
     weekDayLabel: {
         flex: 1,
         textAlign: 'center',
-        color: '#666',
         fontSize: 11,
         fontWeight: '600',
     },
@@ -495,11 +522,7 @@ const styles = StyleSheet.create({
         marginBottom: 2,
         borderRadius: 20,
     },
-    dayCellSelected: {
-        backgroundColor: '#FFF',
-    },
     dayNum: {
-        color: '#FFF',
         fontSize: 15,
         fontWeight: '500',
     },
@@ -523,18 +546,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         width: 45,
         borderRadius: 12,
-        backgroundColor: '#1C1C1E',
-    },
-    weekDaySelected: {
-        backgroundColor: '#007AFF',
     },
     weekDayName: {
-        color: '#8E8E93',
         fontSize: 10,
         marginBottom: 4,
     },
     weekDayNum: {
-        color: '#FFF',
         fontSize: 16,
         fontWeight: '700',
     },
@@ -542,7 +559,6 @@ const styles = StyleSheet.create({
     // Agenda
     agendaContainer: {
         flex: 1,
-        backgroundColor: '#171717',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         paddingTop: 20,
@@ -556,19 +572,16 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     agendaDate: {
-        color: '#FFF',
         fontSize: 16,
         fontWeight: '700',
         textTransform: 'capitalize',
     },
     todayBtn: {
-        backgroundColor: '#333',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 12,
     },
     todayText: {
-        color: '#FFF',
         fontSize: 12,
         fontWeight: '600',
     },
@@ -580,7 +593,6 @@ const styles = StyleSheet.create({
         marginTop: 40,
     },
     emptyText: {
-        color: '#666',
         fontStyle: 'italic',
         marginBottom: 10,
     },
@@ -589,7 +601,6 @@ const styles = StyleSheet.create({
     },
     eventCard: {
         flexDirection: 'row',
-        backgroundColor: '#000',
         borderRadius: 12,
         marginBottom: 12,
         padding: 12,
@@ -600,17 +611,14 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         justifyContent: 'center',
         borderRightWidth: 1,
-        borderRightColor: '#262626',
         paddingRight: 8,
         marginRight: 12,
     },
     timeText: {
-        color: '#FFF',
         fontSize: 13,
         fontWeight: '600',
     },
     endTimeText: {
-        color: '#666',
         fontSize: 11,
     },
     eventContent: {
@@ -618,14 +626,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     eventTitle: {
-        color: '#FFF',
         fontSize: 15,
         fontWeight: '500',
         flex: 1,
-    },
-    textDone: {
-        textDecorationLine: 'line-through',
-        color: '#666',
     },
     metaRow: {
         flexDirection: 'row',
@@ -634,7 +637,6 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     metaText: {
-        color: '#888',
         fontSize: 11,
     },
     googleBadge: {
