@@ -103,6 +103,59 @@ export const generateActionableCoaching = async (
   }
 };
 
+export const generateLifeWheelAnalysis = async (fullContext: any): Promise<number[] | null> => {
+    if (!ai) return null;
+    await logAiUsage('analysis');
+
+    try {
+        const prompt = `
+        Analyse les données suivantes de l'utilisateur (Tâches accomplies, Habitudes, Journal, Réflexions) pour évaluer son équilibre de vie actuel.
+        
+        Données:
+        ${JSON.stringify(fullContext).substring(0, 15000)} 
+        
+        Ta réponse DOIT être un JSON STRICT représentant les scores (0-100) pour ces 6 catégories :
+        {
+            "health": number,
+            "leisure": number,
+            "personal": number,
+            "learning": number,
+            "mental": number,
+            "career": number
+        }
+        
+        Règles :
+        - Sois réaliste. Si peu de données sur le sport, mets un score bas en santé.
+        - Si le journal mentionne du stress, baisse le score mental.
+        - Renvoie UNIQUEMENT le JSON, pas de markdown, pas de texte avant/après.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+
+        const text = response.text;
+        if (!text) return null;
+
+        const data = JSON.parse(text);
+        // Ordre attendu par le graph : Santé, Loisirs, Perso, Appr., Mental, Carrière
+        return [
+            data.health || 20,
+            data.leisure || 20,
+            data.personal || 20,
+            data.learning || 20,
+            data.mental || 20,
+            data.career || 20
+        ];
+
+    } catch (e) {
+        console.error("AI Wheel Analysis Error", e);
+        return null;
+    }
+};
+
 export const generateCoaching = async (msg: string, ctx: any) => {
     const res = await generateActionableCoaching(msg, ctx, false);
     return res.text;

@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image, Switch, Alert, KeyboardAvoidingView, Platform, LayoutAnimation, Dimensions } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, Goal } from '../types';
-import { Send, Menu, TrendingUp, Clock, BarChart2, Activity, Brain, Info, Grid, Hexagon, Zap } from 'lucide-react-native';
-import { generateActionableCoaching } from '../services/ai';
+import { Send, Menu, TrendingUp, Clock, BarChart2, Activity, Brain, Info, Grid, Hexagon, Zap, Sparkles } from 'lucide-react-native';
+import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../services/supabase';
 import Markdown from 'react-native-markdown-display';
 import Svg, { Polygon, Line, Text as SvgText, Circle } from 'react-native-svg';
 import { playMenuClick, playSuccess } from '../services/sound';
 import SkeletonAnalysis from '../components/SkeletonAnalysis';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -68,16 +69,17 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   
   // 6 Categories Radar
   const [radarData, setRadarData] = useState([20,20,20,20,20,20]); // Base value visible
+  const [isAiWheel, setIsAiWheel] = useState(false);
   const [heatmapData, setHeatmapData] = useState<number[]>(Array(90).fill(0)); 
 
   useEffect(() => {
       // Parallel fetch for robust stats
       const initData = async () => {
           await Promise.all([
-            fetchFocusStats(),
-            fetchHeatmapData()
+            calculateGlobalChronobiology(),
+            fetchHeatmapData(),
+            checkAndRunAIAnalysis()
           ]);
-          calculateLifeWheel();
           setLoading(false);
       };
       
@@ -92,9 +94,67 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       return () => clearTimeout(timer);
   }, [tasks, habits, goals]);
 
-  // 1. CALCUL REAL WHEEL OF LIFE (Based on Keywords)
-  const calculateLifeWheel = () => {
-      // Dictionnaire de mots clés (sommaire pour la démo, extensible)
+  // --- AI ANALYSIS LOGIC ---
+  const checkAndRunAIAnalysis = async () => {
+      try {
+          const today = new Date().toISOString().split('T')[0];
+          const storageKey = `life_wheel_${user.id}`;
+          const lastAnalysisStr = await AsyncStorage.getItem(storageKey);
+          
+          let runAnalysis = true;
+          
+          if (lastAnalysisStr) {
+              const lastAnalysis = JSON.parse(lastAnalysisStr);
+              if (lastAnalysis.date === today && lastAnalysis.data) {
+                  setRadarData(lastAnalysis.data);
+                  setIsAiWheel(true);
+                  runAnalysis = false;
+                  console.log("Loaded Wheel from cache");
+              }
+          }
+
+          if (runAnalysis) {
+              console.log("Running AI Wheel Analysis...");
+              // 1. Fetch text data (Journal & Reflections) not in props
+              const [journalRes, reflectRes] = await Promise.all([
+                  supabase.from('journal_entries').select('content, mood').eq('user_id', user.id).limit(10),
+                  supabase.from('daily_reflections').select('answer').eq('user_id', user.id).limit(10)
+              ]);
+
+              // 2. Prepare Context
+              const fullContext = {
+                  tasks: tasks.filter(t => t.completed).slice(0, 20).map(t => t.title),
+                  habits: habits.map(h => ({ title: h.title, streak: h.streak, category: h.category })),
+                  goals: goals.map(g => ({ title: g.title, progress: g.progress, completed: g.completed })),
+                  journal: journalRes.data?.map(j => `Mood: ${j.mood}, Text: ${j.content}`),
+                  reflections: reflectRes.data?.map(r => r.answer),
+                  userLevel: player.level
+              };
+
+              // 3. Call AI
+              const aiResult = await generateLifeWheelAnalysis(fullContext);
+              
+              if (aiResult) {
+                  setRadarData(aiResult);
+                  setIsAiWheel(true);
+                  // 4. Save to Cache
+                  await AsyncStorage.setItem(storageKey, JSON.stringify({
+                      date: today,
+                      data: aiResult
+                  }));
+              } else {
+                  // Fallback to keyword calc
+                  calculateLifeWheelFallback();
+              }
+          }
+      } catch (e) {
+          console.error("Analysis Error", e);
+          calculateLifeWheelFallback();
+      }
+  };
+
+  // Fallback (Keyword based) if AI fails or first load
+  const calculateLifeWheelFallback = () => {
       const CATEGORIES: Record<string, string[]> = {
           health: ['sport', 'run', 'gym', 'manger', 'eau', 'sleep', 'santé', 'medit', 'yoga', 'marche', 'fitness'],
           leisure: ['jeu', 'game', 'play', 'art', 'music', 'fun', 'film', 'série', 'lire', 'hobby', 'loisir', 'vacances'],
@@ -106,7 +166,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
       const scores = { health: 0, leisure: 0, personal: 0, learning: 0, mental: 0, career: 0 };
 
-      // Helper to classify text
       const classify = (text: string, points: number) => {
           const lower = text.toLowerCase();
           let found = false;
@@ -114,101 +173,99 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
               if (keywords.some((k: string) => lower.includes(k))) {
                   scores[cat as keyof typeof scores] += points;
                   found = true;
-                  break; // Count once
+                  break;
               }
           }
-          // If not found, assign to Personal or Career based on context? Default to Personal slightly
           if (!found) scores.personal += (points * 0.5); 
       };
 
-      // Analyze Habits (Weighted by streak)
       habits.forEach(h => {
-          if (h.streak > 0) {
-              const points = Math.min(50, 10 + h.streak); // Max 50 per habit
-              classify(h.title + ' ' + (h.category || ''), points);
-          }
+          if (h.streak > 0) classify(h.title + ' ' + (h.category || ''), Math.min(50, 10 + h.streak));
       });
-
-      // Analyze Completed Tasks (Fixed weight)
-      tasks.filter(t => t.completed).forEach(t => {
-          classify(t.title, 10);
-      });
-
-      // Analyze Goals (Big weight)
+      tasks.filter(t => t.completed).forEach(t => classify(t.title, 10));
       goals.forEach(g => {
           if (g.completed) classify(g.title, 50);
           else if ((g.progress || 0) > 0) classify(g.title, 20);
       });
 
-      // Normalize to 0-100 (Relative to max score found or fixed ceiling)
-      // To ensure the chart looks good, we cap at 100 but allow small values to show.
       const data = [
           scores.health, scores.leisure, scores.personal, 
           scores.learning, scores.mental, scores.career
-      ].map(val => Math.min(100, Math.max(10, val))); // Min 10 to show a dot
+      ].map(val => Math.min(100, Math.max(10, val)));
 
       setRadarData(data);
+      setIsAiWheel(false);
   };
 
-  // 2. FETCH REAL CHRONOBIOLOGY
-  const fetchFocusStats = async () => {
+  // 2. FETCH REAL CHRONOBIOLOGY (GLOBAL)
+  const calculateGlobalChronobiology = async () => {
       const today = new Date();
-      // Last 30 days for robust patterns
       const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      const { data: sessions } = await supabase
-        .from('focus_sessions')
-        .select('duration, started_at, completed_at')
-        .eq('user_id', user.id)
-        .gte('completed_at', lastMonth);
+      // Aggregate timestamps from ALL sources
+      const [focusRes, journalRes, reflectRes] = await Promise.all([
+          supabase.from('focus_sessions').select('started_at, duration, completed_at').eq('user_id', user.id).gte('completed_at', lastMonth),
+          supabase.from('journal_entries').select('created_at').eq('user_id', user.id).gte('created_at', lastMonth),
+          supabase.from('daily_reflections').select('created_at').eq('user_id', user.id).gte('created_at', lastMonth)
+      ]);
 
-      if (sessions && sessions.length > 0) {
-          // Weekly Chart Data
-          const weekly = [0,0,0,0,0,0,0];
-          let total = 0;
-          
-          // Peak Hour Data
-          const hourCounts: Record<number, number> = {};
+      const hourCounts: Record<number, number> = {};
+      const weekly = [0,0,0,0,0,0,0];
+      let totalTime = 0;
 
-          sessions.forEach(s => {
-              // Weekly
-              if (s.completed_at) {
-                  const day = new Date(s.completed_at).getDay();
-                  weekly[day] += (s.duration || 0);
-                  total += (s.duration || 0);
-              }
-              
-              // Peak Hour (start time is better indicator of intent)
-              if (s.started_at) {
-                  const h = new Date(s.started_at).getHours();
-                  hourCounts[h] = (hourCounts[h] || 0) + 1;
-              }
-          });
+      // Helper to add hour
+      const addHour = (isoDate: string, weight: number = 1) => {
+          const d = new Date(isoDate);
+          const h = d.getHours();
+          hourCounts[h] = (hourCounts[h] || 0) + weight;
+      };
 
-          setWeeklyFocusData(weekly);
-          setTotalFocusTime(total);
-
-          // Find Peak
-          let maxCount = 0;
-          let bestHour = -1;
-          for (const [h, count] of Object.entries(hourCounts)) {
-              if (count > maxCount) {
-                  maxCount = count;
-                  bestHour = parseInt(h);
-              }
+      // 1. Focus Sessions (High Weight)
+      focusRes.data?.forEach(s => {
+          if (s.started_at) addHour(s.started_at, 3); // Focus is active work
+          if (s.completed_at) {
+              weekly[new Date(s.completed_at).getDay()] += (s.duration || 0);
+              totalTime += (s.duration || 0);
           }
+      });
 
-          if (bestHour !== -1) {
-              setPeakHour(`${bestHour}h00 - ${bestHour + 1}h00`);
-              if (bestHour < 10) setChronoProfile("Lève-tôt (Alouette)");
-              else if (bestHour >= 21) setChronoProfile("Oiseau de Nuit");
-              else setChronoProfile("Rythme Standard");
-          } else {
-              setPeakHour("Pas assez de données");
-              setChronoProfile("Inconnu");
+      // 2. Tasks (Medium Weight - using created_at as proxy for planning/doing)
+      tasks.forEach(t => {
+          if (t.created_at) addHour(t.created_at, 1);
+      });
+
+      // 3. Habits (Medium Weight)
+      habits.forEach(h => {
+          if (h.last_completed_at) addHour(h.last_completed_at, 2);
+      });
+
+      // 4. Journal/Reflection (Low Weight - introspection)
+      journalRes.data?.forEach(j => addHour(j.created_at, 1));
+      reflectRes.data?.forEach(r => addHour(r.created_at, 1));
+
+      // Calculate Peak
+      let maxCount = 0;
+      let bestHour = -1;
+      for (const [h, count] of Object.entries(hourCounts)) {
+          if (count > maxCount) {
+              maxCount = count;
+              bestHour = parseInt(h);
           }
+      }
+
+      setWeeklyFocusData(weekly);
+      setTotalFocusTime(totalTime);
+
+      if (bestHour !== -1) {
+          setPeakHour(`${bestHour}h00 - ${bestHour + 1}h00`);
+          if (bestHour < 6) setChronoProfile("Insomniaque");
+          else if (bestHour < 10) setChronoProfile("Lève-tôt (Alouette)");
+          else if (bestHour < 14) setChronoProfile("Matin tardif");
+          else if (bestHour < 18) setChronoProfile("Après-midi");
+          else if (bestHour < 22) setChronoProfile("Soirée");
+          else setChronoProfile("Oiseau de Nuit");
       } else {
-          setPeakHour("Aucune session");
+          setPeakHour("Pas assez de données");
           setChronoProfile("Inconnu");
       }
   };
@@ -227,19 +284,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           activityMap[key] = 0;
       }
 
-      // Add Task Completions (Approx via created_at if no completed_at, 
-      // but ideally we should track completed_at in DB. Assuming created_at for now as proxy or if completed=true)
-      // *Correction*: We only have created_at in the frontend type, checking DB logic...
-      // Let's assume for this component we fetch `tasks` filtered by completed. 
-      // In a real app, we'd query a `completed_at` column. 
-      // Fallback: Use Focus Sessions + Habit Completions which have dates.
-
       // 1. Habits
       const { data: habitLogs } = await supabase
           .from('habit_completions')
           .select('completed_date')
           .eq('user_id', user.id)
-          .gte('completed_date', Object.keys(activityMap)[89]); // Oldest date
+          .gte('completed_date', Object.keys(activityMap)[89]); 
       
       habitLogs?.forEach(log => {
           if (activityMap[log.completed_date] !== undefined) activityMap[log.completed_date] += 1;
@@ -444,9 +494,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     <View style={styles.cardHeader}>
                         <Hexagon size={20} color={colors.accent} />
                         <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie</Text>
+                        {isAiWheel && <Sparkles size={16} color={colors.accent} style={{marginLeft: 'auto'}} />}
                     </View>
                     <RadarChart />
-                    <Text style={styles.cardFooter}>Calculé via mots-clés de vos tâches & habitudes</Text>
+                    <Text style={styles.cardFooter}>
+                        {isAiWheel ? "Analysé par IA (Habitudes, Journal, Tâches)" : "Calculé via mots-clés (Tâches & Habitudes)"}
+                    </Text>
                 </View>
 
                 <View style={[styles.card, {backgroundColor: colors.card}]}>
@@ -479,7 +532,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             <Text style={[styles.value, {color: colors.text}]}>{peakHour}</Text>
                         </View>
                     </View>
-                    <Text style={styles.cardFooter}>Analysé sur vos sessions Focus des 30 derniers jours</Text>
+                    <Text style={styles.cardFooter}>Analysé sur l'ensemble de votre activité (Tâches, Journal, Focus, Habitudes)</Text>
                 </View>
             </ScrollView>
         )}
@@ -527,6 +580,21 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
         {activeTab === 'AI_COACH' && (
             <>
+                <View style={[styles.aiSettings, {backgroundColor: colors.card}]}>
+                    <Text style={[styles.aiSettingsTitle, {color: colors.subText}]}>AUTORISER L'IA À LIRE :</Text>
+                    <View style={styles.aiToggles}>
+                        <TouchableOpacity style={[styles.aiToggle, aiPermissions.tasks && {backgroundColor: colors.accent}]} onPress={() => setAiPermissions(p => ({...p, tasks: !p.tasks}))}>
+                            <Text style={[styles.aiToggleText, aiPermissions.tasks && {color: '#FFF'}]}>Tâches</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.aiToggle, aiPermissions.habits && {backgroundColor: colors.accent}]} onPress={() => setAiPermissions(p => ({...p, habits: !p.habits}))}>
+                            <Text style={[styles.aiToggleText, aiPermissions.habits && {color: '#FFF'}]}>Habitudes</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.aiToggle, aiPermissions.goals && {backgroundColor: colors.accent}]} onPress={() => setAiPermissions(p => ({...p, goals: !p.goals}))}>
+                            <Text style={[styles.aiToggleText, aiPermissions.goals && {color: '#FFF'}]}>Objectifs</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 <ScrollView 
                     style={styles.chatContainer} 
                     contentContainerStyle={{paddingBottom: 20}}
@@ -595,6 +663,33 @@ const styles = StyleSheet.create({
   kpiItem: { alignItems: 'center', flex: 1 },
   kpiValue: { fontSize: 24, fontWeight: '700' },
   kpiLabel: { fontSize: 10, color: '#888', marginTop: 4 },
+
+  // AI Settings
+  aiSettings: {
+      padding: 16,
+      marginHorizontal: 20,
+      borderRadius: 12,
+      marginBottom: 10,
+  },
+  aiSettingsTitle: {
+      fontSize: 10,
+      fontWeight: '700',
+      marginBottom: 8,
+  },
+  aiToggles: {
+      flexDirection: 'row',
+      gap: 10,
+  },
+  aiToggle: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: '#333', // Default off
+  },
+  aiToggleText: {
+      fontSize: 12,
+      color: '#CCC',
+  },
 
   // Chat
   chatContainer: { flex: 1, paddingHorizontal: 20 },

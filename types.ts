@@ -1,3 +1,4 @@
+
 // derived from provided schema
 
 export interface UserProfile {
@@ -21,12 +22,26 @@ export interface UserSettings {
   unlocked_features?: any;
 }
 
+// Avatar Types
+export type AvatarClass = 'cyber_knight' | 'neon_hacker' | 'quantum_warrior' | 'shadow_ninja' | 'cosmic_sage';
+export type AvatarHelmet = 'standard' | 'visor' | 'crown' | 'halo';
+export type AvatarArmor = 'standard' | 'heavy' | 'stealth' | 'energy';
+export type AvatarColor = '#C4B5FD' | '#34D399' | '#F472B6' | '#60A5FA' | '#FACC15' | '#F87171' | '#A78BFA';
+
+export interface AvatarConfig {
+    class: AvatarClass;
+    helmet: AvatarHelmet;
+    armor: AvatarArmor;
+    color: AvatarColor;
+}
+
 export interface PlayerProfile {
   id: string;
   user_id: string;
   experience_points: number;
   level: number;
-  avatar_type: string;
+  avatar_type: string; // Legacy fallback
+  avatar_customization: AvatarConfig; // New structure
   credits: number;
   total_quests_completed: number;
 }
@@ -52,7 +67,6 @@ export interface Task {
   sort_order: number;
   created_at: string;
   linked_goal_id?: string | null;
-  // UI Helper properties
   subtasks?: Subtask[]; 
   isExpanded?: boolean;
 }
@@ -80,7 +94,6 @@ export interface Goal {
   is_archived?: boolean;
   sort_order: number;
   created_at: string;
-  // UI Helper properties
   subobjectives?: SubObjective[];
   isExpanded?: boolean;
 }
@@ -112,23 +125,31 @@ export interface Quest {
   completed: boolean;
   target_value: number;
   current_progress: number;
-  quest_type: string;
+  quest_type: 'daily' | 'weekly' | 'achievement';
   expires_at?: string;
+  icon?: string; // Icon name
 }
 
 export interface Achievement {
     id: string;
-    achievement_id: string; // string identifier like 'first_win'
+    achievement_id: string; 
     title: string;
     description: string;
     icon: string;
+    category: 'quest' | 'focus' | 'habit' | 'level' | 'task' | 'journal';
+    target_value: number;
 }
 
-export interface UnlockedAchievement {
+export interface ShopItem {
     id: string;
-    user_id: string;
-    achievement_id: string;
-    unlocked_at: string;
+    title: string;
+    description: string;
+    price: number;
+    category: 'boost' | 'protection' | 'box' | 'cosmetic';
+    rarity: 'common' | 'rare' | 'epic' | 'legendary';
+    icon: string;
+    color: string;
+    metadata?: any; // For cosmetics: { type: 'helmet', value: 'halo' }
 }
 
 export interface FocusSession {
@@ -161,8 +182,8 @@ export interface Reflection {
 export interface CalendarEvent {
     id: string;
     title: string;
-    start_time?: string; // ISO String
-    end_time?: string;   // ISO String
+    start_time?: string; 
+    end_time?: string;   
     is_all_day: boolean;
     type: 'task' | 'habit' | 'google';
     status: 'pending' | 'completed';
@@ -176,12 +197,10 @@ export enum ViewState {
   AUTH = 'AUTH',
   ONBOARDING = 'ONBOARDING',
   TODAY = 'TODAY',
-  PLANNING = 'PLANNING', // Nouveau : Calendrier + Objectifs
-  INTROSPECTION = 'INTROSPECTION', // Nouveau : Journal + Réflexion
-  EVOLUTION = 'EVOLUTION', // Nouveau : Growth + CyberKnight
+  PLANNING = 'PLANNING', 
+  INTROSPECTION = 'INTROSPECTION', 
+  EVOLUTION = 'EVOLUTION', 
   FOCUS_MODE = 'FOCUS_MODE',
-  
-  // Vues internes (peuvent être accessibles via "Tout voir" ou autre, mais moins prioritaires dans la nav principale)
   TASKS = 'TASKS',
   HABITS = 'HABITS',
   GOALS = 'GOALS',    
