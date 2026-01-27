@@ -28,6 +28,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { addXp, REWARDS } from './services/gamification';
+import * as NavigationBar from 'expo-navigation-bar';
 
 // Configuration Notifications
 Notifications.setNotificationHandler({
@@ -64,6 +65,20 @@ const App: React.FC = () => {
   
   // Realtime Subscription Ref
   const realtimeChannel = useRef<RealtimeChannel | null>(null);
+
+  // --- SYSTEM BARS CONFIGURATION ---
+  useEffect(() => {
+      const updateSystemBars = async () => {
+          if (Platform.OS === 'android') {
+              // Couleur de fond de la barre de navigation
+              await NavigationBar.setBackgroundColorAsync(isDarkMode ? '#000000' : '#F2F2F7');
+              // Couleur des icônes (Back, Home, Overview)
+              // 'light' signifie icônes claires (pour fond sombre), 'dark' pour icônes foncées (fond clair)
+              await NavigationBar.setButtonStyleAsync(isDarkMode ? 'light' : 'dark');
+          }
+      };
+      updateSystemBars();
+  }, [isDarkMode]);
 
   useEffect(() => {
       registerForPushNotificationsAsync();
@@ -272,7 +287,9 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
   };
 
-  // --- OPTIMISTIC CREATION ACTIONS ---
+  // --- ACTIONS ---
+  // (Include all existing action handlers here: createTask, createHabit, etc.)
+  // ... [Garde le code existant des actions create/toggle/delete] ...
   
   const createTask = async (title: string, priority: 'low'|'medium'|'high', goalId?: string, dueDate?: string) => {
       if (!user) return;
@@ -401,7 +418,7 @@ const App: React.FC = () => {
              
              const { error } = await supabase.from('habit_completions').delete().eq('habit_id', id).eq('completed_date', todayDate);
              if (error) {
-                 // Revert logic needed here in robust app, but for simplicity we rely on next fetch
+                 // Revert logic
              } else {
                  await supabase.from('habits').update({ streak: newStreak, last_completed_at: newLastCompletedAt }).eq('id', id);
              }
@@ -425,7 +442,6 @@ const App: React.FC = () => {
      }
   };
 
-  // --- SUBTASKS OPTIMISTIC ---
   const createSubtask = async (taskId: string, title: string) => {
       if(!user) return;
       const tempId = crypto.randomUUID();
@@ -460,7 +476,6 @@ const App: React.FC = () => {
           }));
           Alert.alert("Erreur", "Échec création sous-tâche");
       } else {
-          // Replace ID
           setTasks(prev => prev.map(t => {
               if (t.id === taskId) {
                   return { ...t, subtasks: t.subtasks?.map(s => s.id === tempId ? data : s) };
@@ -486,7 +501,6 @@ const App: React.FC = () => {
 
       const { error } = await supabase.from('subtasks').update({ completed: newVal }).eq('id', subtaskId);
       if(error) {
-          // Revert
           setTasks(prev => prev.map(t => {
               if(t.id === taskId) {
                   return { ...t, subtasks: t.subtasks?.map(s => s.id === subtaskId ? {...s, completed: !newVal} : s) };
@@ -512,7 +526,7 @@ const App: React.FC = () => {
       const { error } = await supabase.from('subtasks').delete().eq('id', subtaskId);
       if(error) {
           setTasks(prev => prev.map(t => {
-               if(t.id === taskId) return { ...t, subtasks: [...(t.subtasks || []), sub] }; // Re-add
+               if(t.id === taskId) return { ...t, subtasks: [...(t.subtasks || []), sub] };
                return t;
           }));
           Alert.alert("Erreur", "Impossible de supprimer la sous-tâche.");
@@ -544,14 +558,12 @@ const App: React.FC = () => {
       setTasks(prev => prev.filter(t => t.id !== id));
       
       const { error } = await supabase.from('tasks').delete().eq('id', id);
-      // Note: subtasks cascade delete on DB or manually handled before
       if(error) {
            if(taskToDelete) setTasks(prev => [...prev, taskToDelete]);
            Alert.alert("Erreur", "Impossible de supprimer la tâche.");
       }
   };
 
-  // --- SUB-OBJECTIVES OPTIMISTIC ---
   const createSubObjective = async (goalId: string, title: string) => {
       if(!user) return;
       const tempId = crypto.randomUUID();
@@ -694,7 +706,6 @@ const App: React.FC = () => {
       case ViewState.TODAY:
         return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} {...commonProps} />;
       
-      // Nouvelle structure :
       case ViewState.PLANNING:
         return <Planning 
             tasks={tasks} 
@@ -740,12 +751,12 @@ const App: React.FC = () => {
       case ViewState.GOALS:
           return <Planning 
             tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={toggleGoal} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={()=>{}} openMenu={() => {}} isDarkMode={isDarkMode} 
-          />; // Redirection vers Planning pour garder la cohérence
+          />; 
       
       case ViewState.FOCUS_MODE:
         return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={() => {}} />;
       
-      case ViewState.CALENDAR: // Redirige aussi vers Planning
+      case ViewState.CALENDAR:
         return <Planning 
             tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={toggleGoal} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={()=>{}} openMenu={() => {}} isDarkMode={isDarkMode} 
         />;

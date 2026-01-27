@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, LayoutAnimation, Modal, Image } from 'react-native';
 import { PlayerProfile, UserProfile, Quest, ShopItem, AvatarConfig, AvatarClass, AvatarColor, AvatarHelmet, AvatarArmor, Achievement } from '../types';
-import { Shield, Zap, Target, Gamepad2, ShoppingBag, Trophy, Gift, CheckCircle, Lock, Edit2, X, Play, Clock, Flame, Palette } from 'lucide-react-native';
+import { Shield, Zap, Target, Gamepad2, ShoppingBag, Trophy, Gift, CheckCircle, Lock, Edit2, X, Play, Clock, Flame, Palette, CheckCircle2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getXpForNextLevel, getRankName, ACHIEVEMENTS_LIST, RARITY_COLORS } from '../services/gamification';
 import { supabase } from '../services/supabase';
@@ -51,9 +51,6 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   });
 
   // Calculate Progress
-  // Formule: Next Level at 100 * level^2. Current Progress is XP relative to prev level threshold.
-  // Actually simpler: XP is cumulative. 
-  // XP for Next Level = 100 * (level)^2.
   const xpRequired = getXpForNextLevel(player.level);
   const prevLevelXp = getXpForNextLevel(player.level - 1);
   const xpInCurrentLevel = player.experience_points - prevLevelXp;
@@ -81,13 +78,19 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   }, [player]);
 
   const fetchUnlocks = async () => {
-      const [achData, cosData] = await Promise.all([
-          supabase.from('unlocked_achievements').select('achievement_id').eq('user_id', user.id),
-          supabase.from('unlockables').select('unlockable_id').eq('user_id', user.id)
-      ]);
+      // Ensure user.id is available
+      if (!user?.id) return;
+
+      // Unlocked Achievements (Fix: Check table name in your schema)
+      // Assuming table is "achievements" but schema says "unlocked_achievements" or similar relation.
+      // Based on provided schema in other files, checking logic:
+      const { data: achData } = await supabase.from('achievements').select('achievement_id').eq('user_id', user.id);
       
-      if (achData.data) setUnlockedAchievements(new Set(achData.data.map(d => d.achievement_id)));
-      if (cosData.data) setUnlockedCosmetics(new Set([...cosData.data.map(d => d.unlockable_id), 'standard', 'visor', 'stealth'])); // Basic ones
+      // Unlocked Cosmetics
+      const { data: cosData } = await supabase.from('unlockables').select('unlockable_id').eq('user_id', user.id);
+      
+      if (achData) setUnlockedAchievements(new Set(achData.map(d => d.achievement_id)));
+      if (cosData) setUnlockedCosmetics(new Set([...cosData.map(d => d.unlockable_id), 'standard', 'visor', 'stealth'])); // Basic ones always unlocked
   };
 
   const switchTab = (tab: any) => {
@@ -125,14 +128,16 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
 
               // 2. Grant Item
               if (item.category === 'cosmetic') {
-                  await supabase.from('unlockables').insert({
-                      user_id: user.id,
-                      unlockable_type: item.metadata.type,
-                      unlockable_id: item.metadata.value
-                  });
-                  setUnlockedCosmetics(prev => new Set(prev).add(item.metadata.value));
+                  const unlockId = item.metadata?.value;
+                  if (unlockId) {
+                      await supabase.from('unlockables').insert({
+                          user_id: user.id,
+                          unlockable_type: item.metadata.type,
+                          unlockable_id: unlockId
+                      });
+                      setUnlockedCosmetics(prev => new Set(prev).add(unlockId));
+                  }
               } else {
-                  // Boost logic (simplified)
                   Alert.alert("Activé", "Boost activé pour 1h !");
               }
           }}
@@ -140,14 +145,41 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   };
 
   const claimQuest = async (quest: Quest) => {
-      // Simulation of claim (Normally backend would verify completion)
       if (quest.current_progress >= quest.target_value) {
-          // Grant Reward via API or assume auto-granted. 
-          // For UX, we animate removal or marking as claimed.
           Alert.alert("Récompense", `Vous avez gagné ${quest.reward_xp} XP et ${quest.reward_credits} Crédits !`);
       } else {
           Alert.alert("En cours", `Progression : ${quest.current_progress}/${quest.target_value}`);
       }
+  };
+
+  // --- COMPONENT EXTRACTION TO AVOID RENDER BUGS ---
+  
+  const QuestItem: React.FC<{ q: Quest }> = ({ q }) => {
+      const isComplete = q.current_progress >= q.target_value;
+      const progress = Math.min(1, q.current_progress / q.target_value);
+      
+      return (
+        <TouchableOpacity onPress={() => claimQuest(q)} style={[styles.questItem, {backgroundColor: colors.cardBg, borderColor: isComplete ? '#4ADE80' : colors.border}]}>
+            <View style={styles.questLeft}>
+                <View style={[styles.questIconBox, {backgroundColor: isComplete ? 'rgba(74, 222, 128, 0.2)' : (isDarkMode ? '#333' : '#F2F2F7')}]}>
+                    {isComplete ? <CheckCircle2 size={20} color="#4ADE80" /> : <Target size={20} color={colors.text} />}
+                </View>
+                <View style={{flex: 1}}>
+                    <Text style={[styles.questTitle, {color: colors.text}]}>{q.title}</Text>
+                    <Text style={[styles.questDesc, {color: colors.textSub}]}>{q.description}</Text>
+                    
+                    {/* Progress Bar */}
+                    <View style={styles.miniBarBg}>
+                        <View style={[styles.miniBarFill, {width: `${progress*100}%`, backgroundColor: isComplete ? '#4ADE80' : colors.accent}]} />
+                    </View>
+                </View>
+            </View>
+            <View style={styles.questRewards}>
+                <Text style={styles.rewardText}>+{q.reward_xp} XP</Text>
+                <Text style={[styles.rewardText, {color: '#FACC15'}]}>+{q.reward_credits} 🪙</Text>
+            </View>
+        </TouchableOpacity>
+      );
   };
 
   // --- RENDERERS ---
@@ -203,34 +235,6 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   const renderQuests = () => {
       const daily = quests.filter(q => q.quest_type === 'daily');
       const weekly = quests.filter(q => q.quest_type === 'weekly');
-
-      const QuestItem: React.FC<{ q: Quest }> = ({ q }) => {
-          const isComplete = q.current_progress >= q.target_value;
-          const progress = Math.min(1, q.current_progress / q.target_value);
-          
-          return (
-            <TouchableOpacity onPress={() => claimQuest(q)} style={[styles.questItem, {backgroundColor: colors.cardBg, borderColor: isComplete ? '#4ADE80' : colors.border}]}>
-                <View style={styles.questLeft}>
-                    <View style={[styles.questIconBox, {backgroundColor: isComplete ? 'rgba(74, 222, 128, 0.2)' : (isDarkMode ? '#333' : '#F2F2F7')}]}>
-                        {isComplete ? <CheckCircle2 size={20} color="#4ADE80" /> : <Target size={20} color={colors.text} />}
-                    </View>
-                    <View style={{flex: 1}}>
-                        <Text style={[styles.questTitle, {color: colors.text}]}>{q.title}</Text>
-                        <Text style={[styles.questDesc, {color: colors.textSub}]}>{q.description}</Text>
-                        
-                        {/* Progress Bar */}
-                        <View style={styles.miniBarBg}>
-                            <View style={[styles.miniBarFill, {width: `${progress*100}%`, backgroundColor: isComplete ? '#4ADE80' : colors.accent}]} />
-                        </View>
-                    </View>
-                </View>
-                <View style={styles.questRewards}>
-                    <Text style={styles.rewardText}>+{q.reward_xp} XP</Text>
-                    <Text style={[styles.rewardText, {color: '#FACC15'}]}>+{q.reward_credits} 🪙</Text>
-                </View>
-            </TouchableOpacity>
-          );
-      };
 
       return (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 40}}>

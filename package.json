@@ -37,7 +37,8 @@
     "expo-keep-awake": "~13.0.2",
     "expo-linear-gradient": "~13.0.2",
     "expo-blur": "~14.0.1",
-    "expo-av": "~15.0.1"
+    "expo-av": "~15.0.1",
+    "expo-navigation-bar": "~4.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

@@ -7,6 +7,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { playMenuClick } from '../services/sound';
 import Animated, { FadeIn, LayoutAnimationConfig } from 'react-native-reanimated';
+import { supabase } from '../services/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -14,7 +15,6 @@ WebBrowser.maybeCompleteAuthSession();
 const GOOGLE_CONFIG = {
     // ID Client Android fourni par l'utilisateur
     androidClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
-    // Placeholder pour iOS/Web (à remplacer si nécessaire)
     iosClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
     webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
 };
@@ -59,6 +59,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     const [googleEvents, setGoogleEvents] = useState<CalendarEvent[]>([]);
     const [googleToken, setGoogleToken] = useState<string | null>(null);
     const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+    
+    // Historique complet des habitudes (toutes les dates)
+    const [habitHistory, setHabitHistory] = useState<any[]>([]);
 
     // Google Auth Request
     const [request, response, promptAsync] = Google.useAuthRequest({
@@ -78,16 +81,40 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         }
     }, [response]);
 
+    // FETCH HABIT HISTORY
+    useEffect(() => {
+        fetchHabitHistory();
+    }, [habits, selectedDate.getMonth()]); // Rafraîchir si changement de mois
+
+    const fetchHabitHistory = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch completions pour le mois courant +/- 1 mois pour couvrir la vue
+        const startOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() - 1, 1).toISOString();
+        const endOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() + 2, 0).toISOString();
+
+        const { data } = await supabase
+            .from('habit_completions')
+            .select('*')
+            .eq('user_id', user.id)
+            .gte('completed_date', startOfMonth)
+            .lte('completed_date', endOfMonth);
+        
+        if (data) {
+            setHabitHistory(data);
+        }
+    };
+
     // Data Merging Effect
     useEffect(() => {
         mergeAllEvents();
-    }, [selectedDate, tasks, habits, googleEvents]);
+    }, [selectedDate, tasks, habits, googleEvents, habitHistory]);
 
     // Helper: Fetch Google Events
     const fetchGoogleCalendarEvents = async (token: string) => {
         setIsLoadingGoogle(true);
         try {
-            // Get start/end of current view (roughly +/- 1 month to be safe)
             const startDate = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() - 1, 1).toISOString();
             const endDate = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() + 2, 0).toISOString();
 
@@ -102,19 +129,19 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                     title: item.summary || 'Sans titre',
                     description: item.description,
                     location: item.location,
-                    start_time: item.start.dateTime || item.start.date, // Google envoie 'date' pour all-day
+                    start_time: item.start.dateTime || item.start.date, 
                     end_time: item.end.dateTime || item.end.date,
                     is_all_day: !!item.start.date,
                     type: 'google',
                     status: 'pending',
-                    color: '#EA4335', // Google Red default
+                    color: '#EA4335',
                     meta: item
                 }));
                 setGoogleEvents(formatted);
             }
         } catch (error) {
             console.error("Google Calendar Error", error);
-            Alert.alert("Erreur", "Impossible de récupérer les événements Google.");
+            // Alert.alert("Erreur", "Impossible de récupérer les événements Google.");
         } finally {
             setIsLoadingGoogle(false);
         }
@@ -132,8 +159,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     const mergeAllEvents = () => {
         const events: CalendarEvent[] = [];
         const dayOfWeek = selectedDate.getDay();
+        const selectedDateString = selectedDate.toISOString().split('T')[0];
 
-        // 1. Google Events (Filtered by selected day)
+        // 1. Google Events
         googleEvents.forEach(ev => {
             const evDate = new Date(ev.start_time!);
             if (isSameDay(evDate, selectedDate)) {
@@ -159,23 +187,27 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         // 3. Habits
         habits.forEach(habit => {
             const isForToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(dayOfWeek);
+            
+            // Check if user has archived habit but kept history? For now exclude archived.
             if (isForToday && !habit.is_archived) {
-                const isToday = isSameDay(selectedDate, new Date());
-                const isCompleted = habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), new Date());
+                // Check HISTORY for completion on this specific date
+                const isCompletedOnDate = habitHistory.some(h => h.habit_id === habit.id && h.completed_date === selectedDateString);
                 
+                // Also check 'today' local cache from Habits (optional redundancy)
+                const isCompletedTodayLive = isSameDay(selectedDate, new Date()) && habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), new Date());
+
                 events.push({
                     id: habit.id,
                     title: habit.title,
                     is_all_day: true,
                     type: 'habit',
-                    status: isCompleted && isToday ? 'completed' : 'pending',
+                    status: (isCompletedOnDate || isCompletedTodayLive) ? 'completed' : 'pending',
                     color: '#FF9500', // Orange
                     meta: habit
                 });
             }
         });
 
-        // Sort: Time-based first, then Tasks/Habits
         events.sort((a, b) => {
             if (a.is_all_day && !b.is_all_day) return 1;
             if (!a.is_all_day && b.is_all_day) return -1;
@@ -208,6 +240,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
     const hasEventsOnDay = (date: Date) => {
         const dayOfWeek = date.getDay();
+        const dateString = date.toISOString().split('T')[0];
+
         // Check Google
         const hasGoogle = googleEvents.some(ev => isSameDay(new Date(ev.start_time!), date));
         if (hasGoogle) return { has: true, color: colors.googleRed };
@@ -216,9 +250,13 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         const hasTask = tasks.some(t => t.due_date && isSameDay(new Date(t.due_date), date));
         if (hasTask) return { has: true, color: colors.accent };
 
-        // Check Habit
-        const hasHabit = habits.some(h => !h.is_archived && (!h.days_of_week || h.days_of_week.includes(dayOfWeek)));
-        if (hasHabit) return { has: true, color: '#FF9500' };
+        // Check Habit (Completed)
+        const hasCompletedHabit = habitHistory.some(h => h.completed_date === dateString);
+        if (hasCompletedHabit) return { has: true, color: '#34C759' }; // Green if done
+
+        // Check Habit (Scheduled but not done - optional)
+        const hasScheduledHabit = habits.some(h => !h.is_archived && (!h.days_of_week || h.days_of_week.includes(dayOfWeek)));
+        if (hasScheduledHabit) return { has: true, color: '#FF9500' };
 
         return { has: false, color: 'transparent' };
     };
@@ -404,7 +442,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                                     activeOpacity={0.8} 
                                     onPress={() => {
                                         if (event.type === 'task') toggleTask(event.id);
-                                        if (event.type === 'habit') toggleHabit(event.id);
+                                        // On ne toggle pas les habitudes passées pour éviter les conflits de streak, ou on peut ajouter une logique spécifique
+                                        if (event.type === 'habit' && isSameDay(selectedDate, new Date())) toggleHabit(event.id);
                                         if (event.type === 'google') Alert.alert("Google Calendar", event.title);
                                     }}
                                 >
