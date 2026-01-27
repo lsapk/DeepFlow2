@@ -351,9 +351,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       <View style={styles.header}>
             <View style={{width: 40}} /> 
             <Text style={[styles.headerTitle, {color: colors.text}]}>Cyber Arena</Text>
-            <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
-                <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
-            </TouchableOpacity>
+            <View style={{width: 40}} /> 
       </View>
       
       <View style={[styles.tabBar, {borderColor: colors.border}]}>

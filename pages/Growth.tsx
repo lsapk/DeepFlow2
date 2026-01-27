@@ -63,12 +63,23 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   useEffect(() => {
       const initData = async () => {
-          await Promise.all([
-            calculateGlobalChronobiology(),
-            fetchHeatmapData(),
-            checkAndRunAIAnalysis()
-          ]);
-          setLoading(false);
+          // 1. Fallback immédiat (Algorithme local) pour afficher quelque chose tout de suite
+          calculateLifeWheelFallback();
+
+          // 2. Chargement des stats locales (rapide)
+          try {
+              await Promise.all([
+                calculateGlobalChronobiology(),
+                fetchHeatmapData()
+              ]);
+          } catch (e) {
+              console.warn("Erreur chargement stats", e);
+          }
+          
+          setLoading(false); // L'écran s'affiche ici
+
+          // 3. Lancer l'analyse IA en arrière-plan
+          checkAndRunAIAnalysis();
       };
       
       initData();
@@ -84,25 +95,44 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   // --- AI ANALYSIS LOGIC ---
   const checkAndRunAIAnalysis = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const storageKey = `life_wheel_${user.id}`;
+
       try {
-          const today = new Date().toISOString().split('T')[0];
-          const storageKey = `life_wheel_${user.id}`;
+          // A. Vérifier le cache d'abord
           const lastAnalysisStr = await AsyncStorage.getItem(storageKey);
-          
           if (lastAnalysisStr) {
               const lastAnalysis = JSON.parse(lastAnalysisStr);
               if (lastAnalysis.date === today && lastAnalysis.data) {
                   setRadarData(lastAnalysis.data);
                   setIsAiWheel(true);
-                  return;
+                  return; // On a déjà l'analyse IA du jour
               }
           }
 
-          // Fallback initial
-          calculateLifeWheelFallback();
+          // B. Si pas de cache, on appelle l'IA avec le contexte
+          // On récupère un échantillon de journal pour aider l'IA
+          const { data: journal } = await supabase.from('journal_entries').select('content, mood').eq('user_id', user.id).order('created_at', { ascending: false }).limit(3);
+          
+          const fullContext = {
+              tasks: tasks.slice(0, 15).map(t => ({ title: t.title, completed: t.completed, priority: t.priority })),
+              habits: habits.map(h => ({ title: h.title, streak: h.streak, category: h.category })),
+              goals: goals.map(g => ({ title: g.title, progress: g.progress })),
+              journal_sample: journal
+          };
+
+          const aiResult = await generateLifeWheelAnalysis(fullContext);
+          
+          if (aiResult) {
+              setRadarData(aiResult);
+              setIsAiWheel(true);
+              // Mise en cache
+              await AsyncStorage.setItem(storageKey, JSON.stringify({ date: today, data: aiResult }));
+          }
+
       } catch (e) {
-          console.error("Analysis Error", e);
-          calculateLifeWheelFallback();
+          console.log("AI Analysis Background Error", e);
+          // On reste sur le fallback (déjà affiché)
       }
   };
 
