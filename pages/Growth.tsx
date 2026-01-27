@@ -238,24 +238,41 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const fetchHeatmapData = async () => {
       const activityMap: Record<string, number> = {};
       const today = new Date();
+      
+      // Initialisation explicite des 90 derniers jours
       for(let i=0; i<90; i++) {
           const d = new Date(today);
           d.setDate(d.getDate() - i);
+          // Format strict YYYY-MM-DD
           const key = d.toISOString().split('T')[0];
           activityMap[key] = 0;
       }
 
+      // Fetch Habit Completions
       const { data: habitLogs } = await supabase.from('habit_completions').select('completed_date').eq('user_id', user.id);
+      
       habitLogs?.forEach(log => {
-          if (activityMap[log.completed_date] !== undefined) activityMap[log.completed_date] += 1;
+          // Normalisation de la date retournée par la DB (au cas où timestamp)
+          const key = typeof log.completed_date === 'string' ? log.completed_date.split('T')[0] : '';
+          if (key && activityMap[key] !== undefined) {
+              activityMap[key] += 1;
+          }
       });
 
+      // Fetch Focus Sessions
       const { data: focusLogs } = await supabase.from('focus_sessions').select('completed_at').eq('user_id', user.id);
+      
       focusLogs?.forEach(log => {
-          const k = log.completed_at.split('T')[0];
-          if (activityMap[k] !== undefined) activityMap[k] += 2;
+          if (log.completed_at) {
+              const key = log.completed_at.split('T')[0];
+              if (key && activityMap[key] !== undefined) {
+                  activityMap[key] += 2; // Focus vaut plus de "points" de chaleur
+              }
+          }
       });
 
+      // Transformation en tableau trié par date (du plus ancien au plus récent)
+      // La heatmap se lit de gauche à droite, haut en bas, généralement du passé vers le présent.
       const result = Object.entries(activityMap)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([_, val]) => Math.min(4, val));

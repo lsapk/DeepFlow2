@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, Circle } from 'lucide-react-native';
+import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
@@ -25,10 +25,14 @@ interface TasksProps {
 
 const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
-  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
+  // Quick Add State
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickPriority, setQuickPriority] = useState<Task['priority']>('medium');
+
+  // Edit Form State
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formPriority, setFormPriority] = useState<Task['priority']>('medium');
@@ -43,23 +47,31 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
       accent: '#007AFF',
       danger: '#FF3B30',
-      success: '#34C759'
+      warning: '#FF9500',
+      success: '#34C759',
+      priorityHigh: '#FF3B30',
+      priorityMed: '#FF9500',
+      priorityLow: '#34C759' // Green or Blue
   };
 
-  const openCreateModal = () => {
-      setFormTitle('');
-      setFormDesc('');
-      setFormPriority('medium');
-      setFormGoalId(null);
-      setFormDate('');
-      setCreateModalVisible(true);
-  };
+  const handleQuickAdd = () => {
+    if (quickTitle.trim()) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Simple logic: if title contains "demain", set date to tomorrow (basic parsing demo)
+        let dueDate = undefined;
+        let title = quickTitle;
+        
+        if (title.toLowerCase().includes('demain')) {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            dueDate = d.toISOString();
+            title = title.replace(/demain/i, '').trim();
+        }
 
-  const handleAdd = async () => {
-    if (formTitle.trim()) {
-      const dateIso = formDate ? new Date(formDate).toISOString() : undefined;
-      addTask(formTitle, formPriority, formGoalId || undefined, dateIso);
-      setCreateModalVisible(false);
+        addTask(title, quickPriority, undefined, dueDate);
+        setQuickTitle('');
+        setQuickPriority('medium');
+        Keyboard.dismiss();
     }
   };
 
@@ -104,20 +116,27 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   const activeTasks = tasks.filter(t => !t.completed);
   const completedTasks = tasks.filter(t => t.completed);
 
+  const getPriorityColor = (p: string) => {
+      if (p === 'high') return colors.priorityHigh;
+      if (p === 'medium') return colors.priorityMed;
+      return colors.priorityLow;
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* APPLE STYLE HEADER */}
+      {/* HEADER */}
       <View style={styles.header}>
           <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
-          <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
-                <Plus size={20} color="#FFF" strokeWidth={3} />
-          </TouchableOpacity>
+          <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.listGroup, {backgroundColor: colors.cardBg}]}>
+        <View style={styles.listGroup}>
             {activeTasks.length === 0 && (
-                <Text style={[styles.emptyText, {color: colors.textSub}]}>Rien à faire.</Text>
+                <View style={styles.emptyState}>
+                    <Check size={40} color={colors.textSub} style={{opacity: 0.5, marginBottom: 10}} />
+                    <Text style={[styles.emptyText, {color: colors.textSub}]}>Tout est propre. Profitez !</Text>
+                </View>
             )}
             {activeTasks.map((task, index) => (
                 <Animated.View key={task.id} layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut}>
@@ -132,17 +151,18 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                             createSubtask={createSubtask}
                             toggleSubtask={toggleSubtask}
                             deleteSubtask={deleteSubtask}
+                            priorityColor={getPriorityColor(task.priority)}
                         />
                     </SwipeableRow>
-                    {index < activeTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
+                    <View style={{height: 10}} />
                 </Animated.View>
             ))}
         </View>
 
         {completedTasks.length > 0 && (
              <View style={styles.completedGroup}>
-                <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES</Text>
-                <View style={[styles.listGroup, {backgroundColor: colors.cardBg}]}>
+                <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES ({completedTasks.length})</Text>
+                <View style={styles.listGroup}>
                     {completedTasks.map((task, index) => (
                         <Animated.View key={task.id} layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut}>
                              <SwipeableRow onSwipeLeft={() => deleteTask(task.id)}>
@@ -156,9 +176,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                                     createSubtask={createSubtask}
                                     toggleSubtask={toggleSubtask}
                                     deleteSubtask={deleteSubtask}
+                                    priorityColor={colors.border} // Grey for completed
                                 />
                              </SwipeableRow>
-                            {index < completedTasks.length - 1 && <View style={[styles.separator, {backgroundColor: colors.border}]} />}
+                             <View style={{height: 10}} />
                         </Animated.View>
                     ))}
                 </View>
@@ -166,20 +187,53 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         )}
       </ScrollView>
 
-      {/* BLUR MODAL */}
-      <Modal visible={createModalVisible || editModalVisible} transparent={true} animationType="fade" onRequestClose={() => { setCreateModalVisible(false); setEditModalVisible(false); }}>
+      {/* QUICK ADD BAR (Fixed Bottom) */}
+      <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"} 
+          keyboardVerticalOffset={Platform.OS === "ios" ? 85 : 0}
+          style={[styles.quickAddContainer, { backgroundColor: colors.cardBg, borderTopColor: colors.border }]}
+      >
+          <View style={styles.quickAddInner}>
+              <TouchableOpacity 
+                  onPress={() => setQuickPriority(p => p === 'low' ? 'medium' : p === 'medium' ? 'high' : 'low')}
+                  style={[styles.quickPriorityBtn, { borderColor: getPriorityColor(quickPriority) }]}
+              >
+                  <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(quickPriority) }]} />
+              </TouchableOpacity>
+              
+              <TextInput 
+                  style={[styles.quickInput, { color: colors.text }]} 
+                  placeholder="Ajouter une tâche..." 
+                  placeholderTextColor={colors.textSub}
+                  value={quickTitle}
+                  onChangeText={setQuickTitle}
+                  onSubmitEditing={handleQuickAdd}
+              />
+              
+              <TouchableOpacity 
+                  onPress={handleQuickAdd} 
+                  style={[styles.quickSendBtn, { opacity: quickTitle ? 1 : 0.5 }]}
+                  disabled={!quickTitle}
+              >
+                  <ArrowUpCircle size={32} color={colors.accent} fill={colors.cardBg} />
+              </TouchableOpacity>
+          </View>
+      </KeyboardAvoidingView>
+
+      {/* EDIT MODAL */}
+      <Modal visible={editModalVisible} transparent={true} animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
           <BlurView intensity={20} tint="dark" style={styles.modalOverlay}>
               <View style={[styles.modalContent, {backgroundColor: colors.cardBg}]}>
                   <View style={styles.modalHeader}>
-                      <Text style={[styles.modalTitle, {color: colors.text}]}>{createModalVisible ? 'Nouvelle Tâche' : 'Modifier'}</Text>
-                      <TouchableOpacity onPress={() => { setCreateModalVisible(false); setEditModalVisible(false); }}>
+                      <Text style={[styles.modalTitle, {color: colors.text}]}>Modifier</Text>
+                      <TouchableOpacity onPress={() => setEditModalVisible(false)}>
                           <Text style={{color: colors.accent, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
                       </TouchableOpacity>
                   </View>
 
                   <ScrollView showsVerticalScrollIndicator={false}>
                     <Text style={styles.label}>TITRE</Text>
-                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={formTitle} onChangeText={setFormTitle} placeholder="Ex: Payer loyer" placeholderTextColor={colors.textSub} />
+                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={formTitle} onChangeText={setFormTitle} />
 
                     <Text style={styles.label}>PRIORITÉ</Text>
                     <View style={styles.priorityRow}>
@@ -191,30 +245,28 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                     </View>
 
                     <Text style={styles.label}>DESCRIPTION</Text>
-                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 80, paddingTop: 10}]} value={formDesc} onChangeText={setFormDesc} placeholder="Détails de la tâche..." placeholderTextColor={colors.textSub} multiline />
+                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 80, paddingTop: 10}]} value={formDesc} onChangeText={setFormDesc} multiline />
 
-                    <Text style={styles.label}>DATE (YYYY-MM-DD)</Text>
+                    <Text style={styles.label}>DATE</Text>
                     <View style={[styles.inputWithIcon, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7'}]}>
                         <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
-                        <TextInput style={[styles.transparentInput, {color: colors.text}]} value={formDate} onChangeText={setFormDate} placeholder="ex: 2024-12-31" placeholderTextColor={colors.textSub} />
+                        <TextInput style={[styles.transparentInput, {color: colors.text}]} value={formDate} onChangeText={setFormDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSub} />
                     </View>
 
-                    <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={createModalVisible ? handleAdd : handleUpdateTask}>
+                    <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={handleUpdateTask}>
                         <Text style={styles.saveBtnText}>Enregistrer</Text>
                     </TouchableOpacity>
 
-                    {editModalVisible && (
-                        <TouchableOpacity style={styles.deleteActionBtn} onPress={() => {
-                                if (selectedTask) {
-                                    Alert.alert("Supprimer", "Êtes-vous sûr ?", [
-                                        { text: "Annuler", style: "cancel"},
-                                        { text: "Supprimer", style: 'destructive', onPress: () => { deleteTask(selectedTask.id); setEditModalVisible(false); }}
-                                    ])
-                                }
-                            }}>
-                            <Text style={styles.deleteText}>Supprimer la tâche</Text>
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity style={styles.deleteActionBtn} onPress={() => {
+                        if (selectedTask) {
+                            Alert.alert("Supprimer", "Sûr ?", [
+                                { text: "Annuler", style: "cancel"},
+                                { text: "Supprimer", style: 'destructive', onPress: () => { deleteTask(selectedTask.id); setEditModalVisible(false); }}
+                            ])
+                        }
+                    }}>
+                        <Text style={styles.deleteText}>Supprimer la tâche</Text>
+                    </TouchableOpacity>
                   </ScrollView>
               </View>
           </BlurView>
@@ -236,46 +288,42 @@ interface TaskItemProps {
     onToggleExpand: () => void;
     onLongPress: () => void;
     colors: any;
+    priorityColor: string;
     createSubtask: (taskId: string, title: string) => void;
     toggleSubtask: (subtaskId: string, taskId: string) => void;
     deleteSubtask: (subtaskId: string, taskId: string) => void;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, colors, createSubtask, toggleSubtask, deleteSubtask }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggleExpand, onLongPress, colors, priorityColor, createSubtask, toggleSubtask, deleteSubtask }) => {
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
     const handleAddSub = () => { if (!newSubtaskTitle.trim()) return; createSubtask(task.id, newSubtaskTitle); setNewSubtaskTitle(''); };
 
     return (
-        <View style={{backgroundColor: colors.cardBg}}>
+        <View style={[styles.taskCard, {backgroundColor: colors.cardBg, borderLeftColor: priorityColor}]}>
             <TouchableOpacity style={styles.taskItem} onPress={onToggleExpand} onLongPress={onLongPress} activeOpacity={0.7}>
-                <View style={[styles.priorityIndicator, { backgroundColor: task.priority === 'high' ? colors.danger : (task.priority === 'medium' ? '#FF9500' : 'transparent') }]} />
-                <TouchableOpacity onPress={onToggle} style={styles.checkboxContainer}>
-                    {task.completed ? (
-                        <View style={[styles.checkbox, { backgroundColor: colors.success, borderColor: colors.success }]}>
-                            <Check size={12} color="#FFF" strokeWidth={4} />
-                        </View>
-                    ) : (
-                        <View style={[styles.checkbox, { borderColor: colors.textSub }]} />
-                    )}
+                <TouchableOpacity onPress={onToggle} style={[styles.checkbox, { borderColor: task.completed ? colors.success : colors.textSub, backgroundColor: task.completed ? colors.success : 'transparent' }]}>
+                    {task.completed && <Check size={14} color="#FFF" strokeWidth={4} />}
                 </TouchableOpacity>
                 <View style={styles.taskContent}>
                     <Text style={[styles.taskTitle, {color: colors.text}, task.completed && styles.taskTitleCompleted]}>{task.title}</Text>
-                    {task.due_date && <Text style={[styles.dateText, {color: colors.textSub}]}>{new Date(task.due_date).toLocaleDateString()}</Text>}
+                    {task.due_date && <Text style={[styles.dateText, {color: colors.textSub}]}>{new Date(task.due_date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}</Text>}
                 </View>
-                {/* Chevron removed for cleaner look, padding handles expansion */}
             </TouchableOpacity>
+            
             {isExpanded && (
-                <View style={[styles.subtaskList, {backgroundColor: colors.cardBg, borderTopColor: colors.border}]}>
-                    {task.description && <Text style={[styles.taskDescPreview, {color: colors.textSub}]}>{task.description}</Text>}
+                <View style={[styles.subtaskList, {borderTopColor: colors.border}]}>
+                    {task.description ? <Text style={[styles.taskDescPreview, {color: colors.textSub}]}>{task.description}</Text> : null}
                     {task.subtasks?.map(sub => (
                         <View key={sub.id} style={[styles.subtaskRow, {borderBottomColor: colors.border}]}>
-                            <TouchableOpacity onPress={() => toggleSubtask(sub.id, task.id)} style={[styles.subCheck, {borderColor: colors.textSub}]}>{sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}</TouchableOpacity>
+                            <TouchableOpacity onPress={() => toggleSubtask(sub.id, task.id)} style={[styles.subCheck, {borderColor: sub.completed ? colors.text : colors.textSub}]}>
+                                {sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}
+                            </TouchableOpacity>
                             <Text style={[styles.subtaskText, {color: colors.text}, sub.completed && styles.subtaskTextDone]}>{sub.title}</Text>
                             <TouchableOpacity onPress={() => deleteSubtask(sub.id, task.id)}><X size={14} color={colors.textSub} /></TouchableOpacity>
                         </View>
                     ))}
                     <View style={styles.addSubtaskRow}>
-                        <TextInput style={[styles.subInput, {color: colors.text}]} placeholder="Ajouter sous-tâche..." placeholderTextColor={colors.textSub} value={newSubtaskTitle} onChangeText={setNewSubtaskTitle} onSubmitEditing={handleAddSub} />
+                        <TextInput style={[styles.subInput, {color: colors.text}]} placeholder="Ajouter une étape..." placeholderTextColor={colors.textSub} value={newSubtaskTitle} onChangeText={setNewSubtaskTitle} onSubmitEditing={handleAddSub} />
                         <TouchableOpacity onPress={handleAddSub}><Plus size={20} color={colors.accent} /></TouchableOpacity>
                     </View>
                 </View>
@@ -286,51 +334,83 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
-  header: { 
-      paddingHorizontal: 20, 
-      marginBottom: 16, 
-      marginTop: 20, 
-      flexDirection: 'row', 
-      justifyContent: 'space-between', 
-      alignItems: 'center', 
-  },
-  largeTitle: { 
-      fontSize: 34, 
-      fontWeight: '700', 
-      letterSpacing: 0.37 
-  },
-  addButton: { 
-      width: 36, 
-      height: 36, 
-      borderRadius: 18, 
-      alignItems: 'center', 
-      justifyContent: 'center',
-  },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 150 },
-  listGroup: { borderRadius: 14, overflow: 'hidden' },
+  header: { paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
+  largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
+  subtitle: { fontSize: 15, fontWeight: '500', marginTop: 4 },
+  
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  listGroup: {  },
   completedGroup: { marginTop: 30 },
-  groupHeader: { fontSize: 13, fontWeight: '600', marginBottom: 8, marginLeft: 16, textTransform: 'uppercase' },
-  emptyText: { padding: 20, textAlign: 'center', fontStyle: 'italic' },
+  groupHeader: { fontSize: 13, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  emptyState: { alignItems: 'center', marginTop: 40 },
+  emptyText: { fontStyle: 'italic' },
+  
+  taskCard: {
+      borderRadius: 12,
+      marginBottom: 0,
+      borderLeftWidth: 4,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+      overflow: 'hidden'
+  },
   taskItem: { flexDirection: 'row', alignItems: 'center', padding: 16, minHeight: 60 },
-  priorityIndicator: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
-  separator: { height: 1, marginLeft: 56 },
-  checkboxContainer: { marginRight: 16 },
-  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   taskContent: { flex: 1 },
-  taskTitle: { fontSize: 17, fontWeight: '500' },
-  dateText: { fontSize: 12, marginTop: 2 },
+  taskTitle: { fontSize: 17, fontWeight: '600' },
+  dateText: { fontSize: 12, marginTop: 4, fontWeight: '500' },
   taskTitleCompleted: { opacity: 0.5, textDecorationLine: 'line-through' },
-  subtaskList: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1 },
-  taskDescPreview: { fontSize: 14, marginBottom: 12, marginTop: 8, marginLeft: 40 },
-  subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginLeft: 40, borderBottomWidth: 0.5 },
+  
+  subtaskList: { padding: 16, borderTopWidth: 1, backgroundColor: 'rgba(0,0,0,0.02)' },
+  taskDescPreview: { fontSize: 14, marginBottom: 12, fontStyle: 'italic' },
+  subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0.5 },
   subCheck: { width: 18, height: 18, borderRadius: 6, borderWidth: 1.5, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
   subCheckInner: { width: 10, height: 10, borderRadius: 2 },
   subtaskText: { fontSize: 15, flex: 1 },
   subtaskTextDone: { opacity: 0.5, textDecorationLine: 'line-through' },
-  addSubtaskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 40 },
+  addSubtaskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
   subInput: { flex: 1, fontSize: 15, marginRight: 10 },
-  leftAction: { backgroundColor: '#34C759', justifyContent: 'center', alignItems: 'flex-end', flex: 1, paddingRight: 20 },
-  rightAction: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'flex-start', flex: 1, paddingLeft: 20 },
+  
+  leftAction: { backgroundColor: '#34C759', justifyContent: 'center', alignItems: 'flex-end', flex: 1, paddingRight: 20, borderRadius: 12 },
+  rightAction: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'flex-start', flex: 1, paddingLeft: 20, borderRadius: 12 },
+  
+  // QUICK ADD
+  quickAddContainer: {
+      borderTopWidth: 1,
+      paddingTop: 10,
+      paddingBottom: 30, // Safe area approx
+      paddingHorizontal: 16,
+  },
+  quickAddInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+  },
+  quickPriorityBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  priorityDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+  },
+  quickInput: {
+      flex: 1,
+      height: 44,
+      fontSize: 16,
+  },
+  quickSendBtn: {
+      padding: 4,
+  },
+
+  // MODAL
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },

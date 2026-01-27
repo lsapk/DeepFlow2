@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, Dimensions } from 'react-native';
 import { Habit, Goal } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Grid, List, Zap } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 
@@ -18,11 +18,12 @@ interface HabitsProps {
   isDarkMode?: boolean;
 }
 
-const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']; // Dimanche to Samedi
+const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const { width } = Dimensions.get('window');
 
 const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, createHabit, archiveHabit, deleteHabit, refreshHabits, openMenu, isDarkMode = true }) => {
   const [showArchived, setShowArchived] = useState(false);
-  const [showAllDays, setShowAllDays] = useState(false); 
+  const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
   const [modalVisible, setModalVisible] = useState(false);
   
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -42,7 +43,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
       accent: '#007AFF',
       orange: '#FF9500',
-      success: '#34C759'
+      success: '#34C759',
+      streak: '#FF5733'
   };
 
   const openCreateModal = () => {
@@ -116,6 +118,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   };
 
   const handleIncrement = (id: string) => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       incrementHabit(id);
   }
 
@@ -124,10 +127,101 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const displayedHabits = habits.filter(h => {
       if (showArchived) return !!h.is_archived;
       if (h.is_archived) return false;
-      if (showAllDays) return true;
-      if (!h.days_of_week || h.days_of_week.length === 0) return true;
-      return h.days_of_week.includes(todayIndex);
+      return true; // Show all to manage them, visual indication for non-today
   });
+
+  // Helper to render the last 5 days chain
+  const StreakChain = ({ streak, isCompletedToday }: { streak: number, isCompletedToday: boolean }) => {
+      // Logic visual simplified: Show 5 dots. 
+      // If completed today, last one is filled. Previous ones filled if streak > i.
+      const dots = [];
+      const totalDots = 5;
+      
+      for(let i = 0; i < totalDots; i++) {
+          const isFilled = i < (isCompletedToday ? 1 : 0) + (streak > 0 && i > 0 ? 1 : 0); // Simplified visual
+          // Better logic:
+          // Position 4 (rightmost) is today.
+          // Position 3 is yesterday, etc.
+          const dayOffset = totalDots - 1 - i; // 0 for today
+          let active = false;
+          
+          if (dayOffset === 0 && isCompletedToday) active = true;
+          else if (dayOffset > 0 && streak >= dayOffset + (isCompletedToday ? 0 : 1)) active = true;
+          
+          dots.push(
+              <View 
+                key={i} 
+                style={[
+                    styles.chainDot, 
+                    { 
+                        backgroundColor: active ? colors.success : 'transparent',
+                        borderColor: active ? colors.success : colors.border
+                    }
+                ]} 
+              />
+          );
+          if (i < totalDots - 1) {
+              dots.push(
+                  <View key={`line-${i}`} style={[styles.chainLine, { backgroundColor: active ? colors.success : colors.border }]} />
+              );
+          }
+      }
+      return <View style={styles.chainContainer}>{dots}</View>;
+  }
+
+  const renderGridItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean) => (
+      <TouchableOpacity 
+          key={habit.id} 
+          style={[styles.gridCard, {backgroundColor: colors.cardBg, opacity: isScheduledToday ? 1 : 0.6}]}
+          onPress={() => handleIncrement(habit.id)}
+          onLongPress={() => openEditModal(habit)}
+          activeOpacity={0.8}
+      >
+          <View style={[styles.gridIcon, {backgroundColor: isCompletedToday ? colors.success : (isDarkMode ? '#333' : '#F2F2F7')}]}>
+               {isCompletedToday ? <Check size={24} color="#FFF" /> : <Flame size={24} color={colors.textSub} />}
+          </View>
+          <Text style={[styles.gridTitle, {color: colors.text}]} numberOfLines={2}>{habit.title}</Text>
+          <View style={styles.gridFooter}>
+              <Text style={{color: colors.orange, fontSize: 12, fontWeight: '700'}}>{habit.streak} 🔥</Text>
+          </View>
+      </TouchableOpacity>
+  );
+
+  const renderListItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean) => (
+    <TouchableOpacity 
+        key={habit.id} 
+        style={[styles.card, {backgroundColor: colors.cardBg}, !isScheduledToday && {opacity: 0.5}]}
+        onLongPress={() => openEditModal(habit)}
+        activeOpacity={0.9} 
+    >
+        <View style={styles.cardHeader}>
+            <View style={styles.headerLeft}>
+                <View style={[styles.iconContainer, { backgroundColor: isCompletedToday ? colors.success : (isDarkMode ? '#333' : '#F2F2F7') }]}>
+                    <Flame size={20} color={isCompletedToday ? "white" : colors.orange} fill={isCompletedToday ? "white" : colors.orange} />
+                </View>
+                <View>
+                    <Text style={[styles.habitTitle, {color: colors.text}, isCompletedToday && {textDecorationLine: 'line-through', color: colors.textSub}]}>{habit.title}</Text>
+                    <Text style={[styles.categoryLabel, {color: colors.textSub}]}>{habit.category?.toUpperCase() || 'GENERAL'}</Text>
+                </View>
+            </View>
+            
+            <TouchableOpacity 
+                onPress={() => handleIncrement(habit.id)}
+                style={[
+                    styles.actionButton, 
+                    isCompletedToday ? {backgroundColor: colors.success} : {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'},
+                ]}
+            >
+                {isCompletedToday ? <Check size={20} color="#FFF" strokeWidth={3} /> : <Plus size={20} color={colors.text} />}
+            </TouchableOpacity>
+        </View>
+
+        <View style={[styles.cardFooter, {borderTopColor: colors.border}]}>
+             <StreakChain streak={habit.streak} isCompletedToday={isCompletedToday || false} />
+             <Text style={[styles.streakCount, {color: colors.textSub}]}>{habit.streak} jours</Text>
+        </View>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -135,8 +229,8 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       <View style={styles.header}>
          <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
          <View style={styles.headerRight}>
-             <TouchableOpacity style={[styles.iconButton, showAllDays && { backgroundColor: colors.border }]} onPress={() => setShowAllDays(!showAllDays)}>
-                 <Filter size={20} color={colors.accent} />
+             <TouchableOpacity style={[styles.iconButton, {backgroundColor: colors.cardBg}]} onPress={() => setViewMode(viewMode === 'LIST' ? 'GRID' : 'LIST')}>
+                 {viewMode === 'LIST' ? <Grid size={20} color={colors.accent} /> : <List size={20} color={colors.accent} />}
              </TouchableOpacity>
              <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
                 <Plus size={20} color="#FFF" strokeWidth={3} />
@@ -147,56 +241,26 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {displayedHabits.length === 0 && (
             <Text style={[styles.emptyText, {color: colors.textSub}]}>
-                {showArchived ? "Aucune archive." : (showAllDays ? "Aucune habitude crée." : "Rien de prévu aujourd'hui.")}
+                {showArchived ? "Aucune archive." : "Aucune habitude définie."}
             </Text>
         )}
-        {displayedHabits.map(habit => {
-            const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toDateString() === new Date().toDateString();
-            const isScheduledToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(todayIndex);
+        
+        {viewMode === 'GRID' ? (
+            <View style={styles.gridContainer}>
+                {displayedHabits.map(habit => {
+                    const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toDateString() === new Date().toDateString();
+                    const isScheduledToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(todayIndex);
+                    return renderGridItem(habit, !!isCompletedToday, isScheduledToday);
+                })}
+            </View>
+        ) : (
+            displayedHabits.map(habit => {
+                const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toDateString() === new Date().toDateString();
+                const isScheduledToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(todayIndex);
+                return renderListItem(habit, !!isCompletedToday, isScheduledToday);
+            })
+        )}
 
-            return (
-                <TouchableOpacity 
-                    key={habit.id} 
-                    style={[styles.card, {backgroundColor: colors.cardBg}, !isScheduledToday && {opacity: 0.5}]}
-                    onLongPress={() => openEditModal(habit)}
-                    activeOpacity={0.9} 
-                >
-                    <View style={styles.cardHeader}>
-                        <View style={styles.headerLeft}>
-                            <View style={[styles.iconContainer, { backgroundColor: isCompletedToday ? colors.success : (isDarkMode ? '#333' : '#F2F2F7') }]}>
-                                <Flame size={16} color={isCompletedToday ? "white" : colors.orange} fill={isCompletedToday ? "white" : colors.orange} />
-                            </View>
-                            <Text style={styles.categoryLabel}>{habit.category?.toUpperCase() || 'GENERAL'}</Text>
-                        </View>
-                        <Text style={styles.streakCount}>{habit.streak} jrs</Text>
-                    </View>
-
-                    <Text style={[styles.habitTitle, {color: colors.text}]}>{habit.title}</Text>
-                    {habit.description && <Text style={[styles.habitDesc, {color: colors.textSub}]} numberOfLines={1}>{habit.description}</Text>}
-
-                    <View style={[styles.cardFooter, {borderTopColor: colors.border}]}>
-                        <View style={styles.freqBadge}>
-                             <RefreshCw size={12} color={colors.textSub} style={{marginRight: 4}} />
-                             <Text style={[styles.frequencyText, {color: colors.textSub}]}>{habit.frequency}</Text>
-                        </View>
-                        
-                        {!showArchived && (
-                            <TouchableOpacity 
-                                onPress={() => handleIncrement(habit.id)}
-                                style={[
-                                    styles.actionButton, 
-                                    isCompletedToday ? {backgroundColor: colors.success} : {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'},
-                                ]}
-                            >
-                                <Text style={[styles.actionButtonText, isCompletedToday ? { color: '#FFF' } : { color: colors.text }]}>
-                                    {isCompletedToday ? 'Fait' : 'Valider'}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                </TouchableOpacity>
-            );
-        })}
       </ScrollView>
 
       {/* CREATE / EDIT MODAL */}
@@ -214,17 +278,10 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                       <Text style={styles.inputLabel}>TITRE</Text>
                       <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={title} onChangeText={setTitle} placeholder="Ex: Méditation" placeholderTextColor={colors.textSub} />
                       
-                      <Text style={styles.inputLabel}>DESCRIPTION</Text>
-                      <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 60}]} value={description} onChangeText={setDescription} placeholder="Détails optionnels..." placeholderTextColor={colors.textSub} multiline />
-
                       <View style={styles.rowInputs}>
                           <View style={{flex: 1, marginRight: 8}}>
                                 <Text style={styles.inputLabel}>CATÉGORIE</Text>
                                 <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={category} onChangeText={setCategory} placeholder="Santé" placeholderTextColor={colors.textSub} />
-                          </View>
-                          <View style={{flex: 1, marginLeft: 8}}>
-                                <Text style={styles.inputLabel}>CIBLE / JOUR</Text>
-                                <TextInput style={[styles.input, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={target} onChangeText={setTarget} keyboardType="numeric" placeholderTextColor={colors.textSub} />
                           </View>
                       </View>
 
@@ -236,18 +293,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                               </TouchableOpacity>
                           ))}
                       </View>
-
-                      <Text style={styles.inputLabel}>OBJECTIF LIÉ</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.goalsContainer}>
-                          <TouchableOpacity style={[styles.goalChip, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}, !linkedGoalId && {backgroundColor: colors.text}]} onPress={() => setLinkedGoalId(null)}>
-                               <Text style={[styles.goalChipText, !linkedGoalId && {color: isDarkMode ? '#000' : '#FFF'}]}>Aucun</Text>
-                           </TouchableOpacity>
-                           {goals.map(g => (
-                               <TouchableOpacity key={g.id} style={[styles.goalChip, {backgroundColor: isDarkMode ? '#333' : '#E5E5EA'}, linkedGoalId === g.id && {backgroundColor: colors.text}]} onPress={() => setLinkedGoalId(g.id)}>
-                                   <Text style={[styles.goalChipText, linkedGoalId === g.id && {color: isDarkMode ? '#000' : '#FFF'}]}>{g.title}</Text>
-                               </TouchableOpacity>
-                           ))}
-                      </ScrollView>
 
                       {editingHabit && (
                           <View style={styles.editActions}>
@@ -288,7 +333,7 @@ const styles = StyleSheet.create({
   },
   largeTitle: {
     fontSize: 34,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.37,
   },
   headerRight: {
@@ -296,16 +341,16 @@ const styles = StyleSheet.create({
       gap: 12,
   },
   iconButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
   },
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -319,74 +364,111 @@ const styles = StyleSheet.create({
       marginTop: 20,
       fontStyle: 'italic',
   },
+  
+  // LIST VIEW CARD
   card: {
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 16,
+    marginBottom: 0,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    flex: 1,
   },
   iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   categoryLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#8E8E93',
+    fontSize: 10,
+    fontWeight: '700',
     letterSpacing: 0.5,
-  },
-  streakCount: {
-    fontSize: 13,
-    color: '#8E8E93',
   },
   habitTitle: {
     fontSize: 17,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  habitDesc: {
-    fontSize: 14,
-    marginBottom: 16,
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    paddingTop: 16,
+    paddingTop: 12,
   },
-  freqBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-  },
-  frequencyText: {
-    fontSize: 14,
-    textTransform: 'capitalize',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 18,
-  },
-  actionButtonText: {
-    fontSize: 14,
+  streakCount: {
+    fontSize: 12,
     fontWeight: '600',
   },
   
+  // VISUAL CHAIN
+  chainContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+  },
+  chainDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      borderWidth: 1,
+  },
+  chainLine: {
+      width: 10,
+      height: 2,
+  },
+
+  // GRID VIEW
+  gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+  },
+  gridCard: {
+      width: (width - 52) / 2, // 2 cols with padding
+      aspectRatio: 1,
+      borderRadius: 20,
+      padding: 16,
+      justifyContent: 'space-between',
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+  },
+  gridIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+  },
+  gridTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      marginTop: 8,
+  },
+  gridFooter: {
+      alignItems: 'flex-end',
+  },
+
   // MODAL
   modalOverlay: {
     flex: 1,
@@ -440,21 +522,6 @@ const styles = StyleSheet.create({
   dayText: {
       fontWeight: '600',
       fontSize: 15,
-  },
-  goalsContainer: {
-      flexDirection: 'row',
-      marginBottom: 24,
-  },
-  goalChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 20,
-      marginRight: 10,
-  },
-  goalChipText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#8E8E93',
   },
   editActions: {
       flexDirection: 'row',

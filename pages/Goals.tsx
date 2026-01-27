@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, Trash2, ChevronDown, ChevronUp, X, Calendar, Minus } from 'lucide-react-native';
+import { Plus, Check, ChevronDown, ChevronUp, X, Calendar, Minus, Flag, GitBranch } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -125,25 +125,23 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
             <Text style={styles.sectionTitle}>EN COURS</Text>
         </View>
 
-        <View style={[styles.listGroup, { backgroundColor: colors.cardBg }]}>
+        <View style={styles.listGroup}>
             {activeGoals.length === 0 && (
                 <Text style={[styles.emptyText, { color: colors.textSub }]}>Aucun objectif actif.</Text>
             )}
             {activeGoals.map((goal, index) => (
-                <View key={goal.id}>
-                    <GoalItem 
-                        goal={goal} 
-                        isExpanded={expandedGoalIds.has(goal.id)}
-                        onToggle={() => onToggleGoal(goal.id)} 
-                        onToggleExpand={() => toggleExpand(goal.id)}
-                        onLongPress={() => openEditModal(goal)}
-                        colors={colors}
-                        createSubObjective={createSubObjective}
-                        toggleSubObjective={toggleSubObjective}
-                        deleteSubObjective={deleteSubObjective}
-                    />
-                    {index < activeGoals.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
-                </View>
+                <GoalItem 
+                    key={goal.id}
+                    goal={goal} 
+                    isExpanded={expandedGoalIds.has(goal.id)}
+                    onToggle={() => onToggleGoal(goal.id)} 
+                    onToggleExpand={() => toggleExpand(goal.id)}
+                    onLongPress={() => openEditModal(goal)}
+                    colors={colors}
+                    createSubObjective={createSubObjective}
+                    toggleSubObjective={toggleSubObjective}
+                    deleteSubObjective={deleteSubObjective}
+                />
             ))}
         </View>
 
@@ -154,22 +152,20 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
         </TouchableOpacity>
 
         {showCompleted && completedGoals.length > 0 && (
-            <View style={[styles.listGroup, { backgroundColor: colors.cardBg, marginTop: 10 }]}>
+            <View style={[styles.listGroup, { marginTop: 10 }]}>
                 {completedGoals.map((goal, index) => (
-                    <View key={goal.id}>
-                            <GoalItem 
-                            goal={goal} 
-                            isExpanded={expandedGoalIds.has(goal.id)}
-                            onToggle={() => onToggleGoal(goal.id)} 
-                            onToggleExpand={() => toggleExpand(goal.id)}
-                            onLongPress={() => openEditModal(goal)}
-                            colors={colors}
-                            createSubObjective={createSubObjective}
-                            toggleSubObjective={toggleSubObjective}
-                            deleteSubObjective={deleteSubObjective}
-                        />
-                        {index < completedGoals.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
-                    </View>
+                    <GoalItem 
+                        key={goal.id}
+                        goal={goal} 
+                        isExpanded={expandedGoalIds.has(goal.id)}
+                        onToggle={() => onToggleGoal(goal.id)} 
+                        onToggleExpand={() => toggleExpand(goal.id)}
+                        onLongPress={() => openEditModal(goal)}
+                        colors={colors}
+                        createSubObjective={createSubObjective}
+                        toggleSubObjective={toggleSubObjective}
+                        deleteSubObjective={deleteSubObjective}
+                    />
                 ))}
             </View>
         )}
@@ -293,65 +289,79 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
     };
 
     return (
-        <View>
+        <View style={[styles.goalCard, {backgroundColor: colors.cardBg}]}>
             <TouchableOpacity 
                 style={styles.taskItem} 
                 onPress={onToggleExpand}
                 onLongPress={onLongPress}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
             >
-                <TouchableOpacity 
-                    onPress={onToggle}
-                    style={[
-                        styles.checkbox,
-                        { borderColor: colors.textSub },
-                        goal.completed && { backgroundColor: colors.orange, borderColor: colors.orange }
-                    ]}
-                >
-                    {goal.completed && <Check size={14} color="white" strokeWidth={4} />}
-                </TouchableOpacity>
-                
-                <View style={styles.taskContent}>
-                    <Text style={[styles.taskTitle, { color: colors.text }, goal.completed && styles.taskTitleCompleted]}>
-                        {goal.title}
-                    </Text>
-                    {!goal.completed && (goal.progress || 0) > 0 && (
-                        <View style={[styles.miniProgressBg, { backgroundColor: colors.border }]}>
-                            <View style={[styles.miniProgressFill, { width: `${goal.progress}%`, backgroundColor: colors.accent }]} />
-                        </View>
-                    )}
-                    {goal.target_date && (
-                         <Text style={[styles.dateText, { color: colors.textSub }]}>🎯 {new Date(goal.target_date).toLocaleDateString()}</Text>
-                    )}
+                <View style={styles.headerRow}>
+                    <TouchableOpacity onPress={onToggle}>
+                        {goal.completed ? <Check size={24} color={colors.success} /> : <Flag size={24} color={colors.textSub} />}
+                    </TouchableOpacity>
+                    <View style={styles.taskContent}>
+                         <Text style={[styles.taskTitle, { color: colors.text }, goal.completed && styles.taskTitleCompleted]}>{goal.title}</Text>
+                         {goal.target_date && <Text style={[styles.dateText, {color: colors.textSub}]}>Date cible : {new Date(goal.target_date).toLocaleDateString()}</Text>}
+                    </View>
+                    <View style={styles.rightActions}>
+                        {isExpanded ? <ChevronUp size={20} color={colors.textSub} /> : <ChevronDown size={20} color={colors.textSub} />}
+                    </View>
                 </View>
 
-                <View style={styles.rightActions}>
-                     {isExpanded ? <ChevronUp size={20} color={colors.textSub} /> : <ChevronDown size={20} color={colors.textSub} />}
-                </View>
+                {/* RPG Progress Bar */}
+                {!goal.completed && (
+                    <View style={styles.rpgProgressContainer}>
+                         <View style={[styles.rpgBarBg, {backgroundColor: '#333'}]}>
+                             <LinearGradient
+                                colors={['#4F46E5', '#9333EA']}
+                                start={{x: 0, y: 0}}
+                                end={{x: 1, y: 0}}
+                                style={[styles.rpgBarFill, { width: `${goal.progress || 0}%` }]}
+                             />
+                             {/* Milestones Markers */}
+                             <View style={[styles.milestone, {left: '25%'}]} />
+                             <View style={[styles.milestone, {left: '50%'}]} />
+                             <View style={[styles.milestone, {left: '75%'}]} />
+                         </View>
+                         <Text style={styles.progressText}>{goal.progress || 0}%</Text>
+                    </View>
+                )}
             </TouchableOpacity>
 
             {isExpanded && (
                 <View style={[styles.expandedSection, { borderTopColor: colors.border }]}>
                     {goal.description && <Text style={[styles.descText, { color: colors.textSub }]}>{goal.description}</Text>}
 
-                    {goal.subobjectives?.map(subObjective => (
-                        <View key={subObjective.id} style={[styles.subtaskRow, { borderBottomColor: colors.border }]}>
-                            <TouchableOpacity onPress={() => toggleSubObjective(subObjective.id, goal.id)} style={[styles.subtaskCheckbox, { borderColor: colors.textSub }]}>
-                                {subObjective.completed && <View style={[styles.subtaskChecked, { backgroundColor: colors.text }]} />}
-                            </TouchableOpacity>
-                            <Text style={[styles.subtaskTitle, { color: colors.text }, subObjective.completed && styles.subtaskTitleCompleted]}>
-                                {subObjective.title}
-                            </Text>
-                            <TouchableOpacity onPress={() => deleteSubObjective(subObjective.id, goal.id)} style={{marginLeft: 'auto'}}>
-                                <X size={14} color={colors.textSub} />
-                            </TouchableOpacity>
-                        </View>
-                    ))}
+                    <View style={styles.treeContainer}>
+                        {/* Tree Vertical Line */}
+                        <View style={[styles.treeLineVertical, { backgroundColor: colors.border }]} />
+                        
+                        {goal.subobjectives?.map(subObjective => (
+                            <View key={subObjective.id} style={styles.treeItem}>
+                                {/* Tree Connector */}
+                                <View style={[styles.treeLineHorizontal, { backgroundColor: colors.border }]} />
+                                
+                                <View style={[styles.subtaskRow, { borderBottomColor: colors.border }]}>
+                                    <TouchableOpacity onPress={() => toggleSubObjective(subObjective.id, goal.id)} style={[styles.subtaskCheckbox, { borderColor: colors.textSub }]}>
+                                        {subObjective.completed && <View style={[styles.subtaskChecked, { backgroundColor: colors.text }]} />}
+                                    </TouchableOpacity>
+                                    <Text style={[styles.subtaskTitle, { color: colors.text }, subObjective.completed && styles.subtaskTitleCompleted]}>
+                                        {subObjective.title}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => deleteSubObjective(subObjective.id, goal.id)} style={{marginLeft: 'auto'}}>
+                                        <X size={14} color={colors.textSub} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
                     
                     <View style={styles.addSubtaskRow}>
+                        <GitBranch size={16} color={colors.textSub} style={{marginRight: 8}} />
                         <TextInput
                             style={[styles.subtaskInput, { color: colors.text }]}
-                            placeholder="Ajouter une étape..."
+                            placeholder="Nouvelle branche..."
                             placeholderTextColor={colors.textSub}
                             value={newSubGoalTitle}
                             onChangeText={setNewSubGoalTitle}
@@ -382,7 +392,7 @@ const styles = StyleSheet.create({
   },
   largeTitle: {
     fontSize: 34,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.37,
   },
   addButton: {
@@ -398,7 +408,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
       marginBottom: 8,
-      marginLeft: 16,
+      marginLeft: 4,
   },
   sectionTitle: {
       fontSize: 13,
@@ -406,8 +416,7 @@ const styles = StyleSheet.create({
       color: '#8E8E93',
   },
   listGroup: {
-    borderRadius: 14,
-    overflow: 'hidden',
+      gap: 16,
   },
   toggleCompletedBtn: {
       padding: 16,
@@ -422,31 +431,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
+  goalCard: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      paddingBottom: 4,
+  },
   taskItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 16,
-    minHeight: 60,
   },
-  separator: {
-    height: 1,
-    marginLeft: 56, 
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    marginRight: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
   },
   taskContent: {
     flex: 1,
   },
   taskTitle: {
-    fontSize: 17,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '700',
   },
   taskTitleCompleted: {
     opacity: 0.5,
@@ -461,17 +464,78 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       gap: 12,
   },
+  
+  // RPG Bar
+  rpgProgressContainer: {
+      marginTop: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+  },
+  rpgBarBg: {
+      flex: 1,
+      height: 12,
+      borderRadius: 6,
+      overflow: 'hidden',
+      position: 'relative',
+  },
+  rpgBarFill: {
+      height: '100%',
+      borderRadius: 6,
+  },
+  milestone: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      width: 2,
+      backgroundColor: 'rgba(255,255,255,0.3)',
+      zIndex: 10,
+  },
+  progressText: {
+      color: '#FFF',
+      fontSize: 12,
+      fontWeight: '700',
+      width: 35,
+      textAlign: 'right',
+  },
+
   expandedSection: {
-      paddingLeft: 56,
-      paddingRight: 16,
+      paddingHorizontal: 16,
       paddingBottom: 16,
       borderTopWidth: 1,
+      marginTop: 8,
   },
   descText: {
       fontSize: 14,
       marginBottom: 12,
       fontStyle: 'italic',
       marginTop: 8,
+  },
+
+  // Tree Structure
+  treeContainer: {
+      position: 'relative',
+      paddingLeft: 10,
+  },
+  treeLineVertical: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 15,
+      width: 2,
+      borderRadius: 1,
+  },
+  treeItem: {
+      position: 'relative',
+      paddingLeft: 16,
+      marginBottom: 0,
+  },
+  treeLineHorizontal: {
+      position: 'absolute',
+      left: 0,
+      top: 22,
+      width: 12,
+      height: 2,
   },
   subtaskRow: {
       flexDirection: 'row',
@@ -505,6 +569,7 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 12,
+      paddingLeft: 10,
   },
   subtaskInput: {
       flex: 1,
