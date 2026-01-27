@@ -1,10 +1,11 @@
 import 'react-native-gesture-handler';
 import 'react-native-url-polyfill/auto'; // CRUCIAL pour Supabase et l'IA
 import { registerRootComponent } from 'expo';
-import React, { ReactNode, Component } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { ReactNode } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, NativeModules } from 'react-native';
 import App from './App';
-import * as Updates from 'expo-updates';
+
+declare const __DEV__: boolean;
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -16,7 +17,7 @@ interface ErrorBoundaryState {
 }
 
 // Composant de secours en cas de crash total
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = {
     hasError: false,
     error: null
@@ -30,11 +31,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     console.error("CRITICAL APP ERROR:", error, errorInfo);
   }
 
-  restartApp = async () => {
-      try {
-          await Updates.reloadAsync();
-      } catch (e) {
-          Alert.alert("Erreur", "Veuillez redémarrer l'application manuellement.");
+  restartApp = () => {
+      // Tentative de rechargement en développement
+      if (__DEV__ && NativeModules.DevSettings) {
+          NativeModules.DevSettings.reload();
+      } else {
+          // En production, on demande à l'utilisateur de redémarrer car on n'a pas expo-updates configuré
+          Alert.alert("Redémarrage requis", "Veuillez fermer complètement l'application et la relancer.");
       }
   }
 
