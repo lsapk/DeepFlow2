@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard, FlatList } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
 import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
@@ -99,6 +99,13 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       setEditModalVisible(true);
   };
 
+  // Helper for sorting
+  const getPriorityScore = (p: string) => {
+      if (p === 'high') return 3;
+      if (p === 'medium') return 2;
+      return 1;
+  };
+
   const handleUpdateTask = async () => {
       if (!selectedTask) return;
       await supabase.from('tasks').update({ 
@@ -113,7 +120,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       setEditModalVisible(false);
   };
 
-  const activeTasks = tasks.filter(t => !t.completed);
+  // Sort: High Priority First
+  const activeTasks = tasks
+    .filter(t => !t.completed)
+    .sort((a, b) => getPriorityScore(b.priority) - getPriorityScore(a.priority));
+
   const completedTasks = tasks.filter(t => t.completed);
 
   const getPriorityColor = (p: string) => {
@@ -122,25 +133,26 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       return colors.priorityLow;
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* HEADER */}
-      <View style={styles.header}>
-          <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
-          <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.listGroup}>
-            {activeTasks.length === 0 && (
+  // List Header Component
+  const ListHeader = () => (
+      <View style={styles.listHeaderContainer}>
+          {activeTasks.length === 0 && (
                 <View style={styles.emptyState}>
                     <Check size={40} color={colors.textSub} style={{opacity: 0.5, marginBottom: 10}} />
                     <Text style={[styles.emptyText, {color: colors.textSub}]}>Tout est propre. Profitez !</Text>
                 </View>
-            )}
-            {activeTasks.map((task, index) => (
-                <Animated.View key={task.id} layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut}>
-                    <SwipeableRow onSwipeRight={() => onTaskToggle(task.id)} onSwipeLeft={() => deleteTask(task.id)}>
+          )}
+      </View>
+  );
+
+  // List Footer Component (Completed Tasks)
+  const ListFooter = () => (
+      completedTasks.length > 0 ? (
+        <View style={styles.completedGroup}>
+            <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES ({completedTasks.length})</Text>
+            {completedTasks.map((task) => (
+                <Animated.View key={task.id} layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut} style={{marginBottom: 10}}>
+                        <SwipeableRow onSwipeLeft={() => deleteTask(task.id)}>
                         <TaskItem 
                             task={task} 
                             isExpanded={expandedTaskIds.has(task.id)} 
@@ -151,41 +163,64 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                             createSubtask={createSubtask}
                             toggleSubtask={toggleSubtask}
                             deleteSubtask={deleteSubtask}
-                            priorityColor={getPriorityColor(task.priority)}
+                            priorityColor={colors.border} // Grey for completed
                         />
-                    </SwipeableRow>
-                    <View style={{height: 10}} />
+                        </SwipeableRow>
                 </Animated.View>
             ))}
         </View>
+      ) : null
+  );
 
-        {completedTasks.length > 0 && (
-             <View style={styles.completedGroup}>
-                <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES ({completedTasks.length})</Text>
-                <View style={styles.listGroup}>
-                    {completedTasks.map((task, index) => (
-                        <Animated.View key={task.id} layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut}>
-                             <SwipeableRow onSwipeLeft={() => deleteTask(task.id)}>
-                                <TaskItem 
-                                    task={task} 
-                                    isExpanded={expandedTaskIds.has(task.id)} 
-                                    onToggle={() => onTaskToggle(task.id)} 
-                                    onToggleExpand={() => toggleExpand(task.id)} 
-                                    onLongPress={() => openEditModal(task)} 
-                                    colors={colors} 
-                                    createSubtask={createSubtask}
-                                    toggleSubtask={toggleSubtask}
-                                    deleteSubtask={deleteSubtask}
-                                    priorityColor={colors.border} // Grey for completed
-                                />
-                             </SwipeableRow>
-                             <View style={{height: 10}} />
-                        </Animated.View>
-                    ))}
-                </View>
-            </View>
-        )}
-      </ScrollView>
+  const renderItem = ({ item }: { item: Task }) => (
+    <Animated.View layout={LinearTransition.springify()} entering={FadeIn} exiting={FadeOut} style={{marginBottom: 10}}>
+        <SwipeableRow onSwipeRight={() => onTaskToggle(item.id)} onSwipeLeft={() => deleteTask(item.id)}>
+            <TaskItem 
+                task={item} 
+                isExpanded={expandedTaskIds.has(item.id)} 
+                onToggle={() => onTaskToggle(item.id)} 
+                onToggleExpand={() => toggleExpand(item.id)} 
+                onLongPress={() => openEditModal(item)} 
+                colors={colors} 
+                createSubtask={createSubtask}
+                toggleSubtask={toggleSubtask}
+                deleteSubtask={deleteSubtask}
+                priorityColor={getPriorityColor(item.priority)}
+            />
+        </SwipeableRow>
+    </Animated.View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      {/* HEADER */}
+      <View style={styles.header}>
+          <View>
+            <Text style={[styles.largeTitle, {color: colors.text}]} accessibilityRole="header">Tâches</Text>
+            <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>
+          </View>
+          <TouchableOpacity 
+            style={[styles.headerAddBtn, {backgroundColor: colors.cardBg}]} 
+            onPress={() => {
+                // Focus the quick input bar (dummy action for now as TextInput has no ref exposed)
+            }}
+            accessibilityLabel="Ajouter une tâche rapidement"
+            accessibilityRole="button"
+          >
+             <Plus size={24} color={colors.accent} />
+          </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={activeTasks}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.scrollContent}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
 
       {/* QUICK ADD BAR (Fixed Bottom) */}
       <KeyboardAvoidingView 
@@ -197,6 +232,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
               <TouchableOpacity 
                   onPress={() => setQuickPriority(p => p === 'low' ? 'medium' : p === 'medium' ? 'high' : 'low')}
                   style={[styles.quickPriorityBtn, { borderColor: getPriorityColor(quickPriority) }]}
+                  accessibilityLabel="Changer la priorité"
+                  accessibilityHint={`Priorité actuelle : ${quickPriority}`}
               >
                   <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(quickPriority) }]} />
               </TouchableOpacity>
@@ -208,12 +245,15 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                   value={quickTitle}
                   onChangeText={setQuickTitle}
                   onSubmitEditing={handleQuickAdd}
+                  accessibilityLabel="Titre de la nouvelle tâche"
               />
               
               <TouchableOpacity 
                   onPress={handleQuickAdd} 
                   style={[styles.quickSendBtn, { opacity: quickTitle ? 1 : 0.5 }]}
                   disabled={!quickTitle}
+                  accessibilityLabel="Créer la tâche"
+                  accessibilityRole="button"
               >
                   <ArrowUpCircle size={32} color={colors.accent} fill={colors.cardBg} />
               </TouchableOpacity>
@@ -226,12 +266,12 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
               <View style={[styles.modalContent, {backgroundColor: colors.cardBg}]}>
                   <View style={styles.modalHeader}>
                       <Text style={[styles.modalTitle, {color: colors.text}]}>Modifier</Text>
-                      <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                      <TouchableOpacity onPress={() => setEditModalVisible(false)} accessibilityLabel="Fermer la modification">
                           <Text style={{color: colors.accent, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
                       </TouchableOpacity>
                   </View>
 
-                  <ScrollView showsVerticalScrollIndicator={false}>
+                  <View>
                     <Text style={styles.label}>TITRE</Text>
                     <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={formTitle} onChangeText={setFormTitle} />
 
@@ -253,7 +293,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                         <TextInput style={[styles.transparentInput, {color: colors.text}]} value={formDate} onChangeText={setFormDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSub} />
                     </View>
 
-                    <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={handleUpdateTask}>
+                    <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={handleUpdateTask} accessibilityRole="button" accessibilityLabel="Enregistrer les modifications">
                         <Text style={styles.saveBtnText}>Enregistrer</Text>
                     </TouchableOpacity>
 
@@ -264,10 +304,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                                 { text: "Supprimer", style: 'destructive', onPress: () => { deleteTask(selectedTask.id); setEditModalVisible(false); }}
                             ])
                         }
-                    }}>
+                    }} accessibilityRole="button" accessibilityLabel="Supprimer la tâche">
                         <Text style={styles.deleteText}>Supprimer la tâche</Text>
                     </TouchableOpacity>
-                  </ScrollView>
+                  </View>
               </View>
           </BlurView>
       </Modal>
@@ -276,8 +316,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 };
 
 const SwipeableRow = ({ children, onSwipeLeft, onSwipeRight }: any) => {
-    const renderRightActions = () => onSwipeLeft ? <TouchableOpacity style={styles.rightAction} onPress={onSwipeLeft}><Trash2 size={24} color="#FFF" /></TouchableOpacity> : null;
-    const renderLeftActions = () => onSwipeRight ? <TouchableOpacity style={styles.leftAction} onPress={onSwipeRight}><Check size={24} color="#FFF" /></TouchableOpacity> : null;
+    const renderRightActions = () => onSwipeLeft ? <TouchableOpacity style={styles.rightAction} onPress={onSwipeLeft} accessibilityLabel="Supprimer"><Trash2 size={24} color="#FFF" /></TouchableOpacity> : null;
+    const renderLeftActions = () => onSwipeRight ? <TouchableOpacity style={styles.leftAction} onPress={onSwipeRight} accessibilityLabel="Compléter"><Check size={24} color="#FFF" /></TouchableOpacity> : null;
     return <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>{children}</Swipeable>;
 };
 
@@ -300,8 +340,22 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
 
     return (
         <View style={[styles.taskCard, {backgroundColor: colors.cardBg, borderLeftColor: priorityColor}]}>
-            <TouchableOpacity style={styles.taskItem} onPress={onToggleExpand} onLongPress={onLongPress} activeOpacity={0.7}>
-                <TouchableOpacity onPress={onToggle} style={[styles.checkbox, { borderColor: task.completed ? colors.success : colors.textSub, backgroundColor: task.completed ? colors.success : 'transparent' }]}>
+            <TouchableOpacity 
+                style={styles.taskItem} 
+                onPress={onToggleExpand} 
+                onLongPress={onLongPress} 
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${task.title}, ${task.completed ? 'complétée' : 'à faire'}`}
+                accessibilityHint="Double taper pour voir les détails, appuyer longuement pour modifier"
+            >
+                <TouchableOpacity 
+                    onPress={onToggle} 
+                    style={[styles.checkbox, { borderColor: task.completed ? colors.success : colors.textSub, backgroundColor: task.completed ? colors.success : 'transparent' }]}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: task.completed }}
+                    accessibilityLabel="Marquer comme fait"
+                >
                     {task.completed && <Check size={14} color="#FFF" strokeWidth={4} />}
                 </TouchableOpacity>
                 <View style={styles.taskContent}>
@@ -319,12 +373,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
                                 {sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}
                             </TouchableOpacity>
                             <Text style={[styles.subtaskText, {color: colors.text}, sub.completed && styles.subtaskTextDone]}>{sub.title}</Text>
-                            <TouchableOpacity onPress={() => deleteSubtask(sub.id, task.id)}><X size={14} color={colors.textSub} /></TouchableOpacity>
+                            <TouchableOpacity onPress={() => deleteSubtask(sub.id, task.id)} accessibilityLabel="Supprimer la sous-tâche"><X size={14} color={colors.textSub} /></TouchableOpacity>
                         </View>
                     ))}
                     <View style={styles.addSubtaskRow}>
                         <TextInput style={[styles.subInput, {color: colors.text}]} placeholder="Ajouter une étape..." placeholderTextColor={colors.textSub} value={newSubtaskTitle} onChangeText={setNewSubtaskTitle} onSubmitEditing={handleAddSub} />
-                        <TouchableOpacity onPress={handleAddSub}><Plus size={20} color={colors.accent} /></TouchableOpacity>
+                        <TouchableOpacity onPress={handleAddSub} accessibilityLabel="Ajouter la sous-tâche"><Plus size={20} color={colors.accent} /></TouchableOpacity>
                     </View>
                 </View>
             )}
@@ -334,12 +388,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isExpanded, onToggle, onToggl
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
-  header: { paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
   largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
   subtitle: { fontSize: 15, fontWeight: '500', marginTop: 4 },
+  headerAddBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   
   scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
-  listGroup: {  },
+  listHeaderContainer: { marginBottom: 10 },
   completedGroup: { marginTop: 30 },
   groupHeader: { fontSize: 13, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   emptyState: { alignItems: 'center', marginTop: 40 },
@@ -347,7 +402,6 @@ const styles = StyleSheet.create({
   
   taskCard: {
       borderRadius: 12,
-      marginBottom: 0,
       borderLeftWidth: 4,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },

@@ -1,8 +1,5 @@
 {
   "name": "DeepFlow",
   "description": "A gamified personal development and productivity mobile-first application.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ]
+  "requestFramePermissions": []
 }

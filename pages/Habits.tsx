@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, Dimensions } from 'react-native';
 import { Habit, Goal } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Grid, List, Zap } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Grid, List, Zap, Layers, CalendarDays } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 
@@ -24,6 +24,7 @@ const { width } = Dimensions.get('window');
 const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, createHabit, archiveHabit, deleteHabit, refreshHabits, openMenu, isDarkMode = true }) => {
   const [showArchived, setShowArchived] = useState(false);
   const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
+  const [filterMode, setFilterMode] = useState<'TODAY' | 'ALL'>('TODAY'); // Ajout du filtre
   const [modalVisible, setModalVisible] = useState(false);
   
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -124,11 +125,28 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
 
   const todayIndex = new Date().getDay();
 
-  const displayedHabits = habits.filter(h => {
-      if (showArchived) return !!h.is_archived;
-      if (h.is_archived) return false;
-      return true; // Show all to manage them, visual indication for non-today
-  });
+  // Filtrage et Tri
+  const displayedHabits = habits
+    .filter(h => {
+      if (h.is_archived && !showArchived) return false;
+      
+      if (filterMode === 'TODAY') {
+          // Affiche si c'est programmé aujourd'hui OU si l'utilisateur l'a coché aujourd'hui (même si pas prévu)
+          const isScheduledToday = !h.days_of_week || h.days_of_week.length === 0 || h.days_of_week.includes(todayIndex);
+          const isDoneToday = h.last_completed_at && new Date(h.last_completed_at).toDateString() === new Date().toDateString();
+          return isScheduledToday || isDoneToday;
+      }
+      return true; // Show ALL
+    })
+    .sort((a, b) => {
+        // Tri : Non cochés en premier
+        const aDone = a.last_completed_at && new Date(a.last_completed_at).toDateString() === new Date().toDateString();
+        const bDone = b.last_completed_at && new Date(b.last_completed_at).toDateString() === new Date().toDateString();
+        
+        if (aDone === bDone) return 0; // Si statut identique, garde l'ordre par défaut (ou ajouter un tri par nom/création)
+        if (aDone) return 1; // a est fait -> va en bas
+        return -1; // a n'est pas fait -> va en haut
+    });
 
   // Helper to render the last 5 days chain
   const StreakChain = ({ streak, isCompletedToday }: { streak: number, isCompletedToday: boolean }) => {
@@ -172,7 +190,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const renderGridItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean) => (
       <TouchableOpacity 
           key={habit.id} 
-          style={[styles.gridCard, {backgroundColor: colors.cardBg, opacity: isScheduledToday ? 1 : 0.6}]}
+          style={[styles.gridCard, {backgroundColor: colors.cardBg, opacity: isScheduledToday || isCompletedToday ? 1 : 0.6}]}
           onPress={() => handleIncrement(habit.id)}
           onLongPress={() => openEditModal(habit)}
           activeOpacity={0.8}
@@ -190,7 +208,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const renderListItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean) => (
     <TouchableOpacity 
         key={habit.id} 
-        style={[styles.card, {backgroundColor: colors.cardBg}, !isScheduledToday && {opacity: 0.5}]}
+        style={[styles.card, {backgroundColor: colors.cardBg}, !(isScheduledToday || isCompletedToday) && {opacity: 0.5}]}
         onLongPress={() => openEditModal(habit)}
         activeOpacity={0.9} 
     >
@@ -229,6 +247,11 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       <View style={styles.header}>
          <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
          <View style={styles.headerRight}>
+             {/* Toggle Today/All */}
+             <TouchableOpacity style={[styles.iconButton, {backgroundColor: colors.cardBg}]} onPress={() => setFilterMode(filterMode === 'TODAY' ? 'ALL' : 'TODAY')}>
+                 {filterMode === 'TODAY' ? <CalendarDays size={20} color={colors.accent} /> : <Layers size={20} color={colors.accent} />}
+             </TouchableOpacity>
+             {/* Toggle Grid/List */}
              <TouchableOpacity style={[styles.iconButton, {backgroundColor: colors.cardBg}]} onPress={() => setViewMode(viewMode === 'LIST' ? 'GRID' : 'LIST')}>
                  {viewMode === 'LIST' ? <Grid size={20} color={colors.accent} /> : <List size={20} color={colors.accent} />}
              </TouchableOpacity>
@@ -239,9 +262,15 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.filterStatus}>
+            <Text style={{color: colors.textSub, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', marginBottom: 10}}>
+                {filterMode === 'TODAY' ? "Aujourd'hui" : "Toutes les habitudes"}
+            </Text>
+        </View>
+
         {displayedHabits.length === 0 && (
             <Text style={[styles.emptyText, {color: colors.textSub}]}>
-                {showArchived ? "Aucune archive." : "Aucune habitude définie."}
+                {filterMode === 'TODAY' ? "Rien de prévu aujourd'hui." : "Aucune habitude définie."}
             </Text>
         )}
         
@@ -358,6 +387,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100,
     gap: 16,
+  },
+  filterStatus: {
+      alignItems: 'flex-start',
   },
   emptyText: {
       textAlign: 'center',

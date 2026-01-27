@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput, Linking } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings, AiPermissions } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain } from 'lucide-react-native';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -147,9 +147,51 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       setLoading(false);
   };
 
+  const handleDeleteAccount = async () => {
+        Alert.alert(
+            "Supprimer le compte",
+            "Attention : Cette action est définitive. Toutes vos données (tâches, progression, journal) seront effacées immédiatement. Voulez-vous vraiment continuer ?",
+            [
+                { text: "Annuler", style: "cancel" },
+                {
+                    text: "Supprimer définitivement",
+                    style: "destructive",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            // Suppression manuelle des données en cascade
+                            await Promise.all([
+                                supabase.from('tasks').delete().eq('user_id', user.id),
+                                supabase.from('habits').delete().eq('user_id', user.id),
+                                supabase.from('goals').delete().eq('user_id', user.id),
+                                supabase.from('journal_entries').delete().eq('user_id', user.id),
+                                supabase.from('daily_reflections').delete().eq('user_id', user.id),
+                                supabase.from('focus_sessions').delete().eq('user_id', user.id),
+                                supabase.from('user_settings').delete().eq('id', user.id),
+                                supabase.from('player_profiles').delete().eq('user_id', user.id),
+                                supabase.from('user_profiles').delete().eq('id', user.id)
+                            ]);
+                            
+                            // Déconnexion finale
+                            logout();
+                        } catch (e) {
+                            Alert.alert("Erreur", "Une erreur est survenue lors de la suppression. Veuillez contacter le support.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+  };
+
   const switchTab = (tab: any) => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setActiveTab(tab);
+  };
+
+  const openUrl = (url: string) => {
+      Linking.openURL(url).catch(err => Alert.alert("Erreur", "Impossible d'ouvrir le lien"));
   };
 
   const renderProfileTab = () => (
@@ -271,19 +313,40 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
           </View>
 
           <View style={styles.section}>
-              <Text style={styles.sectionHeader}>COMPTE</Text>
+              <Text style={styles.sectionHeader}>SUPPORT & LÉGAL</Text>
               <View style={styles.card}>
-                  <SettingItem icon={Shield} label="Confidentialité" iconColor="#8B5CF6" onPress={() => Alert.alert("Confidentialité", "Vos données sont stockées de manière sécurisée et cryptée. Nous ne partageons aucune information avec des tiers.")} />
+                  <SettingItem icon={MessageSquare} label="Contacter le support" iconColor="#007AFF" onPress={() => openUrl('mailto:deepflow.ia@gmail.com')} />
                   <View style={styles.separator} />
+                  <SettingItem icon={Heart} label="Noter l'application" iconColor="#FF2D55" onPress={() => openUrl('https://deepflow.app/review')} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={FileText} label="Conditions d'utilisation" iconColor="#9CA3AF" onPress={() => openUrl('https://deepflow.app/terms')} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Lock} label="Politique de Confidentialité" iconColor="#9CA3AF" onPress={() => openUrl('https://deepflow.app/privacy')} />
+              </View>
+          </View>
+
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>ZONE DE DANGER</Text>
+              <View style={styles.card}>
                   <TouchableOpacity style={styles.item} onPress={() => Alert.alert("Déconnexion", "Voulez-vous vraiment vous déconnecter ?", [{text: "Annuler"}, {text: "Oui", style: 'destructive', onPress: logout}])}>
                         <View style={styles.itemLeft}>
-                            <View style={[styles.iconBox, { backgroundColor: '#EF4444' }]}>
+                            <View style={[styles.iconBox, { backgroundColor: '#F59E0B' }]}>
                                 <LogOut size={18} color="white" />
                             </View>
-                            <Text style={[styles.label, {color: '#EF4444'}]}>Se déconnecter</Text>
+                            <Text style={[styles.label, {color: '#F59E0B'}]}>Se déconnecter</Text>
+                        </View>
+                  </TouchableOpacity>
+                  <View style={styles.separator} />
+                  <TouchableOpacity style={styles.item} onPress={handleDeleteAccount}>
+                        <View style={styles.itemLeft}>
+                            <View style={[styles.iconBox, { backgroundColor: '#EF4444' }]}>
+                                <Trash2 size={18} color="white" />
+                            </View>
+                            <Text style={[styles.label, {color: '#EF4444'}]}>Supprimer mon compte</Text>
                         </View>
                   </TouchableOpacity>
               </View>
+              <Text style={styles.versionText}>DeepFlow v1.0.2 - Build 2024</Text>
           </View>
       </View>
   )};
@@ -337,7 +400,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                         onPress={() => switchTab(tab)}
                     >
                         <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                            {tab === 'PROFILE' ? 'Profil' : tab === 'SETTINGS' ? 'Préférences' : 'Statistiques'}
+                            {tab === 'PROFILE' ? 'Profil' : tab === 'SETTINGS' ? 'Réglages' : 'Stats'}
                         </Text>
                     </TouchableOpacity>
                 ))}
@@ -361,7 +424,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
 
 // Helper Components
 const SettingItem = ({ icon: Icon, label, isSwitch, value, onToggle, iconColor, onPress }: any) => (
-    <TouchableOpacity style={styles.item} activeOpacity={isSwitch ? 1 : 0.7} onPress={onPress}>
+    <TouchableOpacity style={styles.item} activeOpacity={isSwitch ? 1 : 0.7} onPress={onPress} accessibilityRole={isSwitch ? 'switch' : 'button'}>
         <View style={styles.itemLeft}>
             <View style={[styles.iconBox, { backgroundColor: iconColor }]}>
                 <Icon size={18} color="white" />
@@ -450,6 +513,7 @@ const styles = StyleSheet.create({
   itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   iconBox: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 16, color: '#FFF', fontWeight: '500' },
+  versionText: { textAlign: 'center', color: '#444', fontSize: 11, marginTop: 20, marginBottom: 10 },
 
   // Stats Tab
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

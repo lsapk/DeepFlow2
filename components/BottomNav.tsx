@@ -15,11 +15,11 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
   const insets = useSafeAreaInsets();
   
   const navItems = [
-    { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Aujourd\'hui' },
-    { view: ViewState.PLANNING, icon: CalendarRange, label: 'Planifier' },
-    { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true },
-    { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal' },
-    { view: ViewState.EVOLUTION, icon: TrendingUp, label: 'Évolution' },
+    { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Aujourd\'hui', hint: 'Aller au tableau de bord' },
+    { view: ViewState.PLANNING, icon: CalendarRange, label: 'Planifier', hint: 'Gérer le calendrier et les objectifs' },
+    { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true, hint: 'Démarrer une session de concentration' },
+    { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal', hint: 'Accéder au journal et aux réflexions' },
+    { view: ViewState.EVOLUTION, icon: TrendingUp, label: 'Évolution', hint: 'Voir les statistiques et le profil gamifié' },
   ];
 
   const handlePress = (view: ViewState) => {
@@ -53,6 +53,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
                     onPress={() => handlePress(item.view)}
                     style={styles.specialTabWrapper}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.label}
+                    accessibilityHint={item.hint}
+                    accessibilityState={{ selected: isActive }}
                 >
                     <View style={styles.specialTab}>
                         <Icon size={28} color="#FFFFFF" fill="#FFFFFF" />
@@ -67,6 +71,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
             onPress={() => handlePress(item.view)}
             style={styles.tab}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={item.label}
+            accessibilityHint={item.hint}
+            accessibilityState={{ selected: isActive }}
           >
             <Icon 
                 size={24} 

@@ -1,9 +1,10 @@
 import 'react-native-gesture-handler';
 import 'react-native-url-polyfill/auto'; // CRUCIAL pour Supabase et l'IA
 import { registerRootComponent } from 'expo';
-import React, { ReactNode } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { ReactNode, Component } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import App from './App';
+import * as Updates from 'expo-updates';
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -15,14 +16,11 @@ interface ErrorBoundaryState {
 }
 
 // Composant de secours en cas de crash total
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null
-    };
-  }
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = {
+    hasError: false,
+    error: null
+  };
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
@@ -32,14 +30,28 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     console.error("CRITICAL APP ERROR:", error, errorInfo);
   }
 
+  restartApp = async () => {
+      try {
+          await Updates.reloadAsync();
+      } catch (e) {
+          Alert.alert("Erreur", "Veuillez redémarrer l'application manuellement.");
+      }
+  }
+
   render() {
     if (this.state.hasError) {
       return (
         <View style={styles.errorContainer}>
           <ScrollView contentContainerStyle={styles.scroll}>
-            <Text style={styles.errorTitle}>💥 Oups ! L'application a planté.</Text>
-            <Text style={styles.errorSubtitle}>Voici l'erreur technique (à montrer au développeur) :</Text>
+            <Text style={styles.errorTitle}>Oups ! Une erreur est survenue.</Text>
+            <Text style={styles.errorSubtitle}>L'application a rencontré un problème inattendu. Ne vous inquiétez pas, vos données sont sécurisées.</Text>
+            
+            <TouchableOpacity style={styles.restartBtn} onPress={this.restartApp}>
+                <Text style={styles.restartText}>Redémarrer l'application</Text>
+            </TouchableOpacity>
+
             <View style={styles.codeBox}>
+                <Text style={styles.errorLabel}>Détails techniques (pour le support) :</Text>
                 <Text style={styles.errorText}>{this.state.error?.toString()}</Text>
             </View>
           </ScrollView>
@@ -60,34 +72,57 @@ const styles = StyleSheet.create({
   errorContainer: {
     flex: 1,
     backgroundColor: '#1C1C1E',
-    paddingTop: 60,
+    paddingTop: 80,
     paddingHorizontal: 20,
   },
   scroll: {
       paddingBottom: 40,
+      alignItems: 'center',
   },
   errorTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#FF453A',
+    color: '#FFF',
     marginBottom: 10,
+    textAlign: 'center',
   },
   errorSubtitle: {
     fontSize: 16,
     color: '#E5E5EA',
-    marginBottom: 20,
+    marginBottom: 40,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  restartBtn: {
+      backgroundColor: '#007AFF',
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      borderRadius: 25,
+      marginBottom: 40,
+  },
+  restartText: {
+      color: '#FFF',
+      fontSize: 17,
+      fontWeight: '700',
   },
   codeBox: {
       backgroundColor: '#000',
       padding: 15,
-      borderRadius: 8,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: '#333',
+      width: '100%',
+  },
+  errorLabel: {
+      color: '#8E8E93',
+      fontSize: 12,
+      marginBottom: 8,
+      textTransform: 'uppercase',
   },
   errorText: {
-    color: '#00FF00',
+    color: '#FF453A',
     fontFamily: 'monospace',
-    fontSize: 14,
+    fontSize: 12,
   },
 });
 
