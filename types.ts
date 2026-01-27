@@ -10,6 +10,15 @@ export interface UserProfile {
   created_at: string;
 }
 
+export interface AiPermissions {
+    tasks: boolean;
+    habits: boolean;
+    goals: boolean;
+    journal: boolean;
+    focus: boolean;
+    profile: boolean;
+}
+
 export interface UserSettings {
   id: string;
   theme: string;
@@ -19,7 +28,10 @@ export interface UserSettings {
   focus_mode: boolean;
   clock_format: string;
   karma_points?: number;
-  unlocked_features?: any;
+  unlocked_features?: {
+      ai_permissions?: AiPermissions;
+      [key: string]: any;
+  };
 }
 
 // Avatar Types
@@ -159,6 +171,7 @@ export interface FocusSession {
   session_type: string;
   title?: string | null;
   linked_task_id?: string | null;
+  started_at?: string;
 }
 
 export interface JournalEntry {

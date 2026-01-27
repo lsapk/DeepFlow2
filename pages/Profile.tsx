@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput } from 'react-native';
-import { UserProfile, PlayerProfile, UserSettings } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2 } from 'lucide-react-native';
+import { UserProfile, PlayerProfile, UserSettings, AiPermissions } from '../types';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +15,15 @@ interface ProfileProps {
   onThemeChange?: (isDark: boolean) => void;
 }
 
+const DEFAULT_AI_PERMISSIONS: AiPermissions = {
+    tasks: true,
+    habits: true,
+    goals: true,
+    journal: false,
+    focus: true,
+    profile: true
+};
+
 const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
@@ -25,7 +34,8 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       notifications_enabled: true,
       sound_enabled: true,
       focus_mode: false,
-      clock_format: '24h'
+      clock_format: '24h',
+      unlocked_features: { ai_permissions: DEFAULT_AI_PERMISSIONS }
   });
   
   // Edit Profile State
@@ -52,7 +62,12 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       setLoading(true);
       const { data } = await supabase.from('user_settings').select('*').eq('id', user.id).single();
       if (data) {
-          setSettings(data);
+          // Merge defaults for new fields if not present
+          const permissions = data.unlocked_features?.ai_permissions || DEFAULT_AI_PERMISSIONS;
+          setSettings({
+              ...data,
+              unlocked_features: { ...data.unlocked_features, ai_permissions: permissions }
+          });
       } else {
           const defaultSettings = { 
               id: user.id, 
@@ -61,7 +76,8 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
               notifications_enabled: true,
               sound_enabled: true,
               focus_mode: false,
-              clock_format: '24h'
+              clock_format: '24h',
+              unlocked_features: { ai_permissions: DEFAULT_AI_PERMISSIONS }
           };
           await supabase.from('user_settings').upsert(defaultSettings);
           setSettings(defaultSettings);
@@ -70,7 +86,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   };
 
   const fetchStats = async () => {
-      // Parallel fetch for speed
       const [tRes, hRes, gRes, fRes] = await Promise.all([
           supabase.from('tasks').select('id', { count: 'exact' }).eq('user_id', user.id).eq('completed', true),
           supabase.from('habits').select('streak').eq('user_id', user.id),
@@ -93,7 +108,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       const newSettings = { ...settings, [key]: value };
       setSettings(newSettings); 
       
-      // Update global theme if applicable
       if (key === 'theme' && onThemeChange) {
           onThemeChange(value === 'dark');
       }
@@ -106,6 +120,16 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       }
   };
 
+  const updateAiPermission = async (key: keyof AiPermissions, value: boolean) => {
+      const currentPermissions = settings.unlocked_features?.ai_permissions || DEFAULT_AI_PERMISSIONS;
+      const newPermissions = { ...currentPermissions, [key]: value };
+      const newFeatures = { ...settings.unlocked_features, ai_permissions: newPermissions };
+      
+      setSettings({ ...settings, unlocked_features: newFeatures });
+      
+      await supabase.from('user_settings').update({ unlocked_features: newFeatures }).eq('id', user.id);
+  };
+
   const saveProfile = async () => {
       setLoading(true);
       const { error } = await supabase.from('user_profiles').update({
@@ -116,7 +140,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       if (error) {
           Alert.alert("Erreur", "Impossible de mettre à jour le profil.");
       } else {
-          user.display_name = editName; // Local optimistic update
+          user.display_name = editName; 
           user.bio = editBio;
           setIsEditing(false);
       }
@@ -211,8 +235,25 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       </View>
   );
 
-  const renderSettingsTab = () => (
+  const renderSettingsTab = () => {
+      const permissions = settings.unlocked_features?.ai_permissions || DEFAULT_AI_PERMISSIONS;
+      
+      return (
       <View style={styles.tabContent}>
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>INTELLIGENCE ARTIFICIELLE</Text>
+              <Text style={styles.sectionSubHeader}>Choisissez quelles données sont partagées avec le coach IA.</Text>
+              <View style={styles.card}>
+                  <SettingItem icon={Brain} label="Accès au Journal" iconColor="#8B5CF6" isSwitch value={permissions.journal} onToggle={(val: boolean) => updateAiPermission('journal', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Zap} label="Accès Historique Focus" iconColor="#F59E0B" isSwitch value={permissions.focus} onToggle={(val: boolean) => updateAiPermission('focus', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={User} label="Accès Profil" iconColor="#3B82F6" isSwitch value={permissions.profile} onToggle={(val: boolean) => updateAiPermission('profile', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Check} label="Accès Tâches & Habitudes" iconColor="#10B981" isSwitch value={permissions.tasks} onToggle={(val: boolean) => { updateAiPermission('tasks', val); updateAiPermission('habits', val); }} />
+              </View>
+          </View>
+
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>APPARENCE</Text>
               <View style={styles.card}>
@@ -226,13 +267,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                   <SettingItem icon={Bell} label="Push Notifications" iconColor="#EF4444" isSwitch value={settings.notifications_enabled} onToggle={(val: boolean) => updateSetting('notifications_enabled', val)} />
                   <View style={styles.separator} />
                   <SettingItem icon={Volume2} label="Effets Sonores" iconColor="#F59E0B" isSwitch value={settings.sound_enabled} onToggle={(val: boolean) => updateSetting('sound_enabled', val)} />
-              </View>
-          </View>
-
-          <View style={styles.section}>
-              <Text style={styles.sectionHeader}>PRODUCTIVITÉ</Text>
-              <View style={styles.card}>
-                  <SettingItem icon={Zap} label="Mode Focus (Ne pas déranger)" iconColor="#10B981" isSwitch value={settings.focus_mode} onToggle={(val: boolean) => updateSetting('focus_mode', val)} />
               </View>
           </View>
 
@@ -252,7 +286,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
               </View>
           </View>
       </View>
-  );
+  )};
 
   const renderStatsTab = () => (
       <View style={styles.tabContent}>
@@ -409,6 +443,7 @@ const styles = StyleSheet.create({
   // Settings Tab
   section: { marginBottom: 10 },
   sectionHeader: { fontSize: 12, color: '#666', marginBottom: 8, marginLeft: 4, fontWeight: '600', textTransform: 'uppercase' },
+  sectionSubHeader: { fontSize: 11, color: '#555', marginBottom: 8, marginLeft: 4 },
   card: { backgroundColor: '#1C1C1E', borderRadius: 14, overflow: 'hidden' },
   item: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, minHeight: 56 },
   separator: { height: 1, backgroundColor: '#262626', marginLeft: 56 },

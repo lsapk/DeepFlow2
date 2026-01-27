@@ -78,19 +78,12 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   }, [player]);
 
   const fetchUnlocks = async () => {
-      // Ensure user.id is available
       if (!user?.id) return;
-
-      // Unlocked Achievements (Fix: Check table name in your schema)
-      // Assuming table is "achievements" but schema says "unlocked_achievements" or similar relation.
-      // Based on provided schema in other files, checking logic:
       const { data: achData } = await supabase.from('achievements').select('achievement_id').eq('user_id', user.id);
-      
-      // Unlocked Cosmetics
       const { data: cosData } = await supabase.from('unlockables').select('unlockable_id').eq('user_id', user.id);
       
       if (achData) setUnlockedAchievements(new Set(achData.map(d => d.achievement_id)));
-      if (cosData) setUnlockedCosmetics(new Set([...cosData.map(d => d.unlockable_id), 'standard', 'visor', 'stealth'])); // Basic ones always unlocked
+      if (cosData) setUnlockedCosmetics(new Set([...cosData.map(d => d.unlockable_id), 'standard', 'visor', 'stealth'])); 
   };
 
   const switchTab = (tab: any) => {
@@ -119,14 +112,12 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       Alert.alert("Boutique", `${confirmTitle} ${item.title} pour ${item.price} crédits ?`, [
           { text: "Annuler", style: "cancel" },
           { text: "Confirmer", onPress: async () => {
-              // 1. Deduct Credits
               const { error } = await supabase.from('player_profiles')
                 .update({ credits: player.credits - item.price })
                 .eq('user_id', user.id);
               
               if (error) return Alert.alert("Erreur", "Transaction échouée.");
 
-              // 2. Grant Item
               if (item.category === 'cosmetic') {
                   const unlockId = item.metadata?.value;
                   if (unlockId) {
@@ -152,8 +143,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       }
   };
 
-  // --- COMPONENT EXTRACTION TO AVOID RENDER BUGS ---
-  
+  // --- COMPONENT EXTRACTION ---
   const QuestItem: React.FC<{ q: Quest }> = ({ q }) => {
       const isComplete = q.current_progress >= q.target_value;
       const progress = Math.min(1, q.current_progress / q.target_value);
@@ -167,8 +157,6 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
                 <View style={{flex: 1}}>
                     <Text style={[styles.questTitle, {color: colors.text}]}>{q.title}</Text>
                     <Text style={[styles.questDesc, {color: colors.textSub}]}>{q.description}</Text>
-                    
-                    {/* Progress Bar */}
                     <View style={styles.miniBarBg}>
                         <View style={[styles.miniBarFill, {width: `${progress*100}%`, backgroundColor: isComplete ? '#4ADE80' : colors.accent}]} />
                     </View>
@@ -185,7 +173,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   // --- RENDERERS ---
 
   const renderHQ = () => (
-      <View style={{ gap: 20 }}>
+      <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* AVATAR DISPLAY */}
           <View style={styles.avatarSection}>
               <AvatarGenerator config={player.avatar_customization || tempAvatar} size={180} />
@@ -229,7 +217,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
                   {Math.floor(xpInCurrentLevel)} / {xpNeededForLevel} XP requis
               </Text>
           </View>
-      </View>
+      </ScrollView>
   );
 
   const renderQuests = () => {
@@ -281,19 +269,21 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
   );
 
   const renderBadges = () => (
-      <View style={styles.badgeGrid}>
-          {ACHIEVEMENTS_LIST.map((ach) => {
-              const isUnlocked = unlockedAchievements.has(ach.achievement_id);
-              return (
-                  <TouchableOpacity key={ach.id} style={[styles.badgeCard, {backgroundColor: colors.cardBg, opacity: isUnlocked ? 1 : 0.5}]} onPress={() => Alert.alert(ach.title, ach.description)}>
-                      <View style={[styles.badgeIcon, {backgroundColor: isUnlocked ? '#FACC1520' : '#333'}]}>
-                          {isUnlocked ? <Trophy size={24} color="#FACC15" /> : <Lock size={24} color="#666" />}
-                      </View>
-                      <Text style={[styles.badgeTitle, {color: colors.text}]} numberOfLines={1}>{ach.title}</Text>
-                  </TouchableOpacity>
-              )
-          })}
-      </View>
+      <ScrollView contentContainerStyle={{paddingBottom: 40}}>
+        <View style={styles.badgeGrid}>
+            {ACHIEVEMENTS_LIST.map((ach) => {
+                const isUnlocked = unlockedAchievements.has(ach.achievement_id);
+                return (
+                    <TouchableOpacity key={ach.id} style={[styles.badgeCard, {backgroundColor: colors.cardBg, opacity: isUnlocked ? 1 : 0.5}]} onPress={() => Alert.alert(ach.title, ach.description)}>
+                        <View style={[styles.badgeIcon, {backgroundColor: isUnlocked ? '#FACC1520' : '#333'}]}>
+                            {isUnlocked ? <Trophy size={24} color="#FACC15" /> : <Lock size={24} color="#666" />}
+                        </View>
+                        <Text style={[styles.badgeTitle, {color: colors.text}]} numberOfLines={1}>{ach.title}</Text>
+                    </TouchableOpacity>
+                )
+            })}
+        </View>
+      </ScrollView>
   );
 
   // --- EDITOR MODAL ---

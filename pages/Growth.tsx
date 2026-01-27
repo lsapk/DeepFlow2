@@ -28,13 +28,6 @@ interface GrowthProps {
   isDarkMode?: boolean;
 }
 
-interface AiPermissions {
-    tasks: boolean;
-    habits: boolean;
-    goals: boolean;
-    profile: boolean;
-}
-
 const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], openMenu, openProfile, onAddTask, onAddHabit, onAddGoal, onStartFocus, isDarkMode = true }) => {
   const insets = useSafeAreaInsets();
   
@@ -57,10 +50,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
   
-  const [aiPermissions, setAiPermissions] = useState<AiPermissions>({
-      tasks: true, habits: true, goals: true, profile: true
-  });
-
   // Analytics State
   const [weeklyFocusData, setWeeklyFocusData] = useState<number[]>([0,0,0,0,0,0,0]);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
@@ -73,7 +62,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [heatmapData, setHeatmapData] = useState<number[]>(Array(90).fill(0)); 
 
   useEffect(() => {
-      // Parallel fetch for robust stats
       const initData = async () => {
           await Promise.all([
             calculateGlobalChronobiology(),
@@ -87,7 +75,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       
       const timer = setTimeout(() => {
           if (messages.length === 0) {
-              setMessages([{ role: 'ai', text: `Bonjour **${user.display_name?.split(' ')[0]}** ! 👋\n\nJ'ai analysé vos données réelles. Demandez-moi des conseils pour améliorer votre productivité.` }]);
+              setMessages([{ role: 'ai', text: `Bonjour **${user.display_name?.split(' ')[0]}** ! 👋\n\nJ'ai accès à vos données pour vous coacher. Que voulez-vous savoir ?` }]);
           }
       }, 1000);
       
@@ -101,59 +89,23 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           const storageKey = `life_wheel_${user.id}`;
           const lastAnalysisStr = await AsyncStorage.getItem(storageKey);
           
-          let runAnalysis = true;
-          
           if (lastAnalysisStr) {
               const lastAnalysis = JSON.parse(lastAnalysisStr);
               if (lastAnalysis.date === today && lastAnalysis.data) {
                   setRadarData(lastAnalysis.data);
                   setIsAiWheel(true);
-                  runAnalysis = false;
-                  console.log("Loaded Wheel from cache");
+                  return;
               }
           }
 
-          if (runAnalysis) {
-              console.log("Running AI Wheel Analysis...");
-              // 1. Fetch text data (Journal & Reflections) not in props
-              const [journalRes, reflectRes] = await Promise.all([
-                  supabase.from('journal_entries').select('content, mood').eq('user_id', user.id).limit(10),
-                  supabase.from('daily_reflections').select('answer').eq('user_id', user.id).limit(10)
-              ]);
-
-              // 2. Prepare Context
-              const fullContext = {
-                  tasks: tasks.filter(t => t.completed).slice(0, 20).map(t => t.title),
-                  habits: habits.map(h => ({ title: h.title, streak: h.streak, category: h.category })),
-                  goals: goals.map(g => ({ title: g.title, progress: g.progress, completed: g.completed })),
-                  journal: journalRes.data?.map(j => `Mood: ${j.mood}, Text: ${j.content}`),
-                  reflections: reflectRes.data?.map(r => r.answer),
-                  userLevel: player.level
-              };
-
-              // 3. Call AI
-              const aiResult = await generateLifeWheelAnalysis(fullContext);
-              
-              if (aiResult) {
-                  setRadarData(aiResult);
-                  setIsAiWheel(true);
-                  // 4. Save to Cache
-                  await AsyncStorage.setItem(storageKey, JSON.stringify({
-                      date: today,
-                      data: aiResult
-                  }));
-              } else {
-                  // Fallback to keyword calc
-                  calculateLifeWheelFallback();
-              }
-          }
+          // Fallback initial
+          calculateLifeWheelFallback();
       } catch (e) {
           console.error("Analysis Error", e);
           calculateLifeWheelFallback();
       }
   };
 
-  // Fallback (Keyword based) if AI fails or first load
   const calculateLifeWheelFallback = () => {
       const CATEGORIES: Record<string, string[]> = {
           health: ['sport', 'run', 'gym', 'manger', 'eau', 'sleep', 'santé', 'medit', 'yoga', 'marche', 'fitness'],
@@ -197,12 +149,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       setIsAiWheel(false);
   };
 
-  // 2. FETCH REAL CHRONOBIOLOGY (GLOBAL)
   const calculateGlobalChronobiology = async () => {
       const today = new Date();
       const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Aggregate timestamps from ALL sources
       const [focusRes, journalRes, reflectRes] = await Promise.all([
           supabase.from('focus_sessions').select('started_at, duration, completed_at').eq('user_id', user.id).gte('completed_at', lastMonth),
           supabase.from('journal_entries').select('created_at').eq('user_id', user.id).gte('created_at', lastMonth),
@@ -213,37 +163,25 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       const weekly = [0,0,0,0,0,0,0];
       let totalTime = 0;
 
-      // Helper to add hour
       const addHour = (isoDate: string, weight: number = 1) => {
           const d = new Date(isoDate);
           const h = d.getHours();
           hourCounts[h] = (hourCounts[h] || 0) + weight;
       };
 
-      // 1. Focus Sessions (High Weight)
       focusRes.data?.forEach(s => {
-          if (s.started_at) addHour(s.started_at, 3); // Focus is active work
+          if (s.started_at) addHour(s.started_at, 3);
           if (s.completed_at) {
               weekly[new Date(s.completed_at).getDay()] += (s.duration || 0);
               totalTime += (s.duration || 0);
           }
       });
 
-      // 2. Tasks (Medium Weight - using created_at as proxy for planning/doing)
-      tasks.forEach(t => {
-          if (t.created_at) addHour(t.created_at, 1);
-      });
-
-      // 3. Habits (Medium Weight)
-      habits.forEach(h => {
-          if (h.last_completed_at) addHour(h.last_completed_at, 2);
-      });
-
-      // 4. Journal/Reflection (Low Weight - introspection)
+      tasks.forEach(t => { if (t.created_at) addHour(t.created_at, 1); });
+      habits.forEach(h => { if (h.last_completed_at) addHour(h.last_completed_at, 2); });
       journalRes.data?.forEach(j => addHour(j.created_at, 1));
       reflectRes.data?.forEach(r => addHour(r.created_at, 1));
 
-      // Calculate Peak
       let maxCount = 0;
       let bestHour = -1;
       for (const [h, count] of Object.entries(hourCounts)) {
@@ -264,19 +202,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           else if (bestHour < 18) setChronoProfile("Après-midi");
           else if (bestHour < 22) setChronoProfile("Soirée");
           else setChronoProfile("Oiseau de Nuit");
-      } else {
-          setPeakHour("Pas assez de données");
-          setChronoProfile("Inconnu");
       }
   };
 
-  // 3. REAL HEATMAP (90 Days)
   const fetchHeatmapData = async () => {
-      // Map of "YYYY-MM-DD" -> intensity (0-4)
       const activityMap: Record<string, number> = {};
       const today = new Date();
-      
-      // Init last 90 days with 0
       for(let i=0; i<90; i++) {
           const d = new Date(today);
           d.setDate(d.getDate() - i);
@@ -284,33 +215,20 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           activityMap[key] = 0;
       }
 
-      // 1. Habits
-      const { data: habitLogs } = await supabase
-          .from('habit_completions')
-          .select('completed_date')
-          .eq('user_id', user.id)
-          .gte('completed_date', Object.keys(activityMap)[89]); 
-      
+      const { data: habitLogs } = await supabase.from('habit_completions').select('completed_date').eq('user_id', user.id);
       habitLogs?.forEach(log => {
           if (activityMap[log.completed_date] !== undefined) activityMap[log.completed_date] += 1;
       });
 
-      // 2. Focus Sessions
-      const { data: focusLogs } = await supabase
-        .from('focus_sessions')
-        .select('completed_at')
-        .eq('user_id', user.id)
-        .gte('completed_at', Object.keys(activityMap)[89]);
-      
+      const { data: focusLogs } = await supabase.from('focus_sessions').select('completed_at').eq('user_id', user.id);
       focusLogs?.forEach(log => {
           const k = log.completed_at.split('T')[0];
-          if (activityMap[k] !== undefined) activityMap[k] += 2; // Focus counts double
+          if (activityMap[k] !== undefined) activityMap[k] += 2;
       });
 
-      // Convert map to array (Oldest to Newest)
       const result = Object.entries(activityMap)
           .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([_, val]) => Math.min(4, val)); // Cap at 4
+          .map(([_, val]) => Math.min(4, val));
 
       setHeatmapData(result);
   };
@@ -329,19 +247,44 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
       setLoadingAi(true);
       
-      const context: any = {};
-      if (aiPermissions.profile) context.user = { name: user.display_name, level: player.level };
-      if (aiPermissions.tasks) context.tasks = { pending: tasks.filter(t => !t.completed).length, total: tasks.length };
-      if (aiPermissions.goals) context.goals = { active: goals.filter(g => !g.completed).map(g => g.title) };
-      
-      const response = await generateActionableCoaching(userMsg, context, isCreationMode);
-      setLoadingAi(false);
-      
-      if (response.action) {
-          confirmAction(response.action);
-      } else {
-          setMessages(prev => [...prev, { role: 'ai', text: response.text }]);
-          playSuccess();
+      try {
+          // 1. Fetch User Settings for permissions
+          const { data: settings } = await supabase.from('user_settings').select('unlocked_features').eq('id', user.id).single();
+          const permissions = settings?.unlocked_features?.ai_permissions || { tasks: true, habits: true, goals: true, journal: false, focus: true, profile: true };
+
+          // 2. Build Context based on permissions
+          const context: any = {};
+          
+          if (permissions.profile) context.user = { name: user.display_name, level: player.level };
+          if (permissions.tasks) context.tasks = { pending: tasks.filter(t => !t.completed).map(t => t.title), completed_count: tasks.filter(t => t.completed).length };
+          if (permissions.goals) context.goals = goals.map(g => ({ title: g.title, progress: g.progress }));
+          if (permissions.habits) context.habits = habits.map(h => ({ title: h.title, streak: h.streak }));
+          
+          // Fetch extra data if permitted
+          if (permissions.journal) {
+              const { data: journal } = await supabase.from('journal_entries').select('title, content, mood').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5);
+              const { data: reflection } = await supabase.from('daily_reflections').select('question, answer').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5);
+              context.journal = journal;
+              context.reflections = reflection;
+          }
+
+          if (permissions.focus) {
+              const { data: focus } = await supabase.from('focus_sessions').select('duration, title').eq('user_id', user.id).order('completed_at', { ascending: false }).limit(5);
+              context.focus_history = focus;
+          }
+
+          const response = await generateActionableCoaching(userMsg, context, isCreationMode);
+          
+          if (response.action) {
+              confirmAction(response.action);
+          } else {
+              setMessages(prev => [...prev, { role: 'ai', text: response.text }]);
+              playSuccess();
+          }
+      } catch (e) {
+          setMessages(prev => [...prev, { role: 'ai', text: "Erreur de connexion au cerveau." }]);
+      } finally {
+          setLoadingAi(false);
       }
   };
 
@@ -444,13 +387,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const Heatmap = () => {
-    // Determine colors based on intensity
     const getColor = (val: number) => {
         if (val === 0) return isDarkMode ? '#222' : '#E5E5EA';
-        if (val === 1) return '#E9D5FF'; // Very light purple
-        if (val === 2) return '#C4B5FD'; // Light purple
-        if (val === 3) return '#8B5CF6'; // Medium purple
-        return '#7C3AED'; // Dark purple
+        if (val === 1) return '#E9D5FF';
+        if (val === 2) return '#C4B5FD'; 
+        if (val === 3) return '#8B5CF6'; 
+        return '#7C3AED'; 
     };
 
     return (
@@ -474,9 +416,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         <View style={styles.header}>
             <View style={{width: 40}} /> 
             <Text style={[styles.headerTitle, {color: colors.text}]}>Évolution</Text>
-            <TouchableOpacity onPress={openProfile} style={styles.iconBtn}>
-                <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
-            </TouchableOpacity>
+            <View style={{width: 40}} /> 
         </View>
 
         <View style={[styles.tabBar, {borderColor: colors.border}]}>
@@ -581,18 +521,9 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         {activeTab === 'AI_COACH' && (
             <>
                 <View style={[styles.aiSettings, {backgroundColor: colors.card}]}>
-                    <Text style={[styles.aiSettingsTitle, {color: colors.subText}]}>AUTORISER L'IA À LIRE :</Text>
-                    <View style={styles.aiToggles}>
-                        <TouchableOpacity style={[styles.aiToggle, aiPermissions.tasks && {backgroundColor: colors.accent}]} onPress={() => setAiPermissions(p => ({...p, tasks: !p.tasks}))}>
-                            <Text style={[styles.aiToggleText, aiPermissions.tasks && {color: '#FFF'}]}>Tâches</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.aiToggle, aiPermissions.habits && {backgroundColor: colors.accent}]} onPress={() => setAiPermissions(p => ({...p, habits: !p.habits}))}>
-                            <Text style={[styles.aiToggleText, aiPermissions.habits && {color: '#FFF'}]}>Habitudes</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.aiToggle, aiPermissions.goals && {backgroundColor: colors.accent}]} onPress={() => setAiPermissions(p => ({...p, goals: !p.goals}))}>
-                            <Text style={[styles.aiToggleText, aiPermissions.goals && {color: '#FFF'}]}>Objectifs</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <Text style={[styles.aiSettingsTitle, {color: colors.subText}]}>
+                        Pour modifier les données auxquelles l'IA a accès, rendez-vous dans Profil > Intelligence Artificielle.
+                    </Text>
                 </View>
 
                 <ScrollView 
@@ -672,23 +603,9 @@ const styles = StyleSheet.create({
       marginBottom: 10,
   },
   aiSettingsTitle: {
-      fontSize: 10,
-      fontWeight: '700',
-      marginBottom: 8,
-  },
-  aiToggles: {
-      flexDirection: 'row',
-      gap: 10,
-  },
-  aiToggle: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      backgroundColor: '#333', // Default off
-  },
-  aiToggleText: {
-      fontSize: 12,
-      color: '#CCC',
+      fontSize: 11,
+      fontStyle: 'italic',
+      textAlign: 'center',
   },
 
   // Chat
