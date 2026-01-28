@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput, Linking, Platform } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings, AiPermissions } from '../types';
 import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
@@ -24,6 +24,43 @@ const DEFAULT_AI_PERMISSIONS: AiPermissions = {
     profile: true
 };
 
+// Contenu légal générique (à adapter si besoin)
+const LEGAL_DOCS = {
+    TERMS: `CONDITIONS GÉNÉRALES D'UTILISATION (CGU)
+
+1. OBJET
+Les présentes CGU régissent l'utilisation de l'application DeepFlow. En utilisant l'app, vous acceptez ces conditions sans réserve.
+
+2. COMPTE UTILISATEUR
+L'accès nécessite la création d'un compte. Vous êtes responsable de la confidentialité de vos identifiants.
+
+3. PROPRIÉTÉ INTELLECTUELLE
+Tous les éléments (code, design, gamification) sont la propriété exclusive de DeepFlow. Toute reproduction est interdite.
+
+4. RESPONSABILITÉ
+DeepFlow est un outil de productivité. Nous ne garantissons pas l'atteinte de vos objectifs personnels et ne sommes pas responsables en cas de perte de données, bien que nous fassions tout pour les sécuriser.
+
+5. MODIFICATIONS
+Nous nous réservons le droit de modifier ces termes à tout moment. L'utilisation continue de l'application vaut acceptation.`,
+    
+    PRIVACY: `POLITIQUE DE CONFIDENTIALITÉ
+
+1. DONNÉES COLLECTÉES
+Nous collectons : Email, Nom d'affichage, Photo (via OAuth), et les données que vous saisissez (Tâches, Habitudes, Journal).
+
+2. UTILISATION DES DONNÉES
+Ces données servent uniquement au fonctionnement de l'application, à la synchronisation sur vos appareils et aux fonctionnalités d'IA (si activées).
+
+3. INTELLIGENCE ARTIFICIELLE
+Si vous activez les fonctions IA, certaines données (texte des tâches, journal) sont traitées par l'API Gemini de Google de manière anonymisée pour générer des conseils.
+
+4. SÉCURITÉ
+Vos données sont stockées sur des serveurs sécurisés (Supabase).
+
+5. SUPPRESSION
+Vous pouvez supprimer votre compte et toutes vos données définitivement via la "Zone de Danger" dans les paramètres de cette application.`
+};
+
 const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
@@ -42,6 +79,11 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user.display_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
+
+  // Legal Modal State
+  const [legalModal, setLegalModal] = useState<{visible: boolean, title: string, content: string}>({
+      visible: false, title: '', content: ''
+  });
 
   // Stats Data
   const [stats, setStats] = useState({
@@ -185,6 +227,26 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
         );
   };
 
+  const handleRateApp = () => {
+      const androidPackageName = 'com.deepflow.app'; // Votre ID défini dans app.json
+      // TODO: Remplacez cet ID par votre Apple ID réel une fois l'app créée sur App Store Connect
+      const itunesItemId = '0000000000'; 
+
+      if (Platform.OS === 'android') {
+          Linking.openURL(`market://details?id=${androidPackageName}`);
+      } else {
+          Linking.openURL(`https://apps.apple.com/app/id${itunesItemId}?action=write-review`);
+      }
+  };
+
+  const openLegalDoc = (type: 'TERMS' | 'PRIVACY') => {
+      setLegalModal({
+          visible: true,
+          title: type === 'TERMS' ? "Conditions d'utilisation" : "Politique de Confidentialité",
+          content: type === 'TERMS' ? LEGAL_DOCS.TERMS : LEGAL_DOCS.PRIVACY
+      });
+  };
+
   const switchTab = (tab: any) => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setActiveTab(tab);
@@ -317,11 +379,11 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
               <View style={styles.card}>
                   <SettingItem icon={MessageSquare} label="Contacter le support" iconColor="#007AFF" onPress={() => openUrl('mailto:deepflow.ia@gmail.com')} />
                   <View style={styles.separator} />
-                  <SettingItem icon={Heart} label="Noter l'application" iconColor="#FF2D55" onPress={() => openUrl('https://deepflow.app/review')} />
+                  <SettingItem icon={Heart} label="Noter l'application" iconColor="#FF2D55" onPress={handleRateApp} />
                   <View style={styles.separator} />
-                  <SettingItem icon={FileText} label="Conditions d'utilisation" iconColor="#9CA3AF" onPress={() => openUrl('https://deepflow.app/terms')} />
+                  <SettingItem icon={FileText} label="Conditions d'utilisation" iconColor="#9CA3AF" onPress={() => openLegalDoc('TERMS')} />
                   <View style={styles.separator} />
-                  <SettingItem icon={Lock} label="Politique de Confidentialité" iconColor="#9CA3AF" onPress={() => openUrl('https://deepflow.app/privacy')} />
+                  <SettingItem icon={Lock} label="Politique de Confidentialité" iconColor="#9CA3AF" onPress={() => openLegalDoc('PRIVACY')} />
               </View>
           </View>
 
@@ -383,42 +445,61 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Mon Espace</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                    <Text style={styles.closeText}>Fermer</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.tabBar}>
-                {(['PROFILE', 'SETTINGS', 'STATS'] as const).map(tab => (
-                    <TouchableOpacity 
-                        key={tab} 
-                        style={[styles.tabItem, activeTab === tab && styles.activeTabItem]} 
-                        onPress={() => switchTab(tab)}
-                    >
-                        <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                            {tab === 'PROFILE' ? 'Profil' : tab === 'SETTINGS' ? 'Réglages' : 'Stats'}
-                        </Text>
+    <>
+        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Mon Espace</Text>
+                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                        <Text style={styles.closeText}>Fermer</Text>
                     </TouchableOpacity>
-                ))}
-            </View>
-
-            {loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#FFF" />
                 </View>
-            ) : (
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {activeTab === 'PROFILE' && renderProfileTab()}
-                    {activeTab === 'SETTINGS' && renderSettingsTab()}
-                    {activeTab === 'STATS' && renderStatsTab()}
-                </ScrollView>
-            )}
-        </View>
-    </Modal>
+
+                <View style={styles.tabBar}>
+                    {(['PROFILE', 'SETTINGS', 'STATS'] as const).map(tab => (
+                        <TouchableOpacity 
+                            key={tab} 
+                            style={[styles.tabItem, activeTab === tab && styles.activeTabItem]} 
+                            onPress={() => switchTab(tab)}
+                        >
+                            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                                {tab === 'PROFILE' ? 'Profil' : tab === 'SETTINGS' ? 'Réglages' : 'Stats'}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#FFF" />
+                    </View>
+                ) : (
+                    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                        {activeTab === 'PROFILE' && renderProfileTab()}
+                        {activeTab === 'SETTINGS' && renderSettingsTab()}
+                        {activeTab === 'STATS' && renderStatsTab()}
+                    </ScrollView>
+                )}
+            </View>
+        </Modal>
+
+        {/* MODALE DOCUMENTS LÉGAUX */}
+        <Modal visible={legalModal.visible} animationType="fade" transparent onRequestClose={() => setLegalModal({...legalModal, visible: false})}>
+            <View style={styles.legalModalOverlay}>
+                <View style={styles.legalModalContent}>
+                    <View style={styles.legalHeader}>
+                        <Text style={styles.legalTitle}>{legalModal.title}</Text>
+                        <TouchableOpacity onPress={() => setLegalModal({...legalModal, visible: false})}>
+                            <X size={24} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView style={styles.legalScroll}>
+                        <Text style={styles.legalText}>{legalModal.content}</Text>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    </>
   );
 };
 
@@ -524,6 +605,14 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 16 },
   statRowLabel: { color: '#FFF', fontSize: 16 },
   statRowValue: { fontSize: 16, fontWeight: '700' },
+
+  // Legal Modal
+  legalModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 },
+  legalModalContent: { backgroundColor: '#1C1C1E', borderRadius: 20, maxHeight: '80%', padding: 20 },
+  legalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  legalTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
+  legalScroll: {},
+  legalText: { color: '#DDD', fontSize: 14, lineHeight: 22 },
 });
 
 export default Profile;
