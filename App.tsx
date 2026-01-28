@@ -269,7 +269,12 @@ const App: React.FC = () => {
       if (habitsRes.data) setHabits(habitsRes.data);
       if (goalsRes.data) setGoals(goalsRes.data);
 
-      if (currentView === ViewState.AUTH) {
+      // --- CHECK FOCUS SESSION ---
+      // Si une session est active, on redirige directement
+      const savedSession = await AsyncStorage.getItem('active_focus_session');
+      if (savedSession) {
+          setCurrentView(ViewState.FOCUS_MODE);
+      } else if (currentView === ViewState.AUTH) {
           setCurrentView(ViewState.TODAY);
       }
 
@@ -288,8 +293,6 @@ const App: React.FC = () => {
   };
 
   // --- ACTIONS ---
-  // (Include all existing action handlers here: createTask, createHabit, etc.)
-  // ... [Garde le code existant des actions create/toggle/delete] ...
   
   const createTask = async (title: string, priority: 'low'|'medium'|'high', goalId?: string, dueDate?: string) => {
       if (!user) return;
@@ -743,7 +746,6 @@ const App: React.FC = () => {
             isDarkMode={isDarkMode} 
         />;
       
-      // Vues maintenues pour compatibilité ou accès direct si besoin
       case ViewState.TASKS: 
           return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={()=>{}} openMenu={() => {}} {...commonProps} />;
       case ViewState.HABITS: 

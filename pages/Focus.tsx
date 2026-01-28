@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation } from 'react-native';
 import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2 } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
@@ -7,6 +7,9 @@ import { Task, FocusSession } from '../types';
 import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
+import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.70, 280); 
@@ -32,6 +35,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   const [durationMinutes, setDurationMinutes] = useState(25);
   const [customDuration, setCustomDuration] = useState('');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [endTimeTimestamp, setEndTimeTimestamp] = useState<number | null>(null);
   
   // Session Details
   const [sessionTitle, setSessionTitle] = useState('');
@@ -48,7 +52,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
 
   // Background Timer State
   const appState = useRef(AppState.currentState);
-  const backgroundTimestamp = useRef<number | null>(null);
 
   const colors = {
       bg: isDarkMode ? '#000' : '#F2F2F7',
@@ -60,53 +63,101 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       inputBg: isDarkMode ? '#1C1C1E' : '#FFFFFF'
   };
 
-  // --- BACKGROUND HANDLING ---
+  // --- RESTORE SESSION ON MOUNT ---
+  useEffect(() => {
+      checkActiveSession();
+      // Demander la permission pour les notifs
+      Notifications.requestPermissionsAsync();
+  }, []);
+
+  const checkActiveSession = async () => {
+      try {
+          const savedSession = await AsyncStorage.getItem('active_focus_session');
+          if (savedSession) {
+              const session = JSON.parse(savedSession);
+              const now = Date.now();
+              const remaining = Math.floor((session.endTime - now) / 1000);
+
+              if (remaining > 0) {
+                  // Session is still active
+                  setSessionTitle(session.title);
+                  setSelectedTaskId(session.taskId);
+                  setDurationMinutes(session.duration);
+                  setEndTimeTimestamp(session.endTime);
+                  setTimeLeft(remaining);
+                  setIsActive(true);
+                  setViewMode('RUNNING');
+              } else {
+                  // Session finished while app was closed/backgrounded
+                  // We treat this as a completed session
+                  handleOfflineCompletion(session);
+              }
+          }
+      } catch (e) {
+          console.error("Failed to restore session", e);
+      }
+  };
+
+  const handleOfflineCompletion = async (session: any) => {
+      await AsyncStorage.removeItem('active_focus_session');
+      
+      // Save to DB
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+          const completedAt = new Date(session.endTime).toISOString();
+          const startedAt = new Date(session.startTime).toISOString();
+          
+          await supabase.from('focus_sessions').insert({
+              user_id: user.id,
+              duration: session.duration,
+              completed_at: completedAt,
+              started_at: startedAt,
+              title: session.title || 'Session Focus',
+          });
+
+          // Award XP
+          let xpAmount = REWARDS.FOCUS_SHORT;
+          if (session.duration >= 45) xpAmount = REWARDS.FOCUS_DEEP;
+          else if (session.duration >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
+
+          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
+          if (player) {
+              await addXp(user.id, xpAmount, player);
+          }
+      }
+
+      Alert.alert(
+          "Focus Terminé", 
+          "Votre session s'est terminée pendant votre absence. Bravo !",
+          [{ text: "OK", onPress: () => changeView('HISTORY') }]
+      );
+      
+      fetchHistory();
+  };
+
+  // --- BACKGROUND & TIMER HANDLING ---
   useEffect(() => {
       let interval: any;
 
-      const handleAppStateChange = (nextAppState: AppStateStatus) => {
-          if (appState.current.match(/active/) && nextAppState === 'background') {
-              if (isActive) {
-                  backgroundTimestamp.current = Date.now();
-              }
-          }
-
-          if (appState.current.match(/background/) && nextAppState === 'active') {
-              if (isActive && backgroundTimestamp.current) {
-                  const now = Date.now();
-                  const elapsedSeconds = Math.floor((now - backgroundTimestamp.current) / 1000);
-                  setTimeLeft(prev => {
-                      const newValue = prev - elapsedSeconds;
-                      if (newValue <= 0) {
-                          completeSession();
-                          return 0;
-                      }
-                      return newValue;
-                  });
-              }
-          }
-          appState.current = nextAppState;
-      };
-
-      const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-      if (isActive && timeLeft > 0) {
+      if (isActive && endTimeTimestamp) {
           interval = setInterval(() => {
-              setTimeLeft((prev) => {
-                  if (prev <= 1) {
-                      completeSession();
-                      return 0;
-                  }
-                  return prev - 1;
-              });
+              const now = Date.now();
+              const secondsRemaining = Math.floor((endTimeTimestamp - now) / 1000);
+
+              if (secondsRemaining <= 0) {
+                  setTimeLeft(0);
+                  clearInterval(interval);
+                  completeSession();
+              } else {
+                  setTimeLeft(secondsRemaining);
+              }
           }, 1000);
       }
 
       return () => {
           if (interval) clearInterval(interval);
-          subscription.remove();
       };
-  }, [isActive, timeLeft]);
+  }, [isActive, endTimeTimestamp]);
 
   useEffect(() => {
       if (viewMode === 'HISTORY') {
@@ -127,15 +178,14 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         .from('focus_sessions')
         .select('*')
         .eq('user_id', user.id)
-        .order('completed_at', { ascending: false }) // Tri SQL primaire
+        .order('completed_at', { ascending: false })
         .limit(50);
         
       if (data) {
-          // Tri Client secondaire pour garantir l'ordre : Récents -> Anciens -> Sans date
           const sortedData = data.sort((a, b) => {
               if (!a.completed_at && !b.completed_at) return 0;
-              if (!a.completed_at) return 1; // a (null) à la fin
-              if (!b.completed_at) return -1; // b (null) à la fin
+              if (!a.completed_at) return 1;
+              if (!b.completed_at) return -1;
               return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
           });
 
@@ -152,20 +202,96 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       }
   };
 
-  const startSession = () => {
+  const playSuccessSound = async () => {
+      try {
+          const { sound } = await Audio.Sound.createAsync(
+             { uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' } 
+          );
+          await sound.playAsync();
+      } catch (error) {
+          console.log("Audio play error", error);
+      }
+  };
+
+  const scheduleNotifications = async (seconds: number) => {
+      // 1. Notif de démarrage
+      const endDate = new Date(Date.now() + seconds * 1000);
+      const endHours = endDate.getHours().toString().padStart(2, '0');
+      const endMinutes = endDate.getMinutes().toString().padStart(2, '0');
+
+      await Notifications.scheduleNotificationAsync({
+          content: {
+              title: "Focus en cours 🧠",
+              body: `Session lancée. Fin prévue à ${endHours}:${endMinutes}.`,
+              sound: false,
+          },
+          trigger: null, // Immédiat
+      });
+
+      // 2. Notif de fin
+      await Notifications.scheduleNotificationAsync({
+          content: {
+              title: "Session Terminée ! 🎉",
+              body: "Bravo ! Il est temps de faire une pause.",
+              sound: true, // Son de notif par défaut
+              vibrate: [0, 250, 250, 250],
+          },
+          trigger: {
+              seconds: seconds,
+          },
+      });
+  };
+
+  const cancelNotifications = async () => {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+  };
+
+  const startSession = async () => {
       const d = customDuration ? parseInt(customDuration) : durationMinutes;
       if (isNaN(d) || d <= 0) {
           Alert.alert("Erreur", "Durée invalide");
           return;
       }
+      
+      const now = Date.now();
+      const endTimestamp = now + (d * 60 * 1000);
+      
+      // Persistence
+      const sessionData = {
+          title: sessionTitle,
+          taskId: selectedTaskId,
+          duration: d,
+          endTime: endTimestamp,
+          startTime: now
+      };
+      await AsyncStorage.setItem('active_focus_session', JSON.stringify(sessionData));
+
+      // Notifications
+      await scheduleNotifications(d * 60);
+
       setDurationMinutes(d);
+      setEndTimeTimestamp(endTimestamp);
       setTimeLeft(d * 60);
       setIsActive(true);
       changeView('RUNNING');
   };
 
+  const stopSession = async () => {
+      setIsActive(false);
+      setEndTimeTimestamp(null);
+      await AsyncStorage.removeItem('active_focus_session');
+      await cancelNotifications();
+      changeView('CONFIG');
+  };
+
   const completeSession = async () => {
       setIsActive(false);
+      setEndTimeTimestamp(null);
+      await AsyncStorage.removeItem('active_focus_session');
+      
+      // Audio et Haptique
+      playSuccessSound();
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
           const now = new Date();
@@ -204,13 +330,10 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user && !isNaN(duration)) {
-          // Gérer le format de date manuel simple ou ISO
           let completedAt;
           try {
-              // Ensure we have a valid ISO string date
               completedAt = new Date(manualDate);
               if (isNaN(completedAt.getTime())) {
-                  // Fallback to now if manual date is invalid
                   completedAt = new Date(); 
               }
           } catch(e) {
@@ -241,12 +364,13 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   };
 
   const formatTime = (seconds: number) => {
+    if (seconds <= 0) return "00:00";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progress = 1 - (timeLeft / (durationMinutes * 60));
+  const progress = durationMinutes > 0 ? 1 - (timeLeft / (durationMinutes * 60)) : 0;
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
   // --- RENDERERS ---
@@ -340,17 +464,22 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
             <View style={styles.timerTextContainer}>
                 <Text style={[styles.timeText, { color: colors.text }]}>{formatTime(timeLeft)}</Text>
                 <Text style={[styles.statusText, { color: colors.subText }]}>{sessionTitle || 'Concentration'}</Text>
+                {endTimeTimestamp && (
+                    <Text style={{color: colors.subText, fontSize: 12, marginTop: 4}}>
+                        Fin: {new Date(endTimeTimestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </Text>
+                )}
             </View>
         </View>
 
         <View style={styles.controls}>
-            <TouchableOpacity onPress={() => { setIsActive(false); changeView('CONFIG'); }} style={styles.controlBtnSecondary}>
+            <TouchableOpacity onPress={stopSession} style={styles.controlBtnSecondary}>
                 <X size={24} color="#FFF" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setIsActive(!isActive)} style={styles.playBtn}>
-                {isActive ? <Pause size={32} color="#000" fill="#000" /> : <Play size={32} color="#000" fill="#000" style={{ marginLeft: 4 }} />}
-            </TouchableOpacity>
+            {/* Pause button removed because persisting paused state adds complexity, kept simple for MVP */}
+            <View style={{width: 20}} />
         </View>
+        <Text style={{color: colors.subText, marginTop: 20, fontSize: 12}}>L'app peut être mise en arrière-plan.</Text>
     </View>
   );
 
@@ -631,7 +760,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#333',
+    backgroundColor: '#FF3B30',
     alignItems: 'center',
     justifyContent: 'center',
   },
