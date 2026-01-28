@@ -174,17 +174,19 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
 
   const renderHQ = () => (
       <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-          {/* AVATAR DISPLAY */}
+          {/* AVATAR DISPLAY (CORRECTED LAYOUT) */}
           <View style={styles.avatarSection}>
-              <AvatarGenerator config={player.avatar_customization || tempAvatar} size={180} />
+              <View style={styles.avatarContainer}>
+                  <AvatarGenerator config={player.avatar_customization || tempAvatar} size={180} />
+              </View>
               
               <View style={styles.rankBadge}>
                   <Text style={styles.rankText}>{rankName.toUpperCase()}</Text>
               </View>
               
-              <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditingAvatar(true)}>
-                  <Edit2 size={16} color="#000" />
-                  <Text style={styles.editBtnText}>Personnaliser</Text>
+              <TouchableOpacity style={[styles.editBtn, {backgroundColor: colors.cardBg, borderColor: colors.border}]} onPress={() => setIsEditingAvatar(true)}>
+                  <Edit2 size={16} color={colors.text} />
+                  <Text style={[styles.editBtnText, {color: colors.text}]}>Personnaliser</Text>
               </TouchableOpacity>
           </View>
 
@@ -394,12 +396,44 @@ const styles = StyleSheet.create({
   tabText: { color: '#8E8E93', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   contentArea: { flex: 1, paddingHorizontal: 20, paddingBottom: 20 },
   
-  // HQ
-  avatarSection: { alignItems: 'center', marginTop: 20, marginBottom: 30 },
-  rankBadge: { marginTop: -20, backgroundColor: '#000', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#333' },
-  rankText: { color: '#C4B5FD', fontWeight: '800', fontSize: 14, letterSpacing: 1 },
-  editBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 16 },
-  editBtnText: { fontWeight: '600', marginLeft: 6, fontSize: 12 },
+  // HQ FIX: Correct layout with gap and no negative margins causing overlap
+  avatarSection: { 
+      alignItems: 'center', 
+      marginTop: 20, 
+      marginBottom: 30,
+      gap: 12, 
+  },
+  avatarContainer: {
+      marginBottom: 8,
+  },
+  rankBadge: { 
+      backgroundColor: '#000', 
+      paddingHorizontal: 16, 
+      paddingVertical: 6, 
+      borderRadius: 20, 
+      borderWidth: 1, 
+      borderColor: '#333' 
+  },
+  rankText: { 
+      color: '#C4B5FD', 
+      fontWeight: '800', 
+      fontSize: 14, 
+      letterSpacing: 1 
+  },
+  editBtn: { 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      paddingHorizontal: 16, 
+      paddingVertical: 10, 
+      borderRadius: 20, 
+      borderWidth: 1,
+      zIndex: 10, // Ensure clickable
+  },
+  editBtnText: { 
+      fontWeight: '600', 
+      marginLeft: 8, 
+      fontSize: 13 
+  },
   
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: { flex: 1, padding: 12, borderRadius: 12, alignItems: 'center' },
@@ -415,6 +449,7 @@ const styles = StyleSheet.create({
   // QUESTS
   sectionHeader: { fontSize: 12, color: '#8E8E93', fontWeight: '700', marginBottom: 10 },
   questItem: { flexDirection: 'row', padding: 12, borderRadius: 16, marginBottom: 10, borderWidth: 1, alignItems: 'center' },
+  questLeft: { flexDirection: 'row', flex: 1, alignItems: 'center' },
   questIconBox: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   questTitle: { fontWeight: '700', fontSize: 14, marginBottom: 2 },
   questDesc: { fontSize: 12, marginBottom: 6 },

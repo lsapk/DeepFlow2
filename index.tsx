@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import 'react-native-url-polyfill/auto'; // CRUCIAL pour Supabase et l'IA
 import { registerRootComponent } from 'expo';
-import React, { ReactNode, Component } from 'react';
+import React, { ReactNode } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, NativeModules } from 'react-native';
 import App from './App';
 
@@ -17,7 +17,7 @@ interface ErrorBoundaryState {
 }
 
 // Composant de secours en cas de crash total
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
