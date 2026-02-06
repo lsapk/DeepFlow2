@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
@@ -7,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 
@@ -84,10 +86,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       (Math.min(averageStreak, 30) / 30 * 20) + 
       (Math.min(player.level, 50) / 50 * 40)
   );
-  if (productivityScore < 10) productivityScore = 15; 
+  if (productivityScore < 5 && (completedTasksCount > 0 || averageStreak > 0)) productivityScore = 15; 
+  if (productivityScore > 100) productivityScore = 100;
+
+  // SVG Calculations for Score Ring
+  const size = 80;
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (productivityScore / 100) * circumference;
 
   const handleToggleHabit = (id: string) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); // Faster feedback
       toggleHabit(id);
   }
 
@@ -116,11 +126,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </View>
             <Text style={[styles.greetingTitle, { color: colors.text }]}>{greeting}, {firstName}</Text>
         </View>
-        <TouchableOpacity onPress={openProfile} style={styles.avatarContainer}>
+        <TouchableOpacity onPress={openProfile} style={styles.avatarContainer} activeOpacity={0.7}>
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
                 style={styles.avatar} 
-                transition={500}
+                transition={200}
             />
         </TouchableOpacity>
       </View>
@@ -133,7 +143,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             {/* LARGE HERO: PRODUCTIVITY */}
             <TouchableOpacity 
                 style={[styles.bentoHero, { backgroundColor: colors.cardBg }]}
-                activeOpacity={0.9}
+                activeOpacity={0.8}
                 onPress={() => setView(ViewState.EVOLUTION)}
             >
                 <LinearGradient
@@ -149,11 +159,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                         <Text style={[styles.heroSub, { color: isDarkMode ? '#9CA3AF' : '#6B7280' }]}>Performance globale</Text>
                     </View>
                     <View style={styles.ringContainer}>
-                         {/* Simple visual representation of a ring */}
-                         <View style={[styles.ringOuter, { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                            <View style={[styles.ringInner, { borderColor: isDarkMode ? '#60A5FA' : '#6366F1' }]} />
-                         </View>
-                         <Target size={24} color={isDarkMode ? '#FFF' : '#000'} style={{position: 'absolute'}} />
+                         <Svg width={size} height={size} style={{position: 'absolute'}}>
+                            {/* Background Track */}
+                            <Circle 
+                                cx={size / 2} cy={size / 2} r={radius} 
+                                stroke={isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"} 
+                                strokeWidth={strokeWidth}
+                                fill="transparent"
+                            />
+                            {/* Progress Ring */}
+                            <Circle 
+                                cx={size / 2} cy={size / 2} r={radius} 
+                                stroke={isDarkMode ? "#60A5FA" : "#6366F1"} 
+                                strokeWidth={strokeWidth}
+                                strokeDasharray={circumference}
+                                strokeDashoffset={strokeDashoffset}
+                                strokeLinecap="round"
+                                fill="transparent"
+                                rotation="-90"
+                                origin={`${size / 2}, ${size / 2}`}
+                            />
+                         </Svg>
+                         <Target size={24} color={isDarkMode ? '#FFF' : '#000'} />
                     </View>
                 </View>
             </TouchableOpacity>
@@ -174,6 +201,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                 <TouchableOpacity 
                     style={[styles.bentoSmall, { backgroundColor: isDarkMode ? '#1C1C1E' : '#FFF' }]}
                     onPress={openFocus}
+                    activeOpacity={0.7}
                 >
                     <View style={[styles.iconCircle, { backgroundColor: 'rgba(52, 199, 89, 0.15)' }]}>
                         <Zap size={20} color={colors.success} fill={colors.success} />
@@ -186,14 +214,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </View>
         </View>
 
-        {/* HABITS SECTION (Horizontal) */}
-        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
+        {/* HABITS SECTION (Horizontal) - FAST ANIMATION */}
+        <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
+            {/* FLUIDITY FIX: Make the entire header a touchable button */}
+            <TouchableOpacity 
+                style={styles.sectionHeaderBtn} 
+                onPress={() => setView(ViewState.HABITS)}
+                activeOpacity={0.6}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+            >
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Habitudes</Text>
-                <TouchableOpacity onPress={() => setView(ViewState.HABITS)} style={styles.seeAllBtn}>
-                    <ChevronRight size={20} color={colors.textSub} />
-                </TouchableOpacity>
-            </View>
+                <View style={styles.seeAllContainer}>
+                    <Text style={[styles.seeAllText, { color: colors.textSub }]}>Tout voir</Text>
+                    <ChevronRight size={16} color={colors.textSub} />
+                </View>
+            </TouchableOpacity>
             
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScroll}>
                 {sortedHabits.length === 0 && (
@@ -210,7 +245,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                                 isDone && { opacity: 0.6 }
                             ]} 
                             onPress={() => handleToggleHabit(habit.id)}
-                            activeOpacity={0.7}
+                            activeOpacity={0.6}
                         >
                             <View style={[styles.habitIcon, { backgroundColor: isDone ? colors.success : (isDarkMode ? '#333' : '#F2F2F7') }]}>
                                 {isDone ? <Check size={16} color="#FFF" strokeWidth={3} /> : <Flame size={16} color={colors.textSub} />}
@@ -227,14 +262,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </ScrollView>
         </Animated.View>
 
-        {/* TASKS LIST */}
-        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
+        {/* TASKS LIST - FAST ANIMATION */}
+        <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
+            {/* FLUIDITY FIX: Make the entire header a touchable button */}
+            <TouchableOpacity 
+                style={styles.sectionHeaderBtn} 
+                onPress={() => setView(ViewState.TASKS)}
+                activeOpacity={0.6}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+            >
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Tâches Prioritaires</Text>
-                <TouchableOpacity onPress={() => setView(ViewState.TASKS)} style={styles.seeAllBtn}>
-                    <ChevronRight size={20} color={colors.textSub} />
-                </TouchableOpacity>
-            </View>
+                <View style={styles.seeAllContainer}>
+                    <Text style={[styles.seeAllText, { color: colors.textSub }]}>Tout voir</Text>
+                    <ChevronRight size={16} color={colors.textSub} />
+                </View>
+            </TouchableOpacity>
 
             <View style={[styles.taskList, { backgroundColor: colors.cardBg }]}>
                 {activeTasks.length === 0 ? (
@@ -247,7 +289,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                             key={task.id}
                             style={[styles.taskRow, index < activeTasks.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} 
                             onPress={() => handleToggleTask(task.id)}
-                            activeOpacity={0.7}
+                            activeOpacity={0.6}
+                            hitSlop={{top: 0, bottom: 0, left: 0, right: 10}} // easier to tap right side
                         >
                             <View style={[styles.checkbox, { borderColor: colors.textSub }]}>
                                 {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
@@ -344,21 +387,6 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
   },
-  ringOuter: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      borderWidth: 6,
-      alignItems: 'center',
-      justifyContent: 'center',
-  },
-  ringInner: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      borderWidth: 4,
-      opacity: 0.8,
-  },
   bentoRow: {
       flexDirection: 'row',
       gap: 12,
@@ -391,19 +419,26 @@ const styles = StyleSheet.create({
   sectionContainer: {
       marginBottom: 30,
   },
-  sectionHeader: {
+  sectionHeaderBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 14,
       paddingHorizontal: 4,
+      paddingVertical: 4, // Bigger hit area
   },
   sectionTitle: {
       fontSize: 18,
       fontWeight: '700',
   },
-  seeAllBtn: {
-      padding: 4,
+  seeAllContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+  },
+  seeAllText: {
+      fontSize: 13,
+      fontWeight: '500',
   },
   
   // HABITS

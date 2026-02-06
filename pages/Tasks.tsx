@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard, FlatList, ActivityIndicator } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
@@ -204,9 +205,12 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         ListFooterComponent={ListFooter}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={5}
+        // Performance optimizations
+        initialNumToRender={15}
+        maxToRenderPerBatch={15}
+        windowSize={10}
+        removeClippedSubviews={Platform.OS === 'android'} // Only Android to prevent white flash on iOS
+        updateCellsBatchingPeriod={10}
       />
 
       <KeyboardAvoidingView 
@@ -226,7 +230,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                   onChangeText={setQuickTitle}
                   onSubmitEditing={handleQuickAdd}
               />
-              <TouchableOpacity onPress={handleQuickAdd} disabled={!quickTitle}>
+              <TouchableOpacity onPress={handleQuickAdd} disabled={!quickTitle} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <ArrowUpCircle size={32} color={quickTitle ? colors.accent : colors.textSub} fill={colors.cardBg} />
               </TouchableOpacity>
           </View>
@@ -279,15 +283,28 @@ const SwipeableRow = ({ children, onSwipeLeft, onSwipeRight }: any) => {
     return <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>{children}</Swipeable>;
 };
 
-// Optimization: Subtask Item as pure component
+// Optimization: Subtask Item as pure component - FLUIDITY FIX: Whole row clickable
 const SubtaskItem = React.memo(({ sub, taskId, colors, toggleSubtask, deleteSubtask }: any) => (
-    <View style={[styles.subtaskRow, {borderBottomColor: colors.border}]}>
-        <TouchableOpacity onPress={() => toggleSubtask(sub.id, taskId)} style={[styles.subCheck, {borderColor: sub.completed ? colors.text : colors.textSub}]}>
+    <TouchableOpacity 
+        style={[styles.subtaskRow, {borderBottomColor: colors.border}]} 
+        onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            toggleSubtask(sub.id, taskId);
+        }}
+        activeOpacity={0.6}
+    >
+        <View style={[styles.subCheck, {borderColor: sub.completed ? colors.text : colors.textSub}]}>
             {sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}
-        </TouchableOpacity>
+        </View>
         <Text style={[styles.subtaskText, {color: colors.text}, sub.completed && styles.subtaskTextDone]}>{sub.title}</Text>
-        <TouchableOpacity onPress={() => deleteSubtask(sub.id, taskId)}><X size={14} color={colors.textSub} /></TouchableOpacity>
-    </View>
+        <TouchableOpacity 
+            onPress={() => deleteSubtask(sub.id, taskId)} 
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+            style={{padding: 4}}
+        >
+            <X size={14} color={colors.textSub} />
+        </TouchableOpacity>
+    </TouchableOpacity>
 ));
 
 const TaskItem = React.memo(({ task, isExpanded, onToggle, onToggleExpand, onLongPress, colors, priorityColor, createSubtask, toggleSubtask, deleteSubtask }: any) => {
@@ -313,8 +330,17 @@ const TaskItem = React.memo(({ task, isExpanded, onToggle, onToggleExpand, onLon
                         <SubtaskItem key={sub.id} sub={sub} taskId={task.id} colors={colors} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} />
                     ))}
                     <View style={styles.addSubtaskRow}>
-                        <TextInput style={[styles.subInput, {color: colors.text}]} placeholder="Ajouter une étape..." placeholderTextColor={colors.textSub} value={newSubtaskTitle} onChangeText={setNewSubtaskTitle} onSubmitEditing={handleAddSub} />
-                        <TouchableOpacity onPress={handleAddSub}><Plus size={20} color={colors.accent} /></TouchableOpacity>
+                        <TextInput 
+                            style={[styles.subInput, {color: colors.text}]} 
+                            placeholder="Ajouter une étape..." 
+                            placeholderTextColor={colors.textSub} 
+                            value={newSubtaskTitle} 
+                            onChangeText={setNewSubtaskTitle} 
+                            onSubmitEditing={handleAddSub} 
+                        />
+                        <TouchableOpacity onPress={handleAddSub} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                            <Plus size={20} color={colors.accent} />
+                        </TouchableOpacity>
                     </View>
                 </View>
             )}
@@ -350,13 +376,13 @@ const styles = StyleSheet.create({
   
   subtaskList: { padding: 16, borderTopWidth: 1, backgroundColor: 'rgba(0,0,0,0.02)' },
   taskDescPreview: { fontSize: 14, marginBottom: 12, fontStyle: 'italic' },
-  subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0.5 },
+  subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5 }, // Increased padding for touch target
   subCheck: { width: 18, height: 18, borderRadius: 6, borderWidth: 1.5, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
   subCheckInner: { width: 10, height: 10, borderRadius: 2 },
   subtaskText: { fontSize: 15, flex: 1 },
   subtaskTextDone: { opacity: 0.5, textDecorationLine: 'line-through' },
   addSubtaskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
-  subInput: { flex: 1, fontSize: 15, marginRight: 10 },
+  subInput: { flex: 1, fontSize: 15, marginRight: 10, height: 40 }, // Explicit height
   
   leftAction: { backgroundColor: '#34C759', justifyContent: 'center', alignItems: 'flex-end', flex: 1, paddingRight: 20, borderRadius: 12 },
   rightAction: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'flex-start', flex: 1, paddingLeft: 20, borderRadius: 12 },

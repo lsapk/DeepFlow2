@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation } from 'react-native';
 import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2 } from 'lucide-react-native';
@@ -10,12 +11,15 @@ import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.70, 280); 
 const STROKE_WIDTH = 12;
 const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 
 interface FocusProps {
     onExit: () => void;
@@ -53,6 +57,9 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   // Background Timer State
   const appState = useRef(AppState.currentState);
 
+  // Animation Values
+  const pulse = useSharedValue(1);
+
   const colors = {
       bg: isDarkMode ? '#000' : '#F2F2F7',
       text: isDarkMode ? '#FFF' : '#000',
@@ -62,6 +69,26 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       accent: '#007AFF',
       inputBg: isDarkMode ? '#1C1C1E' : '#FFFFFF'
   };
+
+  // --- ANIMATION EFFECTS ---
+  useEffect(() => {
+      if (isActive) {
+          pulse.value = withRepeat(
+              withSequence(
+                  withTiming(1.03, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+                  withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+              ),
+              -1,
+              true
+          );
+      } else {
+          pulse.value = withTiming(1, { duration: 500 });
+      }
+  }, [isActive]);
+
+  const animatedCircleStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: pulse.value }]
+  }));
 
   // --- RESTORE SESSION ON MOUNT ---
   useEffect(() => {
@@ -449,8 +476,8 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
 
   const renderRunning = () => (
     <View style={styles.content}>
-        <View style={styles.timerContainer}>
-            <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
+        <Animated.View style={[styles.timerContainer, animatedCircleStyle]}>
+            <AnimatedSvg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
                 <Circle cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS} stroke={colors.border} strokeWidth={STROKE_WIDTH} fill="transparent" />
                 <Circle
                     cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS}
@@ -460,7 +487,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                     strokeLinecap="round"
                     transform={`rotate(-90 ${CIRCLE_SIZE / 2} ${CIRCLE_SIZE / 2})`}
                 />
-            </Svg>
+            </AnimatedSvg>
             <View style={styles.timerTextContainer}>
                 <Text style={[styles.timeText, { color: colors.text }]}>{formatTime(timeLeft)}</Text>
                 <Text style={[styles.statusText, { color: colors.subText }]}>{sessionTitle || 'Concentration'}</Text>
@@ -470,7 +497,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                     </Text>
                 )}
             </View>
-        </View>
+        </Animated.View>
 
         <View style={styles.controls}>
             <TouchableOpacity onPress={stopSession} style={styles.controlBtnSecondary}>
@@ -740,6 +767,7 @@ const styles = StyleSheet.create({
   },
   timerTextContainer: {
     alignItems: 'center',
+    position: 'absolute', // Make text absolute to stay centered regardless of scale
   },
   timeText: {
     fontSize: 60,
