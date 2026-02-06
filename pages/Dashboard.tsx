@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
-import { Check, Flame, Plus, Play, ChevronRight, Zap, Target } from 'lucide-react-native';
+import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -21,9 +21,10 @@ interface DashboardProps {
   openProfile: () => void;
   setView: (view: ViewState) => void;
   isDarkMode?: boolean;
+  syncStatus?: 'SYNCED' | 'SYNCING' | 'OFFLINE_PENDING';
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED' }) => {
   const insets = useSafeAreaInsets();
   
   const colors = {
@@ -95,15 +96,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       toggleTask(id);
   }
 
+  const renderSyncIcon = () => {
+      if (syncStatus === 'SYNCING') return <ActivityIndicator size="small" color={colors.textSub} />;
+      if (syncStatus === 'OFFLINE_PENDING') return <CloudOff size={18} color={colors.orange} />;
+      return <Cloud size={18} color={colors.success} />;
+  };
+
   return (
     <Animated.View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       
       {/* HEADER */}
       <View style={styles.header}>
         <View>
-            <Text style={[styles.greetingSub, {color: colors.textSub}]}>
-                {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
-            </Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
+                <Text style={[styles.greetingSub, {color: colors.textSub}]}>
+                    {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
+                </Text>
+                {renderSyncIcon()}
+            </View>
             <Text style={[styles.greetingTitle, { color: colors.text }]}>{greeting}, {firstName}</Text>
         </View>
         <TouchableOpacity onPress={openProfile} style={styles.avatarContainer}>
@@ -273,7 +283,6 @@ const styles = StyleSheet.create({
       fontSize: 11,
       fontWeight: '600',
       letterSpacing: 1,
-      marginBottom: 2,
   },
   greetingTitle: {
       fontSize: 24,

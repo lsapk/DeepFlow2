@@ -584,7 +584,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     ))}
                     {loadingAi && <ActivityIndicator style={{margin: 20, alignSelf: 'flex-start'}} />}
                 </ScrollView>
-                <View style={[styles.inputContainer, {backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: 100}]}>
+                <View style={[
+                    styles.inputContainer, 
+                    {
+                        backgroundColor: colors.card, 
+                        borderTopColor: colors.border,
+                        paddingBottom: 10 + 80 // Base + Bottom Nav height approx
+                    }
+                ]}>
                     <TextInput 
                         style={[styles.input, {backgroundColor: colors.inputBg, color: colors.text}]} 
                         value={chatInput} 

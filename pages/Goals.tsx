@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
 import { Plus, Check, ChevronDown, ChevronUp, X, Calendar, Minus, Flag, GitBranch } from 'lucide-react-native';
@@ -65,25 +65,24 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
     }
   };
 
-  const toggleExpand = (goalId: string) => {
+  const toggleExpand = useCallback((goalId: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const newSet = new Set(expandedGoalIds);
-    if (newSet.has(goalId)) {
-      newSet.delete(goalId);
-    } else {
-      newSet.add(goalId);
-    }
-    setExpandedGoalIds(newSet);
-  };
+    setExpandedGoalIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(goalId)) newSet.delete(goalId);
+      else newSet.add(goalId);
+      return newSet;
+    });
+  }, []);
 
-  const openEditModal = (goal: Goal) => {
+  const openEditModal = useCallback((goal: Goal) => {
       setSelectedGoal(goal);
       setFormTitle(goal.title);
       setFormDesc(goal.description || '');
       setFormDate(goal.target_date ? new Date(goal.target_date).toISOString().split('T')[0] : '');
       setFormProgress(goal.progress || 0);
       setEditModalVisible(true);
-  };
+  }, []);
 
   const handleUpdateGoal = async () => {
       if (!selectedGoal) return;
@@ -103,16 +102,11 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
       setFormProgress(newVal);
   };
 
-  const onToggleGoal = (id: string) => {
-      toggleGoal(id);
-  }
-
   const activeGoals = goals.filter(t => !t.completed);
   const completedGoals = goals.filter(t => t.completed);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* HEADER */}
       <View style={styles.header}>
           <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
           <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
@@ -129,12 +123,12 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
             {activeGoals.length === 0 && (
                 <Text style={[styles.emptyText, { color: colors.textSub }]}>Aucun objectif actif.</Text>
             )}
-            {activeGoals.map((goal, index) => (
+            {activeGoals.map((goal) => (
                 <GoalItem 
                     key={goal.id}
                     goal={goal} 
                     isExpanded={expandedGoalIds.has(goal.id)}
-                    onToggle={() => onToggleGoal(goal.id)} 
+                    onToggle={() => toggleGoal(goal.id)} 
                     onToggleExpand={() => toggleExpand(goal.id)}
                     onLongPress={() => openEditModal(goal)}
                     colors={colors}
@@ -153,12 +147,12 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
 
         {showCompleted && completedGoals.length > 0 && (
             <View style={[styles.listGroup, { marginTop: 10 }]}>
-                {completedGoals.map((goal, index) => (
+                {completedGoals.map((goal) => (
                     <GoalItem 
                         key={goal.id}
                         goal={goal} 
                         isExpanded={expandedGoalIds.has(goal.id)}
-                        onToggle={() => onToggleGoal(goal.id)} 
+                        onToggle={() => toggleGoal(goal.id)} 
                         onToggleExpand={() => toggleExpand(goal.id)}
                         onLongPress={() => openEditModal(goal)}
                         colors={colors}
@@ -244,15 +238,13 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
                         <TouchableOpacity 
                             style={styles.deleteActionBtn} 
                             onPress={() => {
-                                if (selectedGoal) {
-                                    Alert.alert("Supprimer", "Êtes-vous sûr ?", [
-                                        { text: "Annuler", style: "cancel"},
-                                        { text: "Supprimer", style: 'destructive', onPress: () => {
-                                            deleteGoal(selectedGoal.id);
-                                            setEditModalVisible(false);
-                                        }}
-                                    ])
-                                }
+                                Alert.alert("Supprimer", "Êtes-vous sûr ?", [
+                                    { text: "Annuler", style: "cancel"},
+                                    { text: "Supprimer", style: 'destructive', onPress: () => {
+                                        deleteGoal(selectedGoal!.id);
+                                        setEditModalVisible(false);
+                                    }}
+                                ])
                             }}
                         >
                             <Text style={styles.deleteText}>Supprimer l'objectif</Text>
@@ -267,19 +259,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   );
 };
 
-interface GoalItemProps {
-    goal: Goal;
-    isExpanded: boolean;
-    onToggle: () => void;
-    onToggleExpand: () => void;
-    onLongPress: () => void;
-    colors: any;
-    createSubObjective: (goalId: string, title: string) => void;
-    toggleSubObjective: (subId: string, goalId: string) => void;
-    deleteSubObjective: (subId: string, goalId: string) => void;
-}
-
-const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggleExpand, onLongPress, colors, createSubObjective, toggleSubObjective, deleteSubObjective }) => {
+const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLongPress, colors, createSubObjective, toggleSubObjective, deleteSubObjective }: any) => {
     const [newSubGoalTitle, setNewSubGoalTitle] = useState('');
     
     const addSubGoal = () => {
@@ -290,12 +270,7 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
 
     return (
         <View style={[styles.goalCard, {backgroundColor: colors.cardBg}]}>
-            <TouchableOpacity 
-                style={styles.taskItem} 
-                onPress={onToggleExpand}
-                onLongPress={onLongPress}
-                activeOpacity={0.8}
-            >
+            <TouchableOpacity style={styles.taskItem} onPress={onToggleExpand} onLongPress={onLongPress} activeOpacity={0.8}>
                 <View style={styles.headerRow}>
                     <TouchableOpacity onPress={onToggle}>
                         {goal.completed ? <Check size={24} color={colors.success} /> : <Flag size={24} color={colors.textSub} />}
@@ -309,17 +284,10 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
                     </View>
                 </View>
 
-                {/* RPG Progress Bar */}
                 {!goal.completed && (
                     <View style={styles.rpgProgressContainer}>
                          <View style={[styles.rpgBarBg, {backgroundColor: '#333'}]}>
-                             <LinearGradient
-                                colors={['#4F46E5', '#9333EA']}
-                                start={{x: 0, y: 0}}
-                                end={{x: 1, y: 0}}
-                                style={[styles.rpgBarFill, { width: `${goal.progress || 0}%` }]}
-                             />
-                             {/* Milestones Markers */}
+                             <LinearGradient colors={['#4F46E5', '#9333EA']} start={{x: 0, y: 0}} end={{x: 1, y: 0}} style={[styles.rpgBarFill, { width: `${goal.progress || 0}%` }]} />
                              <View style={[styles.milestone, {left: '25%'}]} />
                              <View style={[styles.milestone, {left: '50%'}]} />
                              <View style={[styles.milestone, {left: '75%'}]} />
@@ -332,349 +300,95 @@ const GoalItem: React.FC<GoalItemProps> = ({ goal, isExpanded, onToggle, onToggl
             {isExpanded && (
                 <View style={[styles.expandedSection, { borderTopColor: colors.border }]}>
                     {goal.description && <Text style={[styles.descText, { color: colors.textSub }]}>{goal.description}</Text>}
-
                     <View style={styles.treeContainer}>
-                        {/* Tree Vertical Line */}
                         <View style={[styles.treeLineVertical, { backgroundColor: colors.border }]} />
-                        
-                        {goal.subobjectives?.map(subObjective => (
+                        {goal.subobjectives?.map((subObjective: SubObjective) => (
                             <View key={subObjective.id} style={styles.treeItem}>
-                                {/* Tree Connector */}
                                 <View style={[styles.treeLineHorizontal, { backgroundColor: colors.border }]} />
-                                
                                 <View style={[styles.subtaskRow, { borderBottomColor: colors.border }]}>
                                     <TouchableOpacity onPress={() => toggleSubObjective(subObjective.id, goal.id)} style={[styles.subtaskCheckbox, { borderColor: colors.textSub }]}>
                                         {subObjective.completed && <View style={[styles.subtaskChecked, { backgroundColor: colors.text }]} />}
                                     </TouchableOpacity>
-                                    <Text style={[styles.subtaskTitle, { color: colors.text }, subObjective.completed && styles.subtaskTitleCompleted]}>
-                                        {subObjective.title}
-                                    </Text>
-                                    <TouchableOpacity onPress={() => deleteSubObjective(subObjective.id, goal.id)} style={{marginLeft: 'auto'}}>
-                                        <X size={14} color={colors.textSub} />
-                                    </TouchableOpacity>
+                                    <Text style={[styles.subtaskTitle, { color: colors.text }, subObjective.completed && styles.subtaskTitleCompleted]}>{subObjective.title}</Text>
+                                    <TouchableOpacity onPress={() => deleteSubObjective(subObjective.id, goal.id)} style={{marginLeft: 'auto'}}><X size={14} color={colors.textSub} /></TouchableOpacity>
                                 </View>
                             </View>
                         ))}
                     </View>
-                    
                     <View style={styles.addSubtaskRow}>
                         <GitBranch size={16} color={colors.textSub} style={{marginRight: 8}} />
-                        <TextInput
-                            style={[styles.subtaskInput, { color: colors.text }]}
-                            placeholder="Nouvelle branche..."
-                            placeholderTextColor={colors.textSub}
-                            value={newSubGoalTitle}
-                            onChangeText={setNewSubGoalTitle}
-                            onSubmitEditing={addSubGoal}
-                        />
-                        <TouchableOpacity onPress={addSubGoal} disabled={!newSubGoalTitle.trim()}>
-                            <Plus size={20} color={newSubGoalTitle.trim() ? colors.accent : colors.textSub} />
-                        </TouchableOpacity>
+                        <TextInput style={[styles.subtaskInput, { color: colors.text }]} placeholder="Nouvelle branche..." placeholderTextColor={colors.textSub} value={newSubGoalTitle} onChangeText={setNewSubGoalTitle} onSubmitEditing={addSubGoal} />
+                        <TouchableOpacity onPress={addSubGoal} disabled={!newSubGoalTitle.trim()}><Plus size={20} color={newSubGoalTitle.trim() ? colors.accent : colors.textSub} /></TouchableOpacity>
                     </View>
                 </View>
             )}
         </View>
     )
-}
+}, (prev, next) => {
+    return (
+        prev.isExpanded === next.isExpanded &&
+        prev.goal === next.goal && 
+        prev.goal.subobjectives === next.goal.subobjectives && 
+        prev.goal.progress === next.goal.progress &&
+        prev.colors.bg === next.colors.bg
+    );
+});
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 20,
-  },
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    marginTop: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  largeTitle: {
-    fontSize: 34,
-    fontWeight: '800',
-    letterSpacing: 0.37,
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 150,
-  },
-  sectionHeader: {
-      marginBottom: 8,
-      marginLeft: 4,
-  },
-  sectionTitle: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: '#8E8E93',
-  },
-  listGroup: {
-      gap: 16,
-  },
-  toggleCompletedBtn: {
-      padding: 16,
-      alignItems: 'center',
-  },
-  toggleText: {
-      fontSize: 15,
-      fontWeight: '500',
-  },
-  emptyText: {
-    padding: 20,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  goalCard: {
-      borderRadius: 16,
-      overflow: 'hidden',
-      paddingBottom: 4,
-  },
-  taskItem: {
-    padding: 16,
-  },
-  headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
-  },
-  taskContent: {
-    flex: 1,
-  },
-  taskTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  taskTitleCompleted: {
-    opacity: 0.5,
-    textDecorationLine: 'line-through',
-  },
-  dateText: {
-      fontSize: 12,
-      marginTop: 2,
-  },
-  rightActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-  },
-  
-  // RPG Bar
-  rpgProgressContainer: {
-      marginTop: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-  },
-  rpgBarBg: {
-      flex: 1,
-      height: 12,
-      borderRadius: 6,
-      overflow: 'hidden',
-      position: 'relative',
-  },
-  rpgBarFill: {
-      height: '100%',
-      borderRadius: 6,
-  },
-  milestone: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      width: 2,
-      backgroundColor: 'rgba(255,255,255,0.3)',
-      zIndex: 10,
-  },
-  progressText: {
-      color: '#FFF',
-      fontSize: 12,
-      fontWeight: '700',
-      width: 35,
-      textAlign: 'right',
-  },
-
-  expandedSection: {
-      paddingHorizontal: 16,
-      paddingBottom: 16,
-      borderTopWidth: 1,
-      marginTop: 8,
-  },
-  descText: {
-      fontSize: 14,
-      marginBottom: 12,
-      fontStyle: 'italic',
-      marginTop: 8,
-  },
-
-  // Tree Structure
-  treeContainer: {
-      position: 'relative',
-      paddingLeft: 10,
-  },
-  treeLineVertical: {
-      position: 'absolute',
-      left: 0,
-      top: 0,
-      bottom: 15,
-      width: 2,
-      borderRadius: 1,
-  },
-  treeItem: {
-      position: 'relative',
-      paddingLeft: 16,
-      marginBottom: 0,
-  },
-  treeLineHorizontal: {
-      position: 'absolute',
-      left: 0,
-      top: 22,
-      width: 12,
-      height: 2,
-  },
-  subtaskRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: 0.5,
-  },
-  subtaskCheckbox: {
-      width: 18,
-      height: 18,
-      borderRadius: 6,
-      borderWidth: 1.5,
-      marginRight: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-  },
-  subtaskChecked: {
-      width: 10,
-      height: 10,
-      borderRadius: 2,
-  },
-  subtaskTitle: {
-      fontSize: 15,
-      flex: 1,
-  },
-  subtaskTitleCompleted: {
-      opacity: 0.5,
-      textDecorationLine: 'line-through',
-  },
-  addSubtaskRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: 12,
-      paddingLeft: 10,
-  },
-  subtaskInput: {
-      flex: 1,
-      fontSize: 15,
-      marginRight: 8,
-  },
-  
-  // Progress
-  miniProgressBg: {
-      height: 4,
-      borderRadius: 2,
-      marginTop: 6,
-      width: '60%',
-  },
-  miniProgressFill: {
-      height: '100%',
-      borderRadius: 2,
-  },
-  progressControl: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      marginBottom: 20,
-  },
-  progressBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-  },
-  progressBarBg: {
-      flex: 1,
-      height: 8,
-      borderRadius: 4,
-      overflow: 'hidden',
-  },
-  progressBarFill: {
-      height: '100%',
-  },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      padding: 20,
-      paddingBottom: 40,
-      maxHeight: '90%',
-  },
-  modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 24,
-  },
-  modalTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-  },
-  modalInput: {
-      padding: 14,
-      borderRadius: 12,
-      fontSize: 17,
-      marginBottom: 20,
-  },
-  inputWithIcon: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      marginBottom: 20,
-  },
-  inputLabel: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: '#8E8E93',
-      marginBottom: 8,
-      textTransform: 'uppercase',
-  },
-  deleteActionBtn: {
-      alignItems: 'center',
-      marginTop: 20,
-      padding: 10,
-  },
-  deleteText: {
-      color: '#FF3B30',
-      fontWeight: '600',
-      fontSize: 17,
-  },
-  saveBtn: {
-      padding: 16,
-      borderRadius: 14,
-      alignItems: 'center',
-      marginTop: 10,
-  },
-  saveBtnText: {
-      color: '#FFF',
-      fontWeight: '700',
-      fontSize: 17,
-  }
+  container: { flex: 1, paddingTop: 20 },
+  header: { paddingHorizontal: 20, marginBottom: 16, marginTop: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
+  addButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 150 },
+  sectionHeader: { marginBottom: 8, marginLeft: 4 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#8E8E93' },
+  listGroup: { gap: 16 },
+  toggleCompletedBtn: { padding: 16, alignItems: 'center' },
+  toggleText: { fontSize: 15, fontWeight: '500' },
+  emptyText: { padding: 20, textAlign: 'center', fontStyle: 'italic' },
+  goalCard: { borderRadius: 16, overflow: 'hidden', paddingBottom: 4 },
+  taskItem: { padding: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  taskContent: { flex: 1 },
+  taskTitle: { fontSize: 18, fontWeight: '700' },
+  taskTitleCompleted: { opacity: 0.5, textDecorationLine: 'line-through' },
+  dateText: { fontSize: 12, marginTop: 2 },
+  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rpgProgressContainer: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rpgBarBg: { flex: 1, height: 12, borderRadius: 6, overflow: 'hidden', position: 'relative' },
+  rpgBarFill: { height: '100%', borderRadius: 6 },
+  milestone: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: 'rgba(255,255,255,0.3)', zIndex: 10 },
+  progressText: { color: '#FFF', fontSize: 12, fontWeight: '700', width: 35, textAlign: 'right' },
+  expandedSection: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, marginTop: 8 },
+  descText: { fontSize: 14, marginBottom: 12, fontStyle: 'italic', marginTop: 8 },
+  treeContainer: { position: 'relative', paddingLeft: 10 },
+  treeLineVertical: { position: 'absolute', left: 0, top: 0, bottom: 15, width: 2, borderRadius: 1 },
+  treeItem: { position: 'relative', paddingLeft: 16, marginBottom: 0 },
+  treeLineHorizontal: { position: 'absolute', left: 0, top: 22, width: 12, height: 2 },
+  subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0.5 },
+  subtaskCheckbox: { width: 18, height: 18, borderRadius: 6, borderWidth: 1.5, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
+  subtaskChecked: { width: 10, height: 10, borderRadius: 2 },
+  subtaskTitle: { fontSize: 15, flex: 1 },
+  subtaskTitleCompleted: { opacity: 0.5, textDecorationLine: 'line-through' },
+  addSubtaskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingLeft: 10 },
+  subtaskInput: { flex: 1, fontSize: 15, marginRight: 8 },
+  miniProgressBg: { height: 4, borderRadius: 2, marginTop: 6, width: '60%' },
+  miniProgressFill: { height: '100%', borderRadius: 2 },
+  progressControl: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  progressBtn: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  progressBarBg: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
+  progressBarFill: { height: '100%' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40, maxHeight: '90%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  modalTitle: { fontSize: 20, fontWeight: '700' },
+  modalInput: { padding: 14, borderRadius: 12, fontSize: 17, marginBottom: 20 },
+  inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14, marginBottom: 20 },
+  inputLabel: { fontSize: 12, fontWeight: '600', color: '#8E8E93', marginBottom: 8, textTransform: 'uppercase' },
+  deleteActionBtn: { alignItems: 'center', marginTop: 20, padding: 10 },
+  deleteText: { color: '#FF3B30', fontWeight: '600', fontSize: 17 },
+  saveBtn: { padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 10 },
+  saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 17 }
 });
 
 export default Goals;

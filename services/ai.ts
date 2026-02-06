@@ -156,6 +156,41 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
     }
 };
 
+export const generateSubtasks = async (taskTitle: string): Promise<string[]> => {
+    if (!ai) return [];
+    await logAiUsage('analysis');
+
+    try {
+        const prompt = `
+        Agis comme un assistant de productivité expert.
+        Découpe la tâche complexe suivante en une liste de sous-tâches logiques, concrètes et chronologiques (maximum 10 étapes).
+        Tâche Mère : "${taskTitle}"
+
+        Ta réponse DOIT être un tableau JSON de chaînes de caractères (strings). Rien d'autre.
+        Exemple : ["Choisir la date", "Réserver le lieu", "Envoyer les invitations"]
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+
+        const text = response.text;
+        if (!text) return [];
+
+        const data = JSON.parse(text);
+        if (Array.isArray(data)) return data;
+        if (data.subtasks && Array.isArray(data.subtasks)) return data.subtasks;
+        
+        return [];
+
+    } catch (e) {
+        console.error("AI Split Error", e);
+        return [];
+    }
+};
+
 export const generateCoaching = async (msg: string, ctx: any) => {
     const res = await generateActionableCoaching(msg, ctx, false);
     return res.text;

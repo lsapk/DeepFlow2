@@ -85,6 +85,10 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       visible: false, title: '', content: ''
   });
 
+  // Delete Confirm Modal
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+
   // Stats Data
   const [stats, setStats] = useState({
       tasksCompleted: 0,
@@ -189,47 +193,39 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       setLoading(false);
   };
 
-  const handleDeleteAccount = async () => {
-        Alert.alert(
-            "Supprimer le compte",
-            "Attention : Cette action est définitive. Toutes vos données (tâches, progression, journal) seront effacées immédiatement. Voulez-vous vraiment continuer ?",
-            [
-                { text: "Annuler", style: "cancel" },
-                {
-                    text: "Supprimer définitivement",
-                    style: "destructive",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            // Suppression manuelle des données en cascade
-                            await Promise.all([
-                                supabase.from('tasks').delete().eq('user_id', user.id),
-                                supabase.from('habits').delete().eq('user_id', user.id),
-                                supabase.from('goals').delete().eq('user_id', user.id),
-                                supabase.from('journal_entries').delete().eq('user_id', user.id),
-                                supabase.from('daily_reflections').delete().eq('user_id', user.id),
-                                supabase.from('focus_sessions').delete().eq('user_id', user.id),
-                                supabase.from('user_settings').delete().eq('id', user.id),
-                                supabase.from('player_profiles').delete().eq('user_id', user.id),
-                                supabase.from('user_profiles').delete().eq('id', user.id)
-                            ]);
-                            
-                            // Déconnexion finale
-                            logout();
-                        } catch (e) {
-                            Alert.alert("Erreur", "Une erreur est survenue lors de la suppression. Veuillez contacter le support.");
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
-                }
-            ]
-        );
+  const executeDeleteAccount = async () => {
+        if (deleteConfirmationText !== "SUPPRIMER") {
+            Alert.alert("Erreur", "Vous devez taper 'SUPPRIMER' en majuscules pour confirmer.");
+            return;
+        }
+
+        setDeleteModalVisible(false);
+        setLoading(true);
+        try {
+            // Suppression manuelle des données en cascade
+            await Promise.all([
+                supabase.from('tasks').delete().eq('user_id', user.id),
+                supabase.from('habits').delete().eq('user_id', user.id),
+                supabase.from('goals').delete().eq('user_id', user.id),
+                supabase.from('journal_entries').delete().eq('user_id', user.id),
+                supabase.from('daily_reflections').delete().eq('user_id', user.id),
+                supabase.from('focus_sessions').delete().eq('user_id', user.id),
+                supabase.from('user_settings').delete().eq('id', user.id),
+                supabase.from('player_profiles').delete().eq('user_id', user.id),
+                supabase.from('user_profiles').delete().eq('id', user.id)
+            ]);
+            
+            // Déconnexion finale
+            logout();
+        } catch (e) {
+            Alert.alert("Erreur", "Une erreur est survenue lors de la suppression. Veuillez contacter le support.");
+        } finally {
+            setLoading(false);
+        }
   };
 
   const handleRateApp = () => {
-      const androidPackageName = 'com.deepflow.app'; // Votre ID défini dans app.json
-      // TODO: Remplacez cet ID par votre Apple ID réel une fois l'app créée sur App Store Connect
+      const androidPackageName = 'com.deepflow.app'; 
       const itunesItemId = '0000000000'; 
 
       if (Platform.OS === 'android') {
@@ -399,7 +395,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                         </View>
                   </TouchableOpacity>
                   <View style={styles.separator} />
-                  <TouchableOpacity style={styles.item} onPress={handleDeleteAccount}>
+                  <TouchableOpacity style={styles.item} onPress={() => { setDeleteConfirmationText(''); setDeleteModalVisible(true); }}>
                         <View style={styles.itemLeft}>
                             <View style={[styles.iconBox, { backgroundColor: '#EF4444' }]}>
                                 <Trash2 size={18} color="white" />
@@ -496,6 +492,39 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                     <ScrollView style={styles.legalScroll}>
                         <Text style={styles.legalText}>{legalModal.content}</Text>
                     </ScrollView>
+                </View>
+            </View>
+        </Modal>
+
+        {/* MODALE SUPPRESSION COMPTE */}
+        <Modal visible={deleteModalVisible} animationType="fade" transparent onRequestClose={() => setDeleteModalVisible(false)}>
+            <View style={styles.legalModalOverlay}>
+                <View style={[styles.legalModalContent, {maxHeight: 'auto'}]}>
+                    <Text style={[styles.legalTitle, {color: '#FF3B30', textAlign: 'center', marginBottom: 15}]}>DANGER IMMÉDIAT</Text>
+                    <Text style={styles.deleteWarning}>Cette action est irréversible. Toutes vos données seront perdues à jamais.</Text>
+                    <Text style={styles.deleteInstruction}>Pour confirmer, écrivez "SUPPRIMER" ci-dessous :</Text>
+                    
+                    <TextInput 
+                        style={styles.deleteInput}
+                        value={deleteConfirmationText}
+                        onChangeText={setDeleteConfirmationText}
+                        placeholder="SUPPRIMER"
+                        placeholderTextColor="#666"
+                        autoCapitalize="characters"
+                    />
+
+                    <View style={styles.deleteActions}>
+                        <TouchableOpacity style={styles.cancelDeleteBtn} onPress={() => setDeleteModalVisible(false)}>
+                            <Text style={styles.btnText}>Annuler</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.confirmDeleteBtn, deleteConfirmationText !== 'SUPPRIMER' && {opacity: 0.5}]}
+                            disabled={deleteConfirmationText !== 'SUPPRIMER'}
+                            onPress={executeDeleteAccount}
+                        >
+                            <Text style={styles.btnText}>CONFIRMER</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
         </Modal>
@@ -613,6 +642,15 @@ const styles = StyleSheet.create({
   legalTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
   legalScroll: {},
   legalText: { color: '#DDD', fontSize: 14, lineHeight: 22 },
+
+  // Delete Modal
+  deleteWarning: { color: '#FFF', textAlign: 'center', marginBottom: 20 },
+  deleteInstruction: { color: '#AAA', textAlign: 'center', marginBottom: 10, fontSize: 12 },
+  deleteInput: { backgroundColor: '#000', color: '#FFF', padding: 12, borderRadius: 8, textAlign: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#333' },
+  deleteActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  cancelDeleteBtn: { flex: 1, backgroundColor: '#333', padding: 12, borderRadius: 8, alignItems: 'center' },
+  confirmDeleteBtn: { flex: 1, backgroundColor: '#FF3B30', padding: 12, borderRadius: 8, alignItems: 'center' },
+  btnText: { color: '#FFF', fontWeight: '700' }
 });
 
 export default Profile;
