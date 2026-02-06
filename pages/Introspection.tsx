@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import Journal from './Journal';
@@ -8,6 +9,8 @@ interface IntrospectionProps {
     userId: string;
     openMenu: () => void;
     isDarkMode?: boolean;
+    deleteJournalEntry?: (id: string) => void;
+    deleteReflection?: (id: string) => void;
 }
 
 const Introspection: React.FC<IntrospectionProps> = (props) => {
@@ -50,6 +53,7 @@ const Introspection: React.FC<IntrospectionProps> = (props) => {
                         openMenu={() => {}} 
                         isDarkMode={props.isDarkMode}
                         noPadding={true}
+                        deleteEntry={props.deleteJournalEntry}
                     />
                 ) : (
                     <ReflectionPage 
@@ -57,6 +61,7 @@ const Introspection: React.FC<IntrospectionProps> = (props) => {
                         openMenu={() => {}} 
                         isDarkMode={props.isDarkMode}
                         noPadding={true}
+                        deleteReflection={props.deleteReflection}
                     />
                 )}
             </View>

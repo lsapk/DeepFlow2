@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
 import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw } from 'lucide-react-native';
@@ -96,6 +96,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (productivityScore / 100) * circumference;
 
+  // --- OPTIMIZED NAVIGATION ---
+  // Using requestAnimationFrame ensures the touch feedback renders BEFORE the heavy view switch occurs
+  const handleNav = useCallback((view: ViewState) => {
+      requestAnimationFrame(() => {
+          setView(view);
+      });
+  }, [setView]);
+
   const handleToggleHabit = (id: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); // Faster feedback
       toggleHabit(id);
@@ -144,7 +152,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             <TouchableOpacity 
                 style={[styles.bentoHero, { backgroundColor: colors.cardBg }]}
                 activeOpacity={0.8}
-                onPress={() => setView(ViewState.EVOLUTION)}
+                onPress={() => handleNav(ViewState.EVOLUTION)}
             >
                 <LinearGradient
                     colors={isDarkMode ? ['#1E3A8A', '#000000'] : ['#E0E7FF', '#FFFFFF']}
@@ -216,10 +224,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
         {/* HABITS SECTION (Horizontal) - FAST ANIMATION */}
         <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
-            {/* FLUIDITY FIX: Make the entire header a touchable button */}
             <TouchableOpacity 
                 style={styles.sectionHeaderBtn} 
-                onPress={() => setView(ViewState.HABITS)}
+                onPress={() => handleNav(ViewState.HABITS)}
                 activeOpacity={0.6}
                 hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
             >
@@ -256,7 +263,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                         </TouchableOpacity>
                     )
                 })}
-                <TouchableOpacity style={[styles.addHabitCard, { borderColor: colors.border }]} onPress={() => setView(ViewState.HABITS)}>
+                <TouchableOpacity style={[styles.addHabitCard, { borderColor: colors.border }]} onPress={() => handleNav(ViewState.HABITS)}>
                     <Plus size={24} color={colors.textSub} />
                 </TouchableOpacity>
             </ScrollView>
@@ -264,10 +271,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
         {/* TASKS LIST - FAST ANIMATION */}
         <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
-            {/* FLUIDITY FIX: Make the entire header a touchable button */}
             <TouchableOpacity 
                 style={styles.sectionHeaderBtn} 
-                onPress={() => setView(ViewState.TASKS)}
+                onPress={() => handleNav(ViewState.TASKS)}
                 activeOpacity={0.6}
                 hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
             >

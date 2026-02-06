@@ -1,12 +1,11 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard, FlatList, ActivityIndicator } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
 import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle, Sparkles } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { generateSubtasks } from '../services/ai';
 import * as Haptics from 'expo-haptics';
-import Animated from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { BlurView } from 'expo-blur';
 
@@ -75,6 +74,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
     }
   };
 
+  // Instant Expand toggle without layout animation for max speed
   const toggleExpand = useCallback((taskId: string) => {
     setExpandedTaskIds(prev => {
       const newSet = new Set(prev);
@@ -93,6 +93,20 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       setFormDate(task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '');
       setEditModalVisible(true);
   }, []);
+
+  const confirmDeleteTask = (id: string) => {
+      Alert.alert(
+          "Supprimer la tâche ?",
+          "Cette action est irréversible.",
+          [
+              { text: "Annuler", style: "cancel" },
+              { text: "Supprimer", style: "destructive", onPress: () => {
+                  deleteTask(id);
+                  setEditModalVisible(false);
+              }}
+          ]
+      );
+  };
 
   const handleUpdateTask = async () => {
       if (!selectedTask) return;
@@ -130,11 +144,15 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       }
   };
 
-  const activeTasks = tasks.filter(t => !t.completed).sort((a, b) => {
-      const score = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
-      return score(b.priority) - score(a.priority);
-  });
-  const completedTasks = tasks.filter(t => t.completed);
+  // Heavy calculation memoized
+  const activeTasks = useMemo(() => {
+      return tasks.filter(t => !t.completed).sort((a, b) => {
+          const score = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
+          return score(b.priority) - score(a.priority);
+      });
+  }, [tasks]);
+
+  const completedTasks = useMemo(() => tasks.filter(t => t.completed), [tasks]);
 
   const getPriorityColor = (p: string) => {
       if (p === 'high') return colors.priorityHigh;
@@ -142,10 +160,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       return colors.priorityLow;
   };
 
-  // Removed animations for instant response
   const renderItem = useCallback(({ item }: { item: Task }) => (
     <View style={{marginBottom: 10}}>
-        <SwipeableRow onSwipeRight={() => toggleTask(item.id)} onSwipeLeft={() => deleteTask(item.id)}>
+        <SwipeableRow onSwipeRight={() => toggleTask(item.id)} onSwipeLeft={() => confirmDeleteTask(item.id)}>
             <TaskItem 
                 task={item} 
                 isExpanded={expandedTaskIds.has(item.id)} 
@@ -168,7 +185,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
             <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES ({completedTasks.length})</Text>
             {completedTasks.map((task) => (
                 <View key={task.id} style={{marginBottom: 10}}>
-                    <SwipeableRow onSwipeLeft={() => deleteTask(task.id)}>
+                    <SwipeableRow onSwipeLeft={() => confirmDeleteTask(task.id)}>
                         <TaskItem 
                             task={task} 
                             isExpanded={expandedTaskIds.has(task.id)} 
@@ -205,11 +222,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         ListFooterComponent={ListFooter}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        // Performance optimizations
         initialNumToRender={15}
         maxToRenderPerBatch={15}
         windowSize={10}
-        removeClippedSubviews={Platform.OS === 'android'} // Only Android to prevent white flash on iOS
+        removeClippedSubviews={Platform.OS === 'android'} 
         updateCellsBatchingPeriod={10}
       />
 
@@ -268,7 +284,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                         <TextInput style={[styles.transparentInput, {color: colors.text}]} value={formDate} onChangeText={setFormDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSub} />
                     </View>
                     <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={handleUpdateTask}><Text style={styles.saveBtnText}>Enregistrer</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteActionBtn} onPress={() => { deleteTask(selectedTask!.id); setEditModalVisible(false); }}><Text style={styles.deleteText}>Supprimer</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteActionBtn} onPress={() => confirmDeleteTask(selectedTask!.id)}><Text style={styles.deleteText}>Supprimer</Text></TouchableOpacity>
                   </View>
               </View>
           </BlurView>
@@ -283,29 +299,37 @@ const SwipeableRow = ({ children, onSwipeLeft, onSwipeRight }: any) => {
     return <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>{children}</Swipeable>;
 };
 
-// Optimization: Subtask Item as pure component - FLUIDITY FIX: Whole row clickable
-const SubtaskItem = React.memo(({ sub, taskId, colors, toggleSubtask, deleteSubtask }: any) => (
-    <TouchableOpacity 
-        style={[styles.subtaskRow, {borderBottomColor: colors.border}]} 
-        onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            toggleSubtask(sub.id, taskId);
-        }}
-        activeOpacity={0.6}
-    >
-        <View style={[styles.subCheck, {borderColor: sub.completed ? colors.text : colors.textSub}]}>
-            {sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}
-        </View>
-        <Text style={[styles.subtaskText, {color: colors.text}, sub.completed && styles.subtaskTextDone]}>{sub.title}</Text>
+const SubtaskItem = React.memo(({ sub, taskId, colors, toggleSubtask, deleteSubtask }: any) => {
+    const confirmDelete = () => {
+        Alert.alert("Supprimer l'étape ?", "", [
+            { text: "Non", style: "cancel" },
+            { text: "Oui", style: "destructive", onPress: () => deleteSubtask(sub.id, taskId) }
+        ]);
+    };
+
+    return (
         <TouchableOpacity 
-            onPress={() => deleteSubtask(sub.id, taskId)} 
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-            style={{padding: 4}}
+            style={[styles.subtaskRow, {borderBottomColor: colors.border}]} 
+            onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                toggleSubtask(sub.id, taskId);
+            }}
+            activeOpacity={0.6}
         >
-            <X size={14} color={colors.textSub} />
+            <View style={[styles.subCheck, {borderColor: sub.completed ? colors.text : colors.textSub}]}>
+                {sub.completed && <View style={[styles.subCheckInner, {backgroundColor: colors.text}]} />}
+            </View>
+            <Text style={[styles.subtaskText, {color: colors.text}, sub.completed && styles.subtaskTextDone]}>{sub.title}</Text>
+            <TouchableOpacity 
+                onPress={confirmDelete} 
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                style={{padding: 4}}
+            >
+                <X size={14} color={colors.textSub} />
+            </TouchableOpacity>
         </TouchableOpacity>
-    </TouchableOpacity>
-));
+    );
+});
 
 const TaskItem = React.memo(({ task, isExpanded, onToggle, onToggleExpand, onLongPress, colors, priorityColor, createSubtask, toggleSubtask, deleteSubtask }: any) => {
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -323,6 +347,7 @@ const TaskItem = React.memo(({ task, isExpanded, onToggle, onToggleExpand, onLon
                 </View>
             </TouchableOpacity>
             
+            {/* Conditional Rendering without AnimateHeight for maximum speed */}
             {isExpanded && (
                 <View style={[styles.subtaskList, {borderTopColor: colors.border}]}>
                     {task.description ? <Text style={[styles.taskDescPreview, {color: colors.textSub}]}>{task.description}</Text> : null}
@@ -347,13 +372,14 @@ const TaskItem = React.memo(({ task, isExpanded, onToggle, onToggleExpand, onLon
         </View>
     )
 }, (prev, next) => {
-    // Custom comparison for performance
-    return (
-        prev.isExpanded === next.isExpanded &&
-        prev.task === next.task && 
-        prev.task.subtasks === next.task.subtasks && // Shallow check usually enough if ref changes
-        prev.colors.bg === next.colors.bg // Theme check
-    );
+    // Custom comparison for performance: 
+    // ONLY re-render if expansion state changed OR task data changed OR subtasks deeply changed
+    // This prevents re-rendering all tasks when one expands.
+    const isSameTask = prev.task === next.task;
+    const isSameExpansion = prev.isExpanded === next.isExpanded;
+    const isSameSubtasks = prev.task.subtasks === next.task.subtasks; // Ref check is usually enough with immutable updates
+    
+    return isSameTask && isSameExpansion && isSameSubtasks && prev.colors.bg === next.colors.bg;
 });
 
 const styles = StyleSheet.create({

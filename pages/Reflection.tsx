@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Reflection } from '../types';
@@ -11,6 +12,7 @@ interface ReflectionProps {
   openMenu?: () => void;
   isDarkMode?: boolean;
   noPadding?: boolean;
+  deleteReflection?: (id: string) => void;
 }
 
 // 1. Base de données de questions (Extrait des 110+ questions)
@@ -44,7 +46,7 @@ const REFLECTION_QUESTIONS = [
     "Quelle relation dans votre vie a besoin de plus d'attention ?"
 ];
 
-const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMode = true, noPadding = false }) => {
+const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMode = true, noPadding = false, deleteReflection }) => {
   const insets = useSafeAreaInsets();
   const [viewMode, setViewMode] = useState<'WRITE' | 'HISTORY'>('WRITE');
   
@@ -87,6 +89,22 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
         .order('created_at', { ascending: false });
       if (data) setReflections(data);
       setLoading(false);
+  };
+
+  const confirmDelete = (id: string) => {
+      Alert.alert(
+          "Supprimer cette réflexion ?",
+          "Cette action est définitive.",
+          [
+              { text: "Annuler", style: "cancel" },
+              { text: "Supprimer", style: "destructive", onPress: () => {
+                  if (deleteReflection) {
+                      deleteReflection(id);
+                      setReflections(prev => prev.filter(r => r.id !== id));
+                  }
+              }}
+          ]
+      );
   };
 
   const handleSave = async () => {
@@ -186,7 +204,12 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
                   const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
                   
                   return (
-                      <View key={item.id} style={[styles.historyCard, {backgroundColor: colors.card}]}>
+                      <TouchableOpacity 
+                        key={item.id} 
+                        style={[styles.historyCard, {backgroundColor: colors.card}]}
+                        activeOpacity={0.7}
+                        onLongPress={() => confirmDelete(item.id)}
+                      >
                           <View style={styles.historyHeader}>
                               <Calendar size={14} color={colors.subText} style={{marginRight: 6}} />
                               <Text style={[styles.historyDate, {color: colors.subText}]}>{formattedDate}</Text>
@@ -197,7 +220,7 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
                           </View>
                           
                           <Text style={[styles.historyAnswer, {color: colors.subText}]}>{item.answer}</Text>
-                      </View>
+                      </TouchableOpacity>
                   );
               })
           )}

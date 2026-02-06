@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StatusBar, Platform, Alert, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -529,6 +530,98 @@ const App: React.FC = () => {
       }
   };
 
+  const deleteGoal = async (id: string) => {
+      const updatedGoals = goals.filter(g => g.id !== id);
+      setGoals(updatedGoals);
+      saveToCache(CACHE_KEYS.GOALS, updatedGoals);
+      try {
+          await supabase.from('goals').delete().eq('id', id);
+      } catch (e) {
+          queueAction({ type: 'DELETE', table: 'goals', payload: { id } });
+      }
+  };
+
+  const createSubObjective = async (goalId: string, title: string) => {
+      if (!user) return;
+      const newSub: SubObjective = {
+          id: generateId(),
+          parent_goal_id: goalId,
+          user_id: user.id,
+          title,
+          completed: false,
+          sort_order: 0,
+          created_at: new Date().toISOString()
+      };
+      const updatedGoals = goals.map(g => {
+          if (g.id === goalId) return { ...g, subobjectives: [...(g.subobjectives || []), newSub] };
+          return g;
+      });
+      setGoals(updatedGoals);
+      saveToCache(CACHE_KEYS.GOALS, updatedGoals);
+      try {
+          await supabase.from('subobjectives').insert(newSub);
+      } catch (e) {
+          queueAction({ type: 'INSERT', table: 'subobjectives', payload: newSub });
+      }
+  };
+
+  const toggleSubObjective = async (subId: string, goalId: string) => {
+      const goal = goals.find(g => g.id === goalId);
+      const sub = goal?.subobjectives?.find(s => s.id === subId);
+      if (sub) {
+          const updatedGoals = goals.map(g => {
+              if (g.id === goalId) {
+                  return {
+                      ...g,
+                      subobjectives: g.subobjectives?.map(s => s.id === subId ? { ...s, completed: !s.completed } : s)
+                  };
+              }
+              return g;
+          });
+          setGoals(updatedGoals);
+          saveToCache(CACHE_KEYS.GOALS, updatedGoals);
+          try {
+              await supabase.from('subobjectives').update({ completed: !sub.completed }).eq('id', subId);
+          } catch (e) {
+              queueAction({ type: 'UPDATE', table: 'subobjectives', payload: { id: subId, completed: !sub.completed } });
+          }
+      }
+  };
+
+  const deleteSubObjective = async (subId: string, goalId: string) => {
+      const updatedGoals = goals.map(g => {
+          if (g.id === goalId) return { ...g, subobjectives: g.subobjectives?.filter(s => s.id !== subId) };
+          return g;
+      });
+      setGoals(updatedGoals);
+      saveToCache(CACHE_KEYS.GOALS, updatedGoals);
+      try {
+          await supabase.from('subobjectives').delete().eq('id', subId);
+      } catch (e) {
+          queueAction({ type: 'DELETE', table: 'subobjectives', payload: { id: subId } });
+      }
+  };
+
+  const deleteJournalEntry = async (id: string) => {
+      // Optimistic update for journal needs local state in Journal.tsx, 
+      // but since Journal handles its own fetch, here we just do the API call.
+      // Ideally, pass a setEntries prop or manage journal state globally.
+      // For now, simple API call
+      try {
+          await supabase.from('journal_entries').delete().eq('id', id);
+      } catch(e) {
+          console.error("Delete journal error", e);
+      }
+  };
+
+  const deleteReflection = async (id: string) => {
+      try {
+          await supabase.from('daily_reflections').delete().eq('id', id);
+      } catch(e) {
+          console.error("Delete reflection error", e);
+      }
+  };
+
   const aiStartFocus = (m: number) => setCurrentView(ViewState.FOCUS_MODE);
 
   const renderView = () => {
@@ -547,21 +640,25 @@ const App: React.FC = () => {
       case ViewState.TODAY:
         return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} {...commonProps} />;
       case ViewState.PLANNING:
-        return <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={()=>{}} createSubObjective={()=>{}} toggleSubObjective={()=>{}} deleteSubObjective={()=>{}} userId={user.id} refreshGoals={()=>{}} openMenu={()=>{}} isDarkMode={isDarkMode} />;
+        return <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={()=>{}} isDarkMode={isDarkMode} />;
       case ViewState.INTROSPECTION:
-        return <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} />;
+        return <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
       case ViewState.EVOLUTION:
         return <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} openMenu={() => {}} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
       case ViewState.TASKS: 
-          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={()=>{}} openMenu={() => {}} {...commonProps} />;
+          return <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={() => fetchData(user.id)} openMenu={() => {}} {...commonProps} />;
       case ViewState.HABITS: 
-          return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={(h) => {/* Archive logic pending */}} deleteHabit={deleteHabit} refreshHabits={()=>{}} openMenu={() => {}} {...commonProps} />;
+          return <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={(h) => {/* Archive logic pending */}} deleteHabit={deleteHabit} refreshHabits={() => fetchData(user.id)} openMenu={() => {}} {...commonProps} />;
       case ViewState.GOALS:
-          return <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={()=>{}} createSubObjective={()=>{}} toggleSubObjective={()=>{}} deleteSubObjective={()=>{}} userId={user.id} refreshGoals={()=>{}} openMenu={() => {}} isDarkMode={isDarkMode} />; 
+          return <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={() => {}} isDarkMode={isDarkMode} />; 
       case ViewState.FOCUS_MODE:
         return <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={() => {}} />;
       case ViewState.CALENDAR:
-        return <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={()=>{}} createSubObjective={()=>{}} toggleSubObjective={()=>{}} deleteSubObjective={()=>{}} userId={user.id} refreshGoals={()=>{}} openMenu={() => {}} isDarkMode={isDarkMode} />;
+        return <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={() => {}} isDarkMode={isDarkMode} />;
+      case ViewState.JOURNAL:
+        return <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
+      case ViewState.REFLECTION:
+        return <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
       default:
         return <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} {...commonProps} />;
     }

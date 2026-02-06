@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
@@ -11,9 +12,10 @@ interface JournalProps {
   openMenu?: () => void;
   isDarkMode?: boolean;
   noPadding?: boolean;
+  deleteEntry?: (id: string) => void;
 }
 
-const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, noPadding = false }) => {
+const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, noPadding = false, deleteEntry }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const insets = useSafeAreaInsets();
@@ -46,6 +48,22 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (data) setEntries(data);
+  };
+
+  const confirmDelete = (id: string) => {
+      Alert.alert(
+          "Supprimer cette entrée ?",
+          "Cette action est définitive.",
+          [
+              { text: "Annuler", style: "cancel" },
+              { text: "Supprimer", style: "destructive", onPress: () => {
+                  if (deleteEntry) {
+                      deleteEntry(id);
+                      setEntries(prev => prev.filter(e => e.id !== id));
+                  }
+              }}
+          ]
+      );
   };
 
   const openModal = () => {
@@ -153,7 +171,12 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
             {entries.map(entry => {
                 const dateObj = new Date(entry.created_at);
                 return (
-                    <View key={entry.id} style={[styles.card, { backgroundColor: colors.cardBg }]}>
+                    <TouchableOpacity 
+                        key={entry.id} 
+                        style={[styles.card, { backgroundColor: colors.cardBg }]}
+                        activeOpacity={0.7}
+                        onLongPress={() => confirmDelete(entry.id)}
+                    >
                         <View style={styles.cardHeader}>
                             <View>
                                 <Text style={styles.dayNum}>{dateObj.getDate()}</Text>
@@ -170,7 +193,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
                             </Text>
                             <Text style={[styles.cardContent, { color: colors.textSub }]} numberOfLines={3}>{entry.content}</Text>
                         </View>
-                    </View>
+                    </TouchableOpacity>
                 );
             })}
         </ScrollView>

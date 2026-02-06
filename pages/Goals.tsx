@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
@@ -233,7 +234,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
                         <TouchableOpacity 
                             style={styles.deleteActionBtn} 
                             onPress={() => {
-                                Alert.alert("Supprimer", "Êtes-vous sûr ?", [
+                                Alert.alert("Supprimer l'objectif ?", "Toutes les sous-tâches associées seront aussi supprimées.", [
                                     { text: "Annuler", style: "cancel"},
                                     { text: "Supprimer", style: 'destructive', onPress: () => {
                                         deleteGoal(selectedGoal!.id);
@@ -261,6 +262,13 @@ const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLon
         if (!newSubGoalTitle.trim()) return;
         createSubObjective(goal.id, newSubGoalTitle);
         setNewSubGoalTitle('');
+    };
+
+    const confirmDeleteSub = (subId: string) => {
+        Alert.alert("Supprimer la branche ?", "", [
+            { text: "Non", style: "cancel" },
+            { text: "Oui", style: "destructive", onPress: () => deleteSubObjective(subId, goal.id) }
+        ]);
     };
 
     return (
@@ -305,7 +313,7 @@ const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLon
                                         {subObjective.completed && <View style={[styles.subtaskChecked, { backgroundColor: colors.text }]} />}
                                     </TouchableOpacity>
                                     <Text style={[styles.subtaskTitle, { color: colors.text }, subObjective.completed && styles.subtaskTitleCompleted]}>{subObjective.title}</Text>
-                                    <TouchableOpacity onPress={() => deleteSubObjective(subObjective.id, goal.id)} style={{marginLeft: 'auto'}}><X size={14} color={colors.textSub} /></TouchableOpacity>
+                                    <TouchableOpacity onPress={() => confirmDeleteSub(subObjective.id)} style={{marginLeft: 'auto'}}><X size={14} color={colors.textSub} /></TouchableOpacity>
                                 </View>
                             </View>
                         ))}
