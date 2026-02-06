@@ -10,6 +10,7 @@ interface ReflectionProps {
   userId: string;
   openMenu?: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
 // 1. Base de données de questions (Extrait des 110+ questions)
@@ -43,7 +44,7 @@ const REFLECTION_QUESTIONS = [
     "Quelle relation dans votre vie a besoin de plus d'attention ?"
 ];
 
-const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMode = true }) => {
+const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMode = true, noPadding = false }) => {
   const insets = useSafeAreaInsets();
   const [viewMode, setViewMode] = useState<'WRITE' | 'HISTORY'>('WRITE');
   
@@ -204,7 +205,7 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
   );
 
   return (
-    <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: insets.top}]}>
+    <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top}]}>
       {/* Header Styled Apple */}
       <View style={styles.header}>
         <View style={styles.headerTitleContainer}>

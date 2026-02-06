@@ -4,16 +4,19 @@ import { JournalEntry } from '../types';
 import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Menu, Calendar } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { addXp, REWARDS } from '../services/gamification';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface JournalProps {
   userId: string;
   openMenu?: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
-const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }) => {
+const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, noPadding = false }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const insets = useSafeAreaInsets();
   
   // Form
   const [title, setTitle] = useState('');
@@ -133,7 +136,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top }]}>
         <View style={styles.header}>
             <View style={styles.headerTitleContainer}>
                 <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
@@ -249,7 +252,6 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 20,
   },
   header: {
     flexDirection: 'row',

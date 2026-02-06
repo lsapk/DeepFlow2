@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import CalendarPage from './CalendarPage';
 import Goals from './Goals';
 import { Task, Habit, Goal } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface PlanningProps {
     tasks: Task[];
@@ -25,6 +26,7 @@ interface PlanningProps {
 const Planning: React.FC<PlanningProps> = (props) => {
     const [view, setView] = useState<'CALENDAR' | 'GOALS'>('CALENDAR');
     const { isDarkMode } = props;
+    const insets = useSafeAreaInsets();
 
     const colors = {
         bg: isDarkMode ? '#000000' : '#F2F2F7',
@@ -34,21 +36,21 @@ const Planning: React.FC<PlanningProps> = (props) => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.bg }]}>
+        <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top + 10 }]}>
             {/* Top Navigation Segment */}
             <View style={styles.segmentContainer}>
                 <View style={[styles.segment, { backgroundColor: colors.segmentBg }]}>
                     <TouchableOpacity 
                         style={[styles.segmentBtn, view === 'CALENDAR' && { backgroundColor: colors.segmentActive }]} 
                         onPress={() => setView('CALENDAR')}
-                        activeOpacity={0.8}
+                        activeOpacity={1}
                     >
                         <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'CALENDAR' ? '700' : '500' }]}>Calendrier</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.segmentBtn, view === 'GOALS' && { backgroundColor: colors.segmentActive }]} 
                         onPress={() => setView('GOALS')}
-                        activeOpacity={0.8}
+                        activeOpacity={1}
                     >
                         <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'GOALS' ? '700' : '500' }]}>Objectifs</Text>
                     </TouchableOpacity>
@@ -64,6 +66,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                         toggleHabit={props.toggleHabit} 
                         openMenu={() => {}} 
                         isDarkMode={props.isDarkMode}
+                        noPadding={true} // New prop to prevent double padding
                     />
                 ) : (
                     <Goals 
@@ -78,6 +81,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                         refreshGoals={props.refreshGoals}
                         openMenu={() => {}}
                         isDarkMode={props.isDarkMode}
+                        noPadding={true} // New prop
                     />
                 )}
             </View>
@@ -92,7 +96,6 @@ const styles = StyleSheet.create({
     segmentContainer: {
         paddingHorizontal: 20,
         paddingBottom: 10,
-        paddingTop: 10,
     },
     segment: {
         flexDirection: 'row',

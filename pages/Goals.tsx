@@ -1,15 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, LayoutAnimation, UIManager, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
 import { Plus, Check, ChevronDown, ChevronUp, X, Calendar, Minus, Flag, GitBranch } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
 
 interface GoalsProps {
   goals: Goal[];
@@ -23,9 +17,10 @@ interface GoalsProps {
   refreshGoals: () => void;
   openMenu?: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
-const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, createSubObjective, toggleSubObjective, deleteSubObjective, userId, refreshGoals, openMenu, isDarkMode = true }) => {
+const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, createSubObjective, toggleSubObjective, deleteSubObjective, userId, refreshGoals, openMenu, isDarkMode = true, noPadding = false }) => {
   const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   
@@ -66,7 +61,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   };
 
   const toggleExpand = useCallback((goalId: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    // Removed LayoutAnimation for instant snap
     setExpandedGoalIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(goalId)) newSet.delete(goalId);
@@ -106,7 +101,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   const completedGoals = goals.filter(t => t.completed);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : 20 }]}>
       <View style={styles.header}>
           <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
           <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
@@ -336,7 +331,7 @@ const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLon
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
-  header: { paddingHorizontal: 20, marginBottom: 16, marginTop: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  header: { paddingHorizontal: 20, marginBottom: 16, marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
   addButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 150 },

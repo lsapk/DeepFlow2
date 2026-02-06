@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import Growth from './Growth';
 import CyberKnight from './CyberKnight';
 import { PlayerProfile, UserProfile, Task, Habit, Goal, Quest } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface EvolutionProps {
     player: PlayerProfile;
@@ -23,6 +24,7 @@ interface EvolutionProps {
 const Evolution: React.FC<EvolutionProps> = (props) => {
     const [view, setView] = useState<'GROWTH' | 'CYBER_KNIGHT'>('GROWTH');
     const { isDarkMode } = props;
+    const insets = useSafeAreaInsets();
 
     const colors = {
         bg: isDarkMode ? '#000000' : '#F2F2F7',
@@ -32,20 +34,20 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.bg }]}>
+        <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top + 10 }]}>
             <View style={styles.segmentContainer}>
                 <View style={[styles.segment, { backgroundColor: colors.segmentBg }]}>
                     <TouchableOpacity 
                         style={[styles.segmentBtn, view === 'GROWTH' && { backgroundColor: colors.segmentActive }]} 
                         onPress={() => setView('GROWTH')}
-                        activeOpacity={0.8}
+                        activeOpacity={1}
                     >
                         <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'GROWTH' ? '700' : '500' }]}>Analyses</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.segmentBtn, view === 'CYBER_KNIGHT' && { backgroundColor: colors.segmentActive }]} 
                         onPress={() => setView('CYBER_KNIGHT')}
-                        activeOpacity={0.8}
+                        activeOpacity={1}
                     >
                         <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'CYBER_KNIGHT' ? '700' : '500' }]}>Avatar</Text>
                     </TouchableOpacity>
@@ -67,6 +69,7 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         onAddGoal={props.onAddGoal}
                         onStartFocus={props.onStartFocus}
                         isDarkMode={props.isDarkMode}
+                        noPadding={true}
                     />
                 ) : (
                     <CyberKnight 
@@ -76,6 +79,7 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         openMenu={() => {}}
                         openProfile={props.openProfile}
                         isDarkMode={props.isDarkMode}
+                        noPadding={true}
                     />
                 )}
             </View>
@@ -90,7 +94,6 @@ const styles = StyleSheet.create({
     segmentContainer: {
         paddingHorizontal: 20,
         paddingBottom: 10,
-        paddingTop: 10,
     },
     segment: {
         flexDirection: 'row',

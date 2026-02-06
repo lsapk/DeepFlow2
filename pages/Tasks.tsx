@@ -5,7 +5,7 @@ import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle, Sparkles } from 'lucid
 import { supabase } from '../services/supabase';
 import { generateSubtasks } from '../services/ai';
 import * as Haptics from 'expo-haptics';
-import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { BlurView } from 'expo-blur';
 
@@ -141,8 +141,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       return colors.priorityLow;
   };
 
+  // Removed animations for instant response
   const renderItem = useCallback(({ item }: { item: Task }) => (
-    <Animated.View layout={LinearTransition.springify().damping(14)} entering={FadeIn} exiting={FadeOut} style={{marginBottom: 10}}>
+    <View style={{marginBottom: 10}}>
         <SwipeableRow onSwipeRight={() => toggleTask(item.id)} onSwipeLeft={() => deleteTask(item.id)}>
             <TaskItem 
                 task={item} 
@@ -157,7 +158,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                 priorityColor={getPriorityColor(item.priority)}
             />
         </SwipeableRow>
-    </Animated.View>
+    </View>
   ), [expandedTaskIds, colors, toggleTask, deleteTask, toggleExpand, openEditModal, createSubtask, toggleSubtask, deleteSubtask]);
 
   const ListFooter = () => (
@@ -165,7 +166,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         <View style={styles.completedGroup}>
             <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES ({completedTasks.length})</Text>
             {completedTasks.map((task) => (
-                <Animated.View key={task.id} layout={LinearTransition} entering={FadeIn} exiting={FadeOut} style={{marginBottom: 10}}>
+                <View key={task.id} style={{marginBottom: 10}}>
                     <SwipeableRow onSwipeLeft={() => deleteTask(task.id)}>
                         <TaskItem 
                             task={task} 
@@ -180,7 +181,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                             priorityColor={colors.border}
                         />
                     </SwipeableRow>
-                </Animated.View>
+                </View>
             ))}
         </View>
       ) : null

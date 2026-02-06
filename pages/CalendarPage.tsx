@@ -26,9 +26,10 @@ interface CalendarPageProps {
     toggleHabit: (id: string) => void;
     openMenu?: () => void;
     isDarkMode?: boolean;
+    noPadding?: boolean;
 }
 
-const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, toggleHabit, openMenu, isDarkMode = true }) => {
+const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, toggleHabit, openMenu, isDarkMode = true, noPadding = false }) => {
     const insets = useSafeAreaInsets();
     
     // Theme Colors
@@ -361,7 +362,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     };
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
+        <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top, backgroundColor: colors.bg }]}>
             {/* TOP BAR */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
