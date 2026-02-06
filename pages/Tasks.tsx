@@ -1,6 +1,6 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard, FlatList, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard, FlatList, ActivityIndicator, InteractionManager } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
 import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle, Sparkles } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
@@ -25,7 +25,9 @@ interface TasksProps {
 }
 
 const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
-  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+  // OPTIMIZATION 1: Deferred rendering for instant navigation response
+  const [isReady, setIsReady] = useState(false);
+
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
@@ -56,6 +58,14 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       priorityLow: '#34C759'
   };
 
+  useEffect(() => {
+    // Wait for navigation animation to finish before rendering the heavy list
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsReady(true);
+    });
+    return () => task.cancel();
+  }, []);
+
   const handleQuickAdd = () => {
     if (quickTitle.trim()) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -73,16 +83,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         Keyboard.dismiss();
     }
   };
-
-  // Instant Expand toggle without layout animation for max speed
-  const toggleExpand = useCallback((taskId: string) => {
-    setExpandedTaskIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(taskId)) newSet.delete(taskId);
-      else newSet.add(taskId);
-      return newSet;
-    });
-  }, []);
 
   const openEditModal = useCallback((task: Task) => {
       setSelectedTask(task);
@@ -132,7 +132,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
               }
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("Magic Split", `${subtasks.length} sous-tâches générées !`);
-              toggleExpand(selectedTask.id);
+              // Note: Expanded state is now local to TaskItem, so we can't force open it easily from here without refs, 
+              // but the data update will trigger the item to re-render.
           } else {
               Alert.alert("Info", "L'IA n'a pas pu diviser cette tâche.");
           }
@@ -144,7 +145,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       }
   };
 
-  // Heavy calculation memoized
   const activeTasks = useMemo(() => {
       return tasks.filter(t => !t.completed).sort((a, b) => {
           const score = (p: string) => p === 'high' ? 3 : p === 'medium' ? 2 : 1;
@@ -165,9 +165,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         <SwipeableRow onSwipeRight={() => toggleTask(item.id)} onSwipeLeft={() => confirmDeleteTask(item.id)}>
             <TaskItem 
                 task={item} 
-                isExpanded={expandedTaskIds.has(item.id)} 
                 onToggle={() => toggleTask(item.id)} 
-                onToggleExpand={() => toggleExpand(item.id)} 
                 onLongPress={() => openEditModal(item)} 
                 colors={colors} 
                 createSubtask={createSubtask}
@@ -177,7 +175,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
             />
         </SwipeableRow>
     </View>
-  ), [expandedTaskIds, colors, toggleTask, deleteTask, toggleExpand, openEditModal, createSubtask, toggleSubtask, deleteSubtask]);
+  ), [colors, toggleTask, deleteTask, openEditModal, createSubtask, toggleSubtask, deleteSubtask]);
 
   const ListFooter = () => (
       completedTasks.length > 0 ? (
@@ -188,9 +186,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                     <SwipeableRow onSwipeLeft={() => confirmDeleteTask(task.id)}>
                         <TaskItem 
                             task={task} 
-                            isExpanded={expandedTaskIds.has(task.id)} 
                             onToggle={() => toggleTask(task.id)} 
-                            onToggleExpand={() => toggleExpand(task.id)} 
                             onLongPress={() => openEditModal(task)} 
                             colors={colors} 
                             createSubtask={createSubtask}
@@ -214,20 +210,25 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
           </View>
       </View>
 
-      <FlatList
-        data={activeTasks}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.scrollContent}
-        ListFooterComponent={ListFooter}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        initialNumToRender={15}
-        maxToRenderPerBatch={15}
-        windowSize={10}
-        removeClippedSubviews={Platform.OS === 'android'} 
-        updateCellsBatchingPeriod={10}
-      />
+      {!isReady ? (
+          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+              <ActivityIndicator size="small" color={colors.textSub} />
+          </View>
+      ) : (
+          <FlatList
+            data={activeTasks}
+            renderItem={renderItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.scrollContent}
+            ListFooterComponent={ListFooter}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS === 'android'}
+          />
+      )}
 
       <KeyboardAvoidingView 
           behavior={Platform.OS === "ios" ? "padding" : "height"} 
@@ -331,13 +332,17 @@ const SubtaskItem = React.memo(({ sub, taskId, colors, toggleSubtask, deleteSubt
     );
 });
 
-const TaskItem = React.memo(({ task, isExpanded, onToggle, onToggleExpand, onLongPress, colors, priorityColor, createSubtask, toggleSubtask, deleteSubtask }: any) => {
+// OPTIMIZATION 2: Local state for expansion to avoid re-rendering entire parent list
+const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColor, createSubtask, toggleSubtask, deleteSubtask }: any) => {
+    const [isExpanded, setIsExpanded] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    
     const handleAddSub = () => { if (!newSubtaskTitle.trim()) return; createSubtask(task.id, newSubtaskTitle); setNewSubtaskTitle(''); };
+    const toggleExpand = () => setIsExpanded(!isExpanded);
 
     return (
         <View style={[styles.taskCard, {backgroundColor: colors.cardBg, borderLeftColor: priorityColor}]}>
-            <TouchableOpacity style={styles.taskItem} onPress={onToggleExpand} onLongPress={onLongPress} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.taskItem} onPress={toggleExpand} onLongPress={onLongPress} activeOpacity={0.7}>
                 <TouchableOpacity onPress={onToggle} style={[styles.checkbox, { borderColor: task.completed ? colors.success : colors.textSub, backgroundColor: task.completed ? colors.success : 'transparent' }]}>
                     {task.completed && <Check size={14} color="#FFF" strokeWidth={4} />}
                 </TouchableOpacity>
@@ -372,14 +377,12 @@ const TaskItem = React.memo(({ task, isExpanded, onToggle, onToggleExpand, onLon
         </View>
     )
 }, (prev, next) => {
-    // Custom comparison for performance: 
-    // ONLY re-render if expansion state changed OR task data changed OR subtasks deeply changed
-    // This prevents re-rendering all tasks when one expands.
-    const isSameTask = prev.task === next.task;
-    const isSameExpansion = prev.isExpanded === next.isExpanded;
-    const isSameSubtasks = prev.task.subtasks === next.task.subtasks; // Ref check is usually enough with immutable updates
-    
-    return isSameTask && isSameExpansion && isSameSubtasks && prev.colors.bg === next.colors.bg;
+    // Precise re-render control: Only re-render if data changes significantly
+    return (
+        prev.task === next.task && 
+        prev.task.subtasks === next.task.subtasks && 
+        prev.colors.bg === next.colors.bg
+    );
 });
 
 const styles = StyleSheet.create({
