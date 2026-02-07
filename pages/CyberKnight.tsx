@@ -1,13 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, LayoutAnimation, Modal, Image } from 'react-native';
-import { PlayerProfile, UserProfile, Quest, ShopItem, AvatarConfig, AvatarClass, AvatarColor, AvatarHelmet, AvatarArmor, Achievement } from '../types';
-import { Shield, Zap, Target, Gamepad2, ShoppingBag, Trophy, Gift, CheckCircle, Lock, Edit2, X, Play, Clock, Flame, Palette, CheckCircle2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Dimensions } from 'react-native';
+import { PlayerProfile, UserProfile, Quest } from '../types';
+import { Shield, Zap, Target, Star, Coins, RefreshCw, CheckCircle2, Trophy, Flame } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getXpForNextLevel, getRankName, ACHIEVEMENTS_LIST, RARITY_COLORS } from '../services/gamification';
+import { getXpForNextLevel, getRankName } from '../services/gamification';
 import { supabase } from '../services/supabase';
 import AvatarGenerator from '../components/AvatarGenerator';
-import { BlurView } from 'expo-blur';
+import { generateQuests } from '../services/ai';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+
+const { width } = Dimensions.get('window');
 
 interface CyberKnightProps {
   player: PlayerProfile;
@@ -16,45 +20,25 @@ interface CyberKnightProps {
   openMenu: () => void;
   openProfile: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
-const AVATAR_CLASSES: {id: AvatarClass, label: string, icon: any}[] = [
-    { id: 'cyber_knight', label: 'Cyber Knight', icon: Shield },
-    { id: 'neon_hacker', label: 'Neon Hacker', icon: Gamepad2 },
-    { id: 'quantum_warrior', label: 'Quantum', icon: Zap },
-    { id: 'shadow_ninja', label: 'Shadow', icon: Target },
-    { id: 'cosmic_sage', label: 'Cosmic', icon: Trophy }
-];
-
-const COLORS: AvatarColor[] = ['#C4B5FD', '#34D399', '#F472B6', '#60A5FA', '#FACC15', '#F87171', '#A78BFA'];
-
-const SHOP_ITEMS: ShopItem[] = [
-    { id: 'boost_xp_1h', title: 'Boost XP x2', description: 'Double XP pendant 1h', price: 200, category: 'boost', rarity: 'rare', icon: 'Zap', color: '#F472B6' },
-    { id: 'streak_freeze', title: 'Gel de Série', description: 'Protège une série brisée', price: 500, category: 'protection', rarity: 'epic', icon: 'Shield', color: '#60A5FA' },
-    { id: 'mystery_box_common', title: 'Coffre Commun', description: 'Récompense aléatoire', price: 100, category: 'box', rarity: 'common', icon: 'Gift', color: '#9CA3AF' },
-    { id: 'helmet_halo', title: 'Halo Angelique', description: 'Cosmétique Casque', price: 1000, category: 'cosmetic', rarity: 'legendary', icon: 'Crown', color: '#FACC15', metadata: { type: 'helmet', value: 'halo' } },
-    { id: 'armor_heavy', title: 'Armure Lourde', description: 'Cosmétique Armure', price: 800, category: 'cosmetic', rarity: 'epic', icon: 'Shield', color: '#C4B5FD', metadata: { type: 'armor', value: 'heavy' } },
-];
-
-const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMenu, openProfile, isDarkMode = true }) => {
+const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initialQuests, openMenu, openProfile, isDarkMode = true, noPadding = false }) => {
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<'HQ' | 'QUESTS' | 'SHOP' | 'BADGES'>('HQ');
-  const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
-  const [unlockedCosmetics, setUnlockedCosmetics] = useState<Set<string>>(new Set(['standard'])); 
+  const [activeQuests, setActiveQuests] = useState<Quest[]>(initialQuests || []);
+  const [generating, setGenerating] = useState(false);
   
-  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
-  const [tempAvatar, setTempAvatar] = useState<AvatarConfig>(player.avatar_customization || {
-      class: 'cyber_knight', helmet: 'standard', armor: 'standard', color: '#C4B5FD'
-  });
+  useEffect(() => {
+      setActiveQuests(initialQuests || []);
+  }, [initialQuests]);
 
   const xpRequired = getXpForNextLevel(player.level);
   const prevLevelXp = getXpForNextLevel(player.level - 1);
   const xpInCurrentLevel = player.experience_points - prevLevelXp;
   const xpNeededForLevel = xpRequired - prevLevelXp;
   const progressPercent = Math.min(100, (xpInCurrentLevel / xpNeededForLevel) * 100);
-  
   const rankName = getRankName(player.level);
-  
+
   const colors = {
       bg: isDarkMode ? '#000000' : '#F2F2F7',
       cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
@@ -62,362 +46,266 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests, openMen
       textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
       border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
       accent: '#C4B5FD',
-      button: '#007AFF'
+      success: '#4ADE80',
+      gold: '#FACC15'
   };
 
-  useEffect(() => {
-      fetchUnlocks();
-  }, [user.id]);
+  const handleClaimQuest = async (quest: Quest) => {
+      if (quest.completed) return;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-  useEffect(() => {
-      if(player.avatar_customization) setTempAvatar(player.avatar_customization);
-  }, [player]);
+      const updatedQuests = activeQuests.map(q => q.id === quest.id ? { ...q, completed: true } : q);
+      setActiveQuests(updatedQuests);
 
-  const fetchUnlocks = async () => {
-      if (!user?.id) return;
-      const { data: achData } = await supabase.from('achievements').select('achievement_id').eq('user_id', user.id);
-      const { data: cosData } = await supabase.from('unlockables').select('unlockable_id').eq('user_id', user.id);
-      
-      if (achData) setUnlockedAchievements(new Set(achData.map(d => d.achievement_id)));
-      if (cosData) setUnlockedCosmetics(new Set([...cosData.map(d => d.unlockable_id), 'standard', 'visor', 'stealth'])); 
-  };
-
-  const switchTab = (tab: any) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setActiveTab(tab);
-  };
-
-  const updateTempAvatar = (key: keyof AvatarConfig, value: any) => {
-      setTempAvatar(prev => ({ ...prev, [key]: value }));
-  };
-
-  const saveAvatar = async () => {
-      // 1. Optimistic Update Local (handled via realtime subscription in App.tsx)
-      // 2. Persist to DB
-      const { error } = await supabase.from('player_profiles')
-        .update({ avatar_customization: tempAvatar })
-        .eq('user_id', user.id);
-        
-      if (!error) {
-          setIsEditingAvatar(false);
-          Alert.alert("Succès", "Avatar mis à jour !");
-      } else {
-          Alert.alert("Erreur", "Impossible de sauvegarder : " + error.message);
+      try {
+          await Promise.all([
+              supabase.from('quests').update({ completed: true }).eq('id', quest.id),
+              supabase.from('player_profiles').update({ 
+                  experience_points: player.experience_points + quest.reward_xp,
+                  credits: player.credits + quest.reward_credits
+              }).eq('user_id', user.id)
+          ]);
+      } catch (e) {
+          Alert.alert("Erreur", "Problème de synchronisation");
       }
   };
 
-  const handleBuy = async (item: ShopItem) => {
-      if (player.credits < item.price) {
-          Alert.alert("Fonds insuffisants", "Complétez des quêtes pour gagner plus de crédits !");
-          return;
-      }
+  const handleGenerateQuests = async () => {
+      setGenerating(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      try {
+          const newQuestsData = await generateQuests(player.level, "Utilisateur actif, aime le code et le sport");
+          
+          if (newQuestsData.length > 0) {
+              const questsToInsert = newQuestsData.map(q => ({
+                  user_id: user.id,
+                  title: q.title,
+                  description: q.description,
+                  reward_xp: q.reward_xp,
+                  reward_credits: q.reward_credits,
+                  target_value: q.target_value,
+                  current_progress: 0,
+                  completed: false,
+                  quest_type: 'daily'
+              }));
 
-      Alert.alert("Boutique", `Acheter ${item.title} pour ${item.price} crédits ?`, [
-          { text: "Annuler", style: "cancel" },
-          { text: "Confirmer", onPress: async () => {
-              const { error } = await supabase.from('player_profiles')
-                .update({ credits: player.credits - item.price })
-                .eq('user_id', user.id);
-              
-              if (error) return Alert.alert("Erreur", "Transaction échouée.");
-
-              if (item.category === 'cosmetic') {
-                  const unlockId = item.metadata?.value;
-                  if (unlockId) {
-                      await supabase.from('unlockables').insert({
-                          user_id: user.id,
-                          unlockable_type: item.metadata.type,
-                          unlockable_id: unlockId
-                      });
-                      setUnlockedCosmetics(prev => new Set(prev).add(unlockId));
-                  }
-              } else {
-                  Alert.alert("Activé", "Boost activé pour 1h !");
-              }
-          }}
-      ]);
-  };
-
-  const claimQuest = async (quest: Quest) => {
-      if (quest.current_progress >= quest.target_value) {
-          Alert.alert("Récompense", `Vous avez gagné ${quest.reward_xp} XP et ${quest.reward_credits} Crédits !`);
-      } else {
-          Alert.alert("En cours", `Progression : ${quest.current_progress}/${quest.target_value}`);
+              const { data, error } = await supabase.from('quests').insert(questsToInsert).select();
+              if (data) setActiveQuests([...activeQuests, ...data]);
+          }
+      } catch (e) {
+          Alert.alert("Erreur IA", "Impossible de générer des quêtes.");
+      } finally {
+          setGenerating(false);
       }
   };
 
-  const QuestItem: React.FC<{ q: Quest }> = ({ q }) => {
-      const isComplete = q.current_progress >= q.target_value;
-      const progress = Math.min(1, q.current_progress / q.target_value);
-      
-      return (
-        <TouchableOpacity onPress={() => claimQuest(q)} style={[styles.questItem, {backgroundColor: colors.cardBg, borderColor: isComplete ? '#4ADE80' : colors.border}]}>
-            <View style={styles.questLeft}>
-                <View style={[styles.questIconBox, {backgroundColor: isComplete ? 'rgba(74, 222, 128, 0.2)' : (isDarkMode ? '#333' : '#F2F2F7')}]}>
-                    {isComplete ? <CheckCircle2 size={20} color="#4ADE80" /> : <Target size={20} color={colors.text} />}
-                </View>
-                <View style={{flex: 1}}>
-                    <Text style={[styles.questTitle, {color: colors.text}]}>{q.title}</Text>
-                    <Text style={[styles.questDesc, {color: colors.textSub}]}>{q.description}</Text>
-                    <View style={styles.miniBarBg}>
-                        <View style={[styles.miniBarFill, {width: `${progress*100}%`, backgroundColor: isComplete ? '#4ADE80' : colors.accent}]} />
-                    </View>
-                </View>
-            </View>
-            <View style={styles.questRewards}>
-                <Text style={styles.rewardText}>+{q.reward_xp} XP</Text>
-                <Text style={[styles.rewardText, {color: '#FACC15'}]}>+{q.reward_credits} 🪙</Text>
-            </View>
-        </TouchableOpacity>
-      );
-  };
-
-  const renderHQ = () => (
-      <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-          <View style={styles.avatarSection}>
-              <View style={styles.avatarContainer}>
-                  <AvatarGenerator config={player.avatar_customization || tempAvatar} size={180} />
-              </View>
-              <View style={styles.rankBadge}>
-                  <Text style={styles.rankText}>{rankName.toUpperCase()}</Text>
-              </View>
-              <TouchableOpacity style={[styles.editBtn, {backgroundColor: colors.cardBg, borderColor: colors.border}]} onPress={() => setIsEditingAvatar(true)}>
-                  <Edit2 size={16} color={colors.text} />
-                  <Text style={[styles.editBtnText, {color: colors.text}]}>Personnaliser</Text>
-              </TouchableOpacity>
-          </View>
-
-          <View style={styles.statsRow}>
-              <View style={[styles.statCard, {backgroundColor: colors.cardBg}]}>
-                  <Text style={[styles.statLabel, {color: colors.textSub}]}>NIVEAU</Text>
-                  <Text style={[styles.statBig, {color: colors.text}]}>{player.level}</Text>
-              </View>
-              <View style={[styles.statCard, {backgroundColor: colors.cardBg}]}>
-                  <Text style={[styles.statLabel, {color: colors.textSub}]}>XP TOTAL</Text>
-                  <Text style={[styles.statBig, {color: colors.accent}]}>{player.experience_points}</Text>
-              </View>
-              <View style={[styles.statCard, {backgroundColor: colors.cardBg}]}>
-                  <Text style={[styles.statLabel, {color: colors.textSub}]}>CRÉDITS</Text>
-                  <Text style={[styles.statBig, {color: '#FACC15'}]}>{player.credits}</Text>
-              </View>
-          </View>
-
-          <View style={[styles.progressBox, {backgroundColor: colors.cardBg}]}>
-              <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8}}>
-                  <Text style={[styles.progLabel, {color: colors.textSub}]}>Progression vers Niv. {player.level + 1}</Text>
-                  <Text style={[styles.progVal, {color: colors.text}]}>{Math.floor(progressPercent)}%</Text>
-              </View>
-              <View style={styles.barBg}>
-                  <View style={[styles.barFill, { width: `${progressPercent}%`, backgroundColor: colors.accent }]} />
-              </View>
-              <Text style={{color: colors.textSub, fontSize: 11, marginTop: 6, textAlign: 'right'}}>
-                  {Math.floor(xpInCurrentLevel)} / {xpNeededForLevel} XP requis
-              </Text>
-          </View>
-      </ScrollView>
-  );
-
-  const renderQuests = () => {
-      const daily = quests.filter(q => q.quest_type === 'daily');
-      const weekly = quests.filter(q => q.quest_type === 'weekly');
-      return (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 40}}>
-              <Text style={styles.sectionHeader}>QUOTIDIENNES 🌅</Text>
-              {daily.length > 0 ? daily.map(q => <QuestItem key={q.id} q={q} />) : <Text style={styles.emptyText}>Aucune quête quotidienne.</Text>}
-              <Text style={[styles.sectionHeader, {marginTop: 24}]}>HEBDOMADAIRES 📅</Text>
-              {weekly.length > 0 ? weekly.map(q => <QuestItem key={q.id} q={q} />) : <Text style={styles.emptyText}>Aucune quête hebdomadaire.</Text>}
-          </ScrollView>
-      );
-  };
-
-  const renderShop = () => (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{gap: 16, paddingBottom: 40}}>
-          {SHOP_ITEMS.map((item, index) => {
-              const Icon = (item.icon === 'Zap' ? Zap : item.icon === 'Shield' ? Shield : item.icon === 'Gift' ? Gift : Trophy) as any;
-              const isOwned = item.category === 'cosmetic' && unlockedCosmetics.has(item.metadata?.value);
-              return (
-                  <View key={index} style={[styles.shopItem, {backgroundColor: colors.cardBg, borderColor: RARITY_COLORS[item.rarity]}]}>
-                      <View style={[styles.shopIconBox, {backgroundColor: `${item.color}20`}]}>
-                          <Icon size={28} color={item.color} />
-                      </View>
-                      <View style={{flex: 1}}>
-                          <Text style={[styles.shopTitle, {color: colors.text}]}>{item.title}</Text>
-                          <Text style={[styles.shopRarity, {color: RARITY_COLORS[item.rarity]}]}>{item.rarity.toUpperCase()}</Text>
-                          <Text style={[styles.shopDesc, {color: colors.textSub}]}>{item.description}</Text>
-                      </View>
-                      {isOwned ? (
-                          <View style={styles.ownedBadge}>
-                              <CheckCircle size={16} color="#4ADE80" style={{marginRight: 4}} />
-                              <Text style={{color: '#4ADE80', fontSize: 12, fontWeight: '700'}}>POSSÉDÉ</Text>
-                          </View>
-                      ) : (
-                          <TouchableOpacity style={[styles.buyBtn, {backgroundColor: isDarkMode ? '#333' : '#F2F2F7'}]} onPress={() => handleBuy(item)}>
-                              <Text style={[styles.buyText, {color: colors.text}]}>{item.price} 🪙</Text>
-                          </TouchableOpacity>
-                      )}
-                  </View>
-              );
-          })}
-      </ScrollView>
-  );
-
-  const renderBadges = () => (
-      <ScrollView contentContainerStyle={{paddingBottom: 40}}>
-        <View style={styles.badgeGrid}>
-            {ACHIEVEMENTS_LIST.map((ach) => {
-                const isUnlocked = unlockedAchievements.has(ach.achievement_id);
-                return (
-                    <TouchableOpacity key={ach.id} style={[styles.badgeCard, {backgroundColor: colors.cardBg, opacity: isUnlocked ? 1 : 0.5}]} onPress={() => Alert.alert(ach.title, ach.description)}>
-                        <View style={[styles.badgeIcon, {backgroundColor: isUnlocked ? '#FACC1520' : '#333'}]}>
-                            {isUnlocked ? <Trophy size={24} color="#FACC15" /> : <Lock size={24} color="#666" />}
-                        </View>
-                        <Text style={[styles.badgeTitle, {color: colors.text}]} numberOfLines={1}>{ach.title}</Text>
-                    </TouchableOpacity>
-                )
-            })}
-        </View>
-      </ScrollView>
-  );
-
-  const renderAvatarEditor = () => (
-      <Modal visible={isEditingAvatar} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setIsEditingAvatar(false)}>
-          <View style={[styles.editorContainer, {backgroundColor: colors.bg}]}>
-              <View style={styles.editorHeader}>
-                  <Text style={[styles.editorTitle, {color: colors.text}]}>Armurerie</Text>
-                  <TouchableOpacity onPress={() => setIsEditingAvatar(false)}><X size={24} color={colors.text} /></TouchableOpacity>
-              </View>
-              <View style={styles.previewContainer}>
-                  <AvatarGenerator config={tempAvatar} size={200} />
-              </View>
-              <ScrollView style={styles.configScroll} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.configLabel}>CLASSE</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
-                      {AVATAR_CLASSES.map(cls => (
-                          <TouchableOpacity key={cls.id} style={[styles.optionBtn, tempAvatar.class === cls.id && {borderColor: colors.accent, borderWidth: 2}]} onPress={() => updateTempAvatar('class', cls.id)}>
-                              <cls.icon size={20} color={tempAvatar.class === cls.id ? colors.accent : '#666'} />
-                              <Text style={[styles.optionText, tempAvatar.class === cls.id && {color: colors.accent}]}>{cls.label}</Text>
-                          </TouchableOpacity>
-                      ))}
-                  </ScrollView>
-                  <Text style={styles.configLabel}>COULEUR NÉON</Text>
-                  <View style={[styles.optionsRow, {flexWrap: 'wrap'}]}>
-                      {COLORS.map(c => (
-                          <TouchableOpacity key={c} style={[styles.colorDot, {backgroundColor: c}, tempAvatar.color === c && {borderWidth: 2, borderColor: '#FFF'}]} onPress={() => updateTempAvatar('color', c)} />
-                      ))}
-                  </View>
-                  <Text style={styles.configLabel}>CASQUE</Text>
-                  <View style={styles.optionsRow}>
-                      {['standard', 'visor', 'crown', 'halo'].map(h => (
-                          <TouchableOpacity key={h} style={[styles.optionBtn, tempAvatar.helmet === h && {borderColor: colors.accent, borderWidth: 2}]} onPress={() => updateTempAvatar('helmet', h)}>
-                              <Text style={[styles.optionText, {textTransform: 'capitalize'}]}>{h}</Text>
-                          </TouchableOpacity>
-                      ))}
-                  </View>
-                  <Text style={styles.configLabel}>ARMURE</Text>
-                  <View style={styles.optionsRow}>
-                      {['standard', 'heavy', 'stealth', 'energy'].map(a => (
-                          <TouchableOpacity key={a} style={[styles.optionBtn, tempAvatar.armor === a && {borderColor: colors.accent, borderWidth: 2}]} onPress={() => updateTempAvatar('armor', a)}>
-                              <Text style={[styles.optionText, {textTransform: 'capitalize'}]}>{a}</Text>
-                          </TouchableOpacity>
-                      ))}
-                  </View>
-                  <View style={{height: 40}} />
-              </ScrollView>
-              <TouchableOpacity style={[styles.saveAvatarBtn, {backgroundColor: colors.button}]} onPress={saveAvatar}>
-                  <Text style={styles.saveAvatarText}>SAUVEGARDER</Text>
-              </TouchableOpacity>
-          </View>
-      </Modal>
-  );
+  const completedCount = activeQuests.filter(q => q.completed).length;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
-      <View style={styles.header}>
-            <View style={{width: 40}} /> 
-            <Text style={[styles.headerTitle, {color: colors.text}]}>Cyber Arena</Text>
-            <View style={{width: 40}} /> 
+    <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top, backgroundColor: colors.bg }]}>
+      
+      {/* HEADER IMMERSIF MOBILE */}
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View style={styles.headerTopRow}>
+              <View>
+                  <Text style={[styles.screenTitle, {color: colors.text}]}>Cyber Arena</Text>
+                  <View style={styles.rankBadge}>
+                      <Shield size={12} color="#FACC15" fill="#FACC15" />
+                      <Text style={styles.rankText}>{rankName}</Text>
+                  </View>
+              </View>
+              <View style={[styles.creditsBox, {backgroundColor: '#333'}]}>
+                  <Coins size={16} color="#FACC15" fill="#FACC15" />
+                  <Text style={styles.creditsText}>{player.credits}</Text>
+              </View>
+          </View>
+
+          <View style={styles.charStatsContainer}>
+              <View style={[styles.avatarFrame, {borderColor: colors.border}]}>
+                  <AvatarGenerator config={player.avatar_customization} size={70} showGlow={false} />
+              </View>
+              <View style={styles.xpSection}>
+                  <View style={styles.xpInfoRow}>
+                      <Text style={[styles.levelBig, {color: colors.text}]}>Niv. {player.level}</Text>
+                      <Text style={styles.xpLabel}>{xpInCurrentLevel} / {xpNeededForLevel} XP</Text>
+                  </View>
+                  <View style={[styles.xpTrack, {backgroundColor: '#333'}]}>
+                      <LinearGradient
+                          colors={['#06b6d4', '#3b82f6']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={[styles.xpFill, { width: `${progressPercent}%` }]} 
+                      />
+                  </View>
+              </View>
+          </View>
       </View>
-      <View style={[styles.tabBar, {borderColor: colors.border}]}>
-          {[
-              {id: 'HQ', label: 'QG'},
-              {id: 'QUESTS', label: 'QUÊTES'},
-              {id: 'SHOP', label: 'MARCHÉ'},
-              {id: 'BADGES', label: 'BADGES'}
-          ].map(tab => (
-              <TouchableOpacity key={tab.id} onPress={() => switchTab(tab.id)} style={[styles.tabItem, activeTab === tab.id && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
-                  <Text style={[styles.tabText, activeTab === tab.id && {color: colors.text}]}>{tab.label}</Text>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          
+          {/* STATS - SCROLL HORIZONTAL (Meilleur pour mobile) */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll} style={{flexGrow: 0}}>
+              <View style={[styles.statCardMobile, {backgroundColor: '#1E293B', borderColor: '#334155'}]}>
+                  <View style={styles.statIconCircle}><Target size={20} color="#60A5FA" /></View>
+                  <View>
+                      <Text style={[styles.statValue, {color: '#FFF'}]}>{activeQuests.length - completedCount}</Text>
+                      <Text style={styles.statName}>Actives</Text>
+                  </View>
+              </View>
+              
+              <View style={[styles.statCardMobile, {backgroundColor: '#2D1B0E', borderColor: '#451a03'}]}>
+                  <View style={styles.statIconCircle}><Trophy size={20} color="#F97316" /></View>
+                  <View>
+                      <Text style={[styles.statValue, {color: '#FFF'}]}>{completedCount}</Text>
+                      <Text style={styles.statName}>Terminées</Text>
+                  </View>
+              </View>
+
+              <View style={[styles.statCardMobile, {backgroundColor: '#0F291E', borderColor: '#064e3b'}]}>
+                  <View style={styles.statIconCircle}><Zap size={20} color="#34D399" /></View>
+                  <View>
+                      <Text style={[styles.statValue, {color: '#FFF'}]}>+{completedCount * 50}</Text>
+                      <Text style={styles.statName}>XP Gagnés</Text>
+                  </View>
+              </View>
+          </ScrollView>
+
+          {/* QUÊTES SECTION */}
+          <View style={styles.questsHeader}>
+              <Text style={[styles.sectionTitle, {color: colors.text}]}>Tableau des Quêtes</Text>
+              <TouchableOpacity 
+                  style={[styles.generateBtn, {borderColor: colors.border}]} 
+                  onPress={handleGenerateQuests} 
+                  disabled={generating}
+              >
+                  {generating ? <ActivityIndicator size="small" color={colors.text} /> : <RefreshCw size={16} color={colors.text} />}
+                  <Text style={[styles.generateText, {color: colors.text}]}>Générer</Text>
               </TouchableOpacity>
-          ))}
-      </View>
-      <View style={styles.contentArea}>
-          {activeTab === 'HQ' && renderHQ()}
-          {activeTab === 'QUESTS' && renderQuests()}
-          {activeTab === 'SHOP' && renderShop()}
-          {activeTab === 'BADGES' && renderBadges()}
-      </View>
-      {renderAvatarEditor()}
+          </View>
+
+          <View style={styles.questsContainer}>
+              {activeQuests.length === 0 && (
+                  <View style={[styles.emptyState, {borderColor: colors.border}]}>
+                      <RefreshCw size={32} color={colors.textSub} style={{opacity: 0.5}} />
+                      <Text style={[styles.emptyText, {color: colors.textSub}]}>Zone vide.</Text>
+                      <Text style={{color: colors.textSub, fontSize: 12}}>Générez de nouvelles quêtes pour gagner de l'XP.</Text>
+                  </View>
+              )}
+              {activeQuests.map((quest) => (
+                  <TouchableOpacity 
+                      key={quest.id} 
+                      style={[styles.questCard, {backgroundColor: colors.cardBg, borderColor: colors.border}]}
+                      activeOpacity={0.9}
+                      onPress={() => !quest.completed && handleClaimQuest(quest)}
+                  >
+                      <View style={styles.questContent}>
+                          <View style={styles.questHeaderRow}>
+                              <View style={styles.tagRow}>
+                                  <View style={[styles.dailyTag, {backgroundColor: 'rgba(59, 130, 246, 0.15)'}]}>
+                                      <Text style={[styles.dailyTagText, {color: '#60A5FA'}]}>QUOTIDIENNE</Text>
+                                  </View>
+                                  <View style={styles.starsRow}>
+                                      {[1,2,3].map(i => <Star key={i} size={10} color="#FACC15" fill="#FACC15" />)}
+                                  </View>
+                              </View>
+                          </View>
+                          
+                          <Text style={[styles.questTitle, {color: colors.text}, quest.completed && {textDecorationLine: 'line-through', opacity: 0.6}]}>
+                              {quest.title}
+                          </Text>
+                          
+                          <View style={styles.rewardsRow}>
+                              <View style={styles.rewardPill}>
+                                  <Zap size={12} color="#C4B5FD" fill="#C4B5FD" />
+                                  <Text style={[styles.rewardText, {color: '#C4B5FD'}]}>+{quest.reward_xp} XP</Text>
+                              </View>
+                              <View style={styles.rewardPill}>
+                                  <Coins size={12} color="#FACC15" fill="#FACC15" />
+                                  <Text style={[styles.rewardText, {color: '#FACC15'}]}>+{quest.reward_credits}</Text>
+                              </View>
+                          </View>
+                      </View>
+                      
+                      <View style={styles.questActionCol}>
+                          {quest.completed ? (
+                              <View style={styles.doneCircle}>
+                                  <CheckCircle2 size={24} color="#4ADE80" />
+                              </View>
+                          ) : (
+                              <View style={styles.claimBtn}>
+                                  <Text style={styles.claimText}>GO</Text>
+                              </View>
+                          )}
+                      </View>
+                  </TouchableOpacity>
+              ))}
+          </View>
+
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
-  headerTitle: { fontSize: 20, fontWeight: '700', letterSpacing: 1 },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1, marginBottom: 10 },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 14 },
-  tabText: { color: '#8E8E93', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
-  contentArea: { flex: 1, paddingHorizontal: 20, paddingBottom: 20 },
-  avatarSection: { alignItems: 'center', marginTop: 20, marginBottom: 30, gap: 12 },
-  avatarContainer: { marginBottom: 8 },
-  rankBadge: { backgroundColor: '#000', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#333' },
-  rankText: { color: '#C4B5FD', fontWeight: '800', fontSize: 14, letterSpacing: 1 },
-  editBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, zIndex: 10 },
-  editBtnText: { fontWeight: '600', marginLeft: 8, fontSize: 13 },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: { flex: 1, padding: 12, borderRadius: 12, alignItems: 'center' },
-  statLabel: { fontSize: 10, fontWeight: '700', marginBottom: 4 },
-  statBig: { fontSize: 18, fontWeight: '800' },
-  progressBox: { padding: 16, borderRadius: 16 },
-  barBg: { height: 8, backgroundColor: '#333', borderRadius: 4, overflow: 'hidden' },
-  barFill: { height: '100%' },
-  progLabel: { fontSize: 12, fontWeight: '600' },
-  progVal: { fontSize: 12, fontWeight: '700' },
-  sectionHeader: { fontSize: 12, color: '#8E8E93', fontWeight: '700', marginBottom: 10 },
-  questItem: { flexDirection: 'row', padding: 12, borderRadius: 16, marginBottom: 10, borderWidth: 1, alignItems: 'center' },
-  questLeft: { flexDirection: 'row', flex: 1, alignItems: 'center' },
-  questIconBox: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  questTitle: { fontWeight: '700', fontSize: 14, marginBottom: 2 },
-  questDesc: { fontSize: 12, marginBottom: 6 },
-  miniBarBg: { height: 4, backgroundColor: '#333', borderRadius: 2, width: '100%' },
-  miniBarFill: { height: '100%', borderRadius: 2 },
-  questRewards: { alignItems: 'flex-end', marginLeft: 10 },
-  rewardText: { fontSize: 11, fontWeight: '600', color: '#C4B5FD', marginBottom: 2 },
-  emptyText: { fontStyle: 'italic', color: '#666', textAlign: 'center' },
-  shopItem: { flexDirection: 'row', padding: 16, borderRadius: 16, borderWidth: 1, alignItems: 'center' },
-  shopIconBox: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  shopTitle: { fontWeight: '700', fontSize: 16 },
-  shopRarity: { fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 2 },
-  shopDesc: { fontSize: 12 },
-  buyBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  buyText: { fontWeight: '700' },
-  ownedBadge: { flexDirection: 'row', alignItems: 'center' },
-  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  badgeCard: { width: '30%', aspectRatio: 1, borderRadius: 16, alignItems: 'center', justifyContent: 'center', padding: 8 },
-  badgeIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  badgeTitle: { fontSize: 10, fontWeight: '700', textAlign: 'center' },
-  editorContainer: { flex: 1, paddingTop: 60 },
-  editorHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20 },
-  editorTitle: { fontSize: 24, fontWeight: '800' },
-  previewContainer: { alignItems: 'center', marginBottom: 30 },
-  configScroll: { paddingHorizontal: 20 },
-  configLabel: { color: '#666', fontSize: 12, fontWeight: '700', marginBottom: 10, marginTop: 10 },
-  optionsRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  optionBtn: { padding: 10, borderRadius: 10, backgroundColor: '#1C1C1E', alignItems: 'center', minWidth: 80 },
-  optionText: { color: '#FFF', fontSize: 12, marginTop: 4, fontWeight: '600' },
-  colorDot: { width: 40, height: 40, borderRadius: 20, margin: 5 },
-  saveAvatarBtn: { margin: 20, padding: 16, borderRadius: 16, alignItems: 'center', marginBottom: 40 },
-  saveAvatarText: { color: '#FFF', fontWeight: '800', fontSize: 16 }
+  header: { padding: 20, paddingBottom: 24, backgroundColor: '#111', borderBottomWidth: 1 },
+  
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  screenTitle: { fontSize: 28, fontWeight: '800', letterSpacing: 0.5 },
+  rankBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, backgroundColor: 'rgba(250, 204, 21, 0.15)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  rankText: { color: '#FACC15', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
+  
+  creditsBox: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+  creditsText: { color: '#FACC15', fontWeight: '700', fontSize: 16 },
+
+  charStatsContainer: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  avatarFrame: { width: 80, height: 80, borderRadius: 20, backgroundColor: '#1A1A1A', alignItems: 'center', justifyContent: 'center', borderWidth: 1, overflow: 'hidden' },
+  
+  xpSection: { flex: 1, justifyContent: 'center' },
+  xpInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
+  levelBig: { fontSize: 20, fontWeight: '700' },
+  xpLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
+  xpTrack: { height: 10, borderRadius: 5, width: '100%', overflow: 'hidden' },
+  xpFill: { height: '100%', borderRadius: 5 },
+
+  scrollContent: { paddingBottom: 100 },
+  
+  // STATS SCROLL
+  statsScroll: { paddingHorizontal: 20, paddingVertical: 20, gap: 12 },
+  statCardMobile: { width: 140, height: 80, borderRadius: 16, padding: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 12 },
+  statIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.2)', alignItems: 'center', justifyContent: 'center' },
+  statValue: { fontSize: 18, fontWeight: '700' },
+  statName: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600' },
+
+  // QUESTS
+  questsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '700' },
+  generateBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  generateText: { fontSize: 12, fontWeight: '600' },
+
+  questsContainer: { paddingHorizontal: 20, gap: 12 },
+  
+  emptyState: { padding: 40, alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderWidth: 1, borderRadius: 16, gap: 10 },
+  emptyText: { fontSize: 16, fontWeight: '600' },
+
+  questCard: { flexDirection: 'row', padding: 16, borderRadius: 20, borderWidth: 1, alignItems: 'center' },
+  questContent: { flex: 1, paddingRight: 16 },
+  questHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dailyTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  dailyTagText: { fontSize: 10, fontWeight: '800' },
+  starsRow: { flexDirection: 'row', gap: 2 },
+  
+  questTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10, lineHeight: 22 },
+  
+  rewardsRow: { flexDirection: 'row', gap: 8 },
+  rewardPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  rewardText: { fontSize: 11, fontWeight: '700' },
+
+  questActionCol: { justifyContent: 'center', alignItems: 'center' },
+  claimBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', shadowColor: "#007AFF", shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 },
+  claimText: { color: '#FFF', fontSize: 12, fontWeight: '900' },
+  doneCircle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });
 
 export default CyberKnight;

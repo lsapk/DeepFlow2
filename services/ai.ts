@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { supabase } from './supabase';
 
@@ -23,13 +24,12 @@ async function logAiUsage(type: 'chat' | 'analysis') {
         if (!user) return;
         const today = new Date().toISOString().split('T')[0];
         
-        // On vérifie d'abord si une entrée existe
         const { data: existing, error } = await supabase
             .from('daily_usage')
             .select('*')
             .eq('user_id', user.id)
             .eq('usage_date', today)
-            .maybeSingle(); // Utiliser maybeSingle pour éviter les erreurs 406 si vide
+            .maybeSingle();
 
         if (existing) {
             await supabase.from('daily_usage').update({
@@ -59,47 +59,55 @@ export const generateActionableCoaching = async (
   await logAiUsage('chat');
   
   try {
-    let prompt = `
-      Tu es DeepFlow, un coach de productivité expert.
+    let systemInstruction = `
+      Tu es DeepFlow, un coach de productivité expert et un système de gestion de vie.
       Réponds en Français, sois concis et motivant. Utilise le format Markdown.
-      
-      Contexte utilisateur:
-      ${JSON.stringify(userContext)}
     `;
 
     if (isCreationMode) {
-        prompt += `
-        Si l'utilisateur veut créer quelque chose, renvoie UNIQUEMENT un JSON strict au format :
-        { "action": "CREATE_TASK", "data": { "title": "...", "priority": "medium" } }
-        (Actions possibles: CREATE_TASK, CREATE_HABIT, CREATE_GOAL)
+        systemInstruction += `
+        IMPORTANT : L'utilisateur veut CRÉER quelque chose dans l'application.
+        Tu DOIS répondre UNIQUEMENT avec un objet JSON (sans markdown autour, juste le JSON brut).
+        
+        Formats acceptés :
+        1. Pour une tâche : { "action": "CREATE_TASK", "data": { "title": "Titre précis", "priority": "high" | "medium" | "low" } }
+        2. Pour une habitude : { "action": "CREATE_HABIT", "data": { "title": "Titre habitude" } }
+        3. Pour un objectif : { "action": "CREATE_GOAL", "data": { "title": "Titre objectif" } }
+
+        Si la demande n'est pas claire, invente un titre pertinent basé sur le contexte.
         `;
+    } else {
+        systemInstruction += `Contexte utilisateur: ${JSON.stringify(userContext)}`;
     }
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash", // Utilisation d'un modèle plus stable pour l'instant
-        contents: prompt + "\n\nMessage: " + userMessage
+        model: "gemini-2.5-flash", 
+        contents: userMessage,
+        config: {
+            systemInstruction: systemInstruction,
+            responseMimeType: isCreationMode ? 'application/json' : 'text/plain'
+        }
     });
     
     const responseText = response.text || "";
 
-    const jsonMatch = responseText.match(/\{[\s\S]*"action"[\s\S]*\}/);
-    let actionData = undefined;
-    let cleanText = responseText;
-
-    if (jsonMatch) {
+    if (isCreationMode) {
         try {
-            actionData = JSON.parse(jsonMatch[0]);
-            cleanText = "J'ai préparé cette action pour vous :";
+            // Nettoyage au cas où le modèle ajoute du markdown ```json ... ```
+            const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const actionData = JSON.parse(cleanJson);
+            return { text: "Action générée", action: actionData };
         } catch (e) {
             console.warn("AI JSON parse error", e);
+            return { text: "Je n'ai pas compris ce que vous voulez créer. Essayez : 'Ajoute une tâche...'" };
         }
     }
 
-    return { text: cleanText, action: actionData };
+    return { text: responseText };
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return { text: "⚠️ Je n'arrive pas à joindre le cerveau central (Erreur réseau)." };
+    return { text: "⚠️ Erreur réseau ou configuration IA." };
   }
 };
 
@@ -123,11 +131,6 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
             "mental": number,
             "career": number
         }
-        
-        Règles :
-        - Sois réaliste. Si peu de données sur le sport, mets un score bas en santé.
-        - Si le journal mentionne du stress, baisse le score mental.
-        - Renvoie UNIQUEMENT le JSON, pas de markdown, pas de texte avant/après.
         `;
 
         const response = await ai.models.generateContent({
@@ -140,7 +143,6 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
         if (!text) return null;
 
         const data = JSON.parse(text);
-        // Ordre attendu par le graph : Santé, Loisirs, Perso, Appr., Mental, Carrière
         return [
             data.health || 20,
             data.leisure || 20,
@@ -162,12 +164,9 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
 
     try {
         const prompt = `
-        Agis comme un assistant de productivité expert.
-        Découpe la tâche complexe suivante en une liste de sous-tâches logiques, concrètes et chronologiques (maximum 10 étapes).
-        Tâche Mère : "${taskTitle}"
-
-        Ta réponse DOIT être un tableau JSON de chaînes de caractères (strings). Rien d'autre.
-        Exemple : ["Choisir la date", "Réserver le lieu", "Envoyer les invitations"]
+        Découpe la tâche suivante en sous-tâches (max 6).
+        Tâche : "${taskTitle}"
+        Renvoie un tableau JSON de strings.
         `;
 
         const response = await ai.models.generateContent({
@@ -178,36 +177,46 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
 
         const text = response.text;
         if (!text) return [];
-
         const data = JSON.parse(text);
-        if (Array.isArray(data)) return data;
-        if (data.subtasks && Array.isArray(data.subtasks)) return data.subtasks;
-        
-        return [];
-
+        return Array.isArray(data) ? data : [];
     } catch (e) {
-        console.error("AI Split Error", e);
         return [];
     }
 };
 
-export const generateCoaching = async (msg: string, ctx: any) => {
-    const res = await generateActionableCoaching(msg, ctx, false);
-    return res.text;
-}
+export const generateQuests = async (userLevel: number, context: string): Promise<any[]> => {
+    if (!ai) return [];
+    
+    try {
+        const prompt = `
+        Génère 3 quêtes RPG motivantes pour un utilisateur de niveau ${userLevel}.
+        Contexte utilisateur : ${context}
+        
+        Format JSON attendu :
+        [
+            {
+                "title": "Titre épique",
+                "description": "Action concrète à faire",
+                "reward_xp": 50,
+                "reward_credits": 20,
+                "target_value": 1,
+                "quest_type": "daily"
+            }
+        ]
+        `;
 
-export const generateReflectionQuestion = async (): Promise<string> => {
-  if (!ai) return "De quoi êtes-vous reconnaissant aujourd'hui ?";
-  try {
-    // Fallback local pour éviter latence
-    const questions = [
-        "Quelle a été votre plus petite victoire aujourd'hui ?",
-        "Qu'avez-vous appris sur vous-même cette semaine ?",
-        "Si vous ne pouviez faire qu'une chose demain, quelle serait-elle ?",
-        "Quelle émotion domine votre esprit actuellement ?"
-    ];
-    return questions[Math.floor(Math.random() * questions.length)];
-  } catch (error) {
-    return "De quoi êtes-vous le plus reconnaissant aujourd'hui ?";
-  }
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+
+        const text = response.text;
+        if (!text) return [];
+        const data = JSON.parse(text);
+        return Array.isArray(data) ? data : [];
+    } catch (e) {
+        console.error("Generate Quests Error", e);
+        return [];
+    }
 };
