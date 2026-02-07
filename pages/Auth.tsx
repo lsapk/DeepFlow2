@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
-import { ArrowRight } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
+
+declare var require: any;
 
 interface AuthProps {
   onLogin: () => void;
@@ -28,12 +30,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         });
         if (error) throw error;
         if (data.user) {
-           Alert.alert("Welcome!", "Please check your email to verify your account.");
+           Alert.alert("Bienvenue !", "Veuillez vérifier votre email pour confirmer votre compte.");
            setIsLogin(true); 
         }
       }
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Erreur", err.message);
     } finally {
       setLoading(false);
     }
@@ -46,13 +48,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     >
         <View style={styles.content}>
             <View style={styles.header}>
-                <View style={styles.logoPlaceholder}>
-                     {/* Replace with actual logo image if available */}
-                     <Text style={styles.logoText}>LU</Text>
-                </View>
-                <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
+                <Image 
+                    source={require('../assets/logo.png')} 
+                    style={styles.logo}
+                    resizeMode="contain"
+                />
+                <Text style={styles.title}>{isLogin ? 'Bon retour' : 'Créer un compte'}</Text>
                 <Text style={styles.subtitle}>
-                    {isLogin ? 'Enter your details to continue.' : 'Join us to gamify your life.'}
+                    {isLogin ? 'Entrez vos identifiants pour continuer.' : 'Rejoignez-nous pour gamifier votre vie.'}
                 </Text>
             </View>
 
@@ -60,7 +63,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 {!isLogin && (
                     <TextInput 
                         style={styles.input}
-                        placeholder="Full Name"
+                        placeholder="Nom complet"
                         placeholderTextColor="#C7C7CC"
                         value={fullName}
                         onChangeText={setFullName}
@@ -79,7 +82,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
                 <TextInput 
                     style={styles.input}
-                    placeholder="Password"
+                    placeholder="Mot de passe"
                     placeholderTextColor="#C7C7CC"
                     value={password}
                     onChangeText={setPassword}
@@ -94,14 +97,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text style={styles.buttonText}>{isLogin ? 'Sign In' : 'Sign Up'}</Text>
+                        <Text style={styles.buttonText}>{isLogin ? 'Se connecter' : "S'inscrire"}</Text>
                     )}
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={() => setIsLogin(!isLogin)} style={styles.switchButton}>
                     <Text style={styles.switchText}>
-                        {isLogin ? "Don't have an account? " : "Already have an account? "}
-                        <Text style={styles.linkText}>{isLogin ? 'Sign Up' : 'Sign In'}</Text>
+                        {isLogin ? "Pas encore de compte ? " : "Déjà un compte ? "}
+                        <Text style={styles.linkText}>{isLogin ? "S'inscrire" : 'Se connecter'}</Text>
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -124,19 +127,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
+    width: 120,
+    height: 120,
     marginBottom: 24,
-  },
-  logoText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: '900',
   },
   title: {
     fontSize: 28,
