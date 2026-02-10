@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Alert, ActivityIndicator, LayoutAnimation, TextInput, Platform, BackHandler } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Alert, ActivityIndicator, LayoutAnimation, TextInput, Platform, BackHandler, Linking, Modal } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings, AiPermissions } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock } from 'lucide-react-native';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
@@ -25,6 +25,66 @@ const DEFAULT_AI_PERMISSIONS: AiPermissions = {
     profile: true
 };
 
+const APP_VERSION = "1.0.2 (Build 2024.1)";
+
+const LEGAL_CONTENT = {
+    FAQ: `
+**Q: Mes données sont-elles privées ?**
+R: Oui. Vos données sont stockées de manière sécurisée. L'IA n'analyse que ce que vous autorisez explicitement dans les réglages.
+
+**Q: Comment fonctionne le système de niveau ?**
+R: Vous gagnez de l'XP en complétant des tâches, des habitudes et des sessions de focus.
+
+**Q: Puis-je utiliser l'application hors ligne ?**
+R: Oui, DeepFlow fonctionne en "Offline First". Vos données se synchroniseront dès que vous retrouverez une connexion.
+
+**Q: L'application est-elle gratuite ?**
+R: Les fonctionnalités de base sont gratuites. Certaines fonctionnalités IA avancées peuvent nécessiter des crédits.
+    `,
+    PRIVACY: `
+**Politique de Confidentialité**
+
+1. **Collecte des données**
+Nous collectons uniquement les données nécessaires au fonctionnement de l'application (email, tâches, habitudes).
+
+2. **Utilisation de l'IA**
+Les données envoyées à l'IA (Google Gemini) sont anonymisées autant que possible et ne sont utilisées que pour vous fournir des conseils personnalisés. Vous pouvez révoquer ces accès à tout moment.
+
+3. **Sécurité**
+Vos données sont chiffrées et stockées via Supabase (PostgreSQL) avec des règles de sécurité strictes (RLS).
+
+4. **Vos droits (RGPD)**
+Vous avez le droit d'accès, de rectification et de suppression de vos données. Utilisez le bouton "Supprimer mon compte" dans la zone de danger pour effacer toutes vos traces.
+    `,
+    TERMS: `
+**Conditions Générales d'Utilisation (CGU)**
+
+L'utilisation de DeepFlow implique l'acceptation pleine et entière des présentes conditions.
+
+1. **Usage personnel**
+L'application est destinée à un usage personnel pour la productivité et le développement personnel.
+
+2. **Responsabilité**
+DeepFlow fournit des conseils via une IA. Ces conseils ne remplacent en aucun cas un avis médical ou psychologique professionnel.
+
+3. **Propriété intellectuelle**
+Le design, le code et les éléments graphiques "Cyber Knight" sont la propriété exclusive de DeepFlow.
+    `,
+    LEGAL: `
+**Mentions Légales**
+
+**Éditeur :**
+DeepFlow Inc. (Développement Personnel)
+Contact : deepflow.ia@gmail.com
+
+**Hébergement :**
+Supabase Inc. / Google Cloud Platform
+
+**Directeur de la publication :**
+L'équipe DeepFlow.
+    `
+};
+
 const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
@@ -44,8 +104,10 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const [editName, setEditName] = useState(user.display_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
 
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  // Legal Modal State
+  const [legalModalVisible, setLegalModalVisible] = useState(false);
+  const [legalTitle, setLegalTitle] = useState('');
+  const [legalBody, setLegalBody] = useState('');
 
   const [stats, setStats] = useState({
       tasksCompleted: 0,
@@ -58,19 +120,19 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   useEffect(() => {
       const backAction = () => {
           if (visible) {
-              onClose();
+              if (legalModalVisible) {
+                  setLegalModalVisible(false);
+              } else {
+                  onClose();
+              }
               return true;
           }
           return false;
       };
 
-      const backHandler = BackHandler.addEventListener(
-          "hardwareBackPress",
-          backAction
-      );
-
+      const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
       return () => backHandler.remove();
-  }, [visible]);
+  }, [visible, legalModalVisible]);
 
   useEffect(() => {
       if (visible) {
@@ -84,9 +146,12 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       const { data } = await supabase.from('user_settings').select('*').eq('id', user.id).single();
       if (data) {
           const permissions = data.unlocked_features?.ai_permissions || DEFAULT_AI_PERMISSIONS;
+          // Ensure all keys exist (migration fallback)
+          const mergedPermissions = { ...DEFAULT_AI_PERMISSIONS, ...permissions };
+          
           setSettings({
               ...data,
-              unlocked_features: { ...data.unlocked_features, ai_permissions: permissions }
+              unlocked_features: { ...data.unlocked_features, ai_permissions: mergedPermissions }
           });
       } else {
           const defaultSettings = { 
@@ -131,7 +196,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const { error } = await supabase.from('user_settings').update({ [key]: value }).eq('id', user.id);
       if (error) {
-          setSettings(settings); 
           Alert.alert("Erreur", "Impossible de sauvegarder le réglage.");
       }
   };
@@ -163,6 +227,16 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const switchTab = (tab: any) => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setActiveTab(tab);
+  };
+
+  const openLegal = (title: string, body: string) => {
+      setLegalTitle(title);
+      setLegalBody(body);
+      setLegalModalVisible(true);
+  };
+
+  const contactSupport = () => {
+      Linking.openURL('mailto:deepflow.ia@gmail.com?subject=Support DeepFlow');
   };
 
   const renderProfileTab = () => (
@@ -214,18 +288,44 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       <View style={styles.tabContent}>
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>INTELLIGENCE ARTIFICIELLE</Text>
+              <Text style={styles.sectionSubHeader}>Contrôlez quelles données DeepFlow AI peut analyser pour vous coacher.</Text>
               <View style={styles.card}>
-                  <SettingItem icon={Brain} label="Accès au Journal" iconColor="#8B5CF6" isSwitch value={permissions.journal} onToggle={(val: boolean) => updateAiPermission('journal', val)} />
+                  <SettingItem icon={Brain} label="Journal & Émotions" iconColor="#8B5CF6" isSwitch value={permissions.journal} onToggle={(val: boolean) => updateAiPermission('journal', val)} />
                   <View style={styles.separator} />
-                  <SettingItem icon={Check} label="Accès Tâches" iconColor="#10B981" isSwitch value={permissions.tasks} onToggle={(val: boolean) => updateAiPermission('tasks', val)} />
+                  <SettingItem icon={Check} label="Tâches & Projets" iconColor="#10B981" isSwitch value={permissions.tasks} onToggle={(val: boolean) => updateAiPermission('tasks', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={RefreshCw} label="Habitudes & Routines" iconColor="#F59E0B" isSwitch value={permissions.habits} onToggle={(val: boolean) => updateAiPermission('habits', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Target} label="Objectifs & Ambitions" iconColor="#EF4444" isSwitch value={permissions.goals} onToggle={(val: boolean) => updateAiPermission('goals', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Zap} label="Sessions Focus" iconColor="#3B82F6" isSwitch value={permissions.focus} onToggle={(val: boolean) => updateAiPermission('focus', val)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={User} label="Profil & Niveau" iconColor="#6366F1" isSwitch value={permissions.profile} onToggle={(val: boolean) => updateAiPermission('profile', val)} />
               </View>
           </View>
+
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>APPARENCE</Text>
               <View style={styles.card}>
                   <SettingItem icon={settings.theme === 'dark' ? Moon : Sun} label="Mode Sombre" iconColor="#5856D6" isSwitch value={settings.theme === 'dark'} onToggle={(val: boolean) => updateSetting('theme', val ? 'dark' : 'light')} />
               </View>
           </View>
+
+          <View style={styles.section}>
+              <Text style={styles.sectionHeader}>SUPPORT & LÉGAL</Text>
+              <View style={styles.card}>
+                  <SettingItem icon={Mail} label="Contacter le Support" iconColor="#EC4899" onPress={contactSupport} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={HelpCircle} label="FAQ" iconColor="#14B8A6" onPress={() => openLegal('Foire Aux Questions', LEGAL_CONTENT.FAQ)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Lock} label="Politique de Confidentialité" iconColor="#64748B" onPress={() => openLegal('Confidentialité', LEGAL_CONTENT.PRIVACY)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={FileText} label="Conditions d'Utilisation (CGU)" iconColor="#64748B" onPress={() => openLegal('Conditions Générales', LEGAL_CONTENT.TERMS)} />
+                  <View style={styles.separator} />
+                  <SettingItem icon={Scale} label="Mentions Légales" iconColor="#64748B" onPress={() => openLegal('Mentions Légales', LEGAL_CONTENT.LEGAL)} />
+              </View>
+          </View>
+
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>ZONE DE DANGER</Text>
               <View style={styles.card}>
@@ -233,10 +333,15 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                         <View style={styles.itemLeft}><View style={[styles.iconBox, { backgroundColor: '#F59E0B' }]}><LogOut size={18} color="white" /></View><Text style={[styles.label, {color: '#F59E0B'}]}>Se déconnecter</Text></View>
                   </TouchableOpacity>
                   <View style={styles.separator} />
-                  <TouchableOpacity style={styles.item} onPress={() => { setDeleteConfirmationText(''); setDeleteModalVisible(true); }}>
+                  <TouchableOpacity style={styles.item} onPress={() => { Alert.alert("Attention", "Cette action est irréversible. Vos données seront effacées.", [{text: "Annuler"}, {text: "Supprimer", style: 'destructive', onPress: () => Alert.alert("Confirmation", "Contactez le support pour finaliser la suppression.")}]) }}>
                         <View style={styles.itemLeft}><View style={[styles.iconBox, { backgroundColor: '#EF4444' }]}><Trash2 size={18} color="white" /></View><Text style={[styles.label, {color: '#EF4444'}]}>Supprimer mon compte</Text></View>
                   </TouchableOpacity>
               </View>
+          </View>
+          
+          <View style={styles.footer}>
+              <Text style={styles.version}>DeepFlow {APP_VERSION}</Text>
+              <Text style={styles.copyright}>© 2024 DeepFlow Inc.</Text>
           </View>
       </View>
   )};
@@ -294,6 +399,24 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                 </ScrollView>
             )}
         </View>
+
+        {/* LEGAL MODAL */}
+        <Modal visible={legalModalVisible} transparent animationType="slide" onRequestClose={() => setLegalModalVisible(false)}>
+            <View style={styles.modalOverlay}>
+                <View style={[styles.modalContent, {paddingBottom: insets.bottom + 20}]}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>{legalTitle}</Text>
+                        <TouchableOpacity onPress={() => setLegalModalVisible(false)} style={styles.modalCloseBtn}>
+                            <X size={24} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView contentContainerStyle={{padding: 20}}>
+                        <Text style={styles.legalText}>{legalBody}</Text>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+
     </Animated.View>
   );
 };
@@ -331,7 +454,7 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 9999,
     elevation: 9999,
-    backgroundColor: '#000', // Solid black to fix "dark screen" issue
+    backgroundColor: '#000', 
   },
   container: { 
     flex: 1, 
@@ -379,13 +502,26 @@ const styles = StyleSheet.create({
 
   // Settings Tab
   section: { marginBottom: 10 },
-  sectionHeader: { fontSize: 12, color: '#666', marginBottom: 8, marginLeft: 4, fontWeight: '600', textTransform: 'uppercase' },
+  sectionHeader: { fontSize: 12, color: '#888', marginBottom: 4, marginLeft: 4, fontWeight: '700', textTransform: 'uppercase' },
+  sectionSubHeader: { fontSize: 12, color: '#555', marginBottom: 12, marginLeft: 4 },
   card: { backgroundColor: '#1C1C1E', borderRadius: 14, overflow: 'hidden' },
   item: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, minHeight: 56 },
   separator: { height: 1, backgroundColor: '#262626', marginLeft: 56 },
   itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   iconBox: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 16, color: '#FFF', fontWeight: '500' },
+
+  footer: { alignItems: 'center', marginTop: 20, marginBottom: 40 },
+  version: { color: '#444', fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  copyright: { color: '#333', fontSize: 10 },
+
+  // Legal Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#111', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '90%' },
+  modalHeader: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#222', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle: { color: '#FFF', fontSize: 18, fontWeight: '700' },
+  modalCloseBtn: { padding: 4 },
+  legalText: { color: '#DDD', fontSize: 15, lineHeight: 24 },
 
   // Stats Tab
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
