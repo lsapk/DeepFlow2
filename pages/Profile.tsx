@@ -2,10 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput, Linking, Platform } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings, AiPermissions } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart } from 'lucide-react-native';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ProfileProps {
@@ -179,29 +177,11 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
         }
   };
 
-  const handleRateApp = () => {
-      const androidPackageName = 'com.deepflow.app'; 
-      const itunesItemId = '0000000000'; 
-      if (Platform.OS === 'android') Linking.openURL(`market://details?id=${androidPackageName}`);
-      else Linking.openURL(`https://apps.apple.com/app/id${itunesItemId}?action=write-review`);
-  };
-
-  const openLegalDoc = (type: 'TERMS' | 'PRIVACY') => {
-      setLegalModal({
-          visible: true,
-          title: type === 'TERMS' ? "Conditions d'utilisation" : "Politique de Confidentialité",
-          content: type === 'TERMS' ? LEGAL_DOCS.TERMS : LEGAL_DOCS.PRIVACY
-      });
-  };
-
   const switchTab = (tab: any) => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setActiveTab(tab);
   };
 
-  const openUrl = (url: string) => Linking.openURL(url).catch(err => Alert.alert("Erreur", "Impossible d'ouvrir le lien"));
-
-  // ... (Render functions remain mostly the same, adjusted for brevity in this response) ...
   const renderProfileTab = () => (
       <View style={styles.tabContent}>
           <View style={styles.profileHeader}>
@@ -291,8 +271,13 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
 
   return (
     <>
-        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} statusBarTranslucent>
-            <View style={[styles.container, { paddingTop: insets.top }]}>
+        <Modal 
+            visible={visible} 
+            animationType="slide" 
+            transparent={false} // CRUCIAL FIX FOR ANDROID
+            onRequestClose={onClose} 
+        >
+            <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? 20 : insets.top }]}>
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Mon Espace</Text>
                     <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -327,8 +312,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                 )}
             </View>
         </Modal>
-
-        {/* Autres Modals (Légal, Delete) inchangés */}
     </>
   );
 };
@@ -357,10 +340,8 @@ const StatCard = ({ label, value, icon: Icon, color }: any) => (
     </View>
 );
 
-import { CheckCircle, Clock } from 'lucide-react-native'; 
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: '#000' }, // Noir par défaut pour éviter l'effet "écran sombre"
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 20, marginTop: 10 },
   headerTitle: { fontSize: 28, fontWeight: '700', color: '#FFF' },
   closeBtn: {},

@@ -112,12 +112,13 @@ const App: React.FC = () => {
   };
 
   const loadOfflineData = async () => {
-      const [cachedTasks, cachedHabits, cachedGoals, cachedUser, cachedPlayer] = await Promise.all([
+      const [cachedTasks, cachedHabits, cachedGoals, cachedUser, cachedPlayer, cachedQuests] = await Promise.all([
           loadFromCache(CACHE_KEYS.TASKS),
           loadFromCache(CACHE_KEYS.HABITS),
           loadFromCache(CACHE_KEYS.GOALS),
           loadFromCache(CACHE_KEYS.USER),
-          loadFromCache(CACHE_KEYS.PLAYER)
+          loadFromCache(CACHE_KEYS.PLAYER),
+          loadFromCache(CACHE_KEYS.QUESTS)
       ]);
 
       if (cachedTasks) setTasks(cachedTasks);
@@ -125,6 +126,7 @@ const App: React.FC = () => {
       if (cachedGoals) setGoals(cachedGoals);
       if (cachedUser) setUser(cachedUser);
       if (cachedPlayer) setPlayer(cachedPlayer);
+      if (cachedQuests) setQuests(cachedQuests);
       
       // Check if we have pending items from last run
       const qSize = await getQueueSize();
@@ -219,6 +221,7 @@ const App: React.FC = () => {
       const channel = supabase.channel('db_changes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'quests', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, (payload) => {
                   if (payload.eventType === 'UPDATE') {
                       const newP = payload.new as PlayerProfile;
@@ -276,10 +279,11 @@ const App: React.FC = () => {
       const { data: settingsData } = await supabase.from('user_settings').select('theme').eq('id', userId).single();
       if (settingsData && settingsData.theme) setIsDarkMode(settingsData.theme === 'dark');
 
-      const [tasksRes, habitsRes, goalsRes] = await Promise.all([
+      const [tasksRes, habitsRes, goalsRes, questsRes] = await Promise.all([
           supabase.from('tasks').select('*, subtasks(*)').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
-          supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId)
+          supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId),
+          supabase.from('quests').select('*').eq('user_id', userId).eq('completed', false)
       ]);
 
       if (tasksRes.data) {
@@ -293,6 +297,10 @@ const App: React.FC = () => {
       if (goalsRes.data) {
           setGoals(goalsRes.data);
           saveToCache(CACHE_KEYS.GOALS, goalsRes.data);
+      }
+      if (questsRes.data) {
+          setQuests(questsRes.data);
+          saveToCache(CACHE_KEYS.QUESTS, questsRes.data);
       }
 
       // Restore active focus session if exists
@@ -332,9 +340,15 @@ const App: React.FC = () => {
       saveToCache(CACHE_KEYS.TASKS, updatedTasks);
       
       // CRITICAL FIX: Destructure to remove 'subtasks' array before inserting to DB
+      // Supabase 'tasks' table does not have 'subtasks' column (it's a relation)
       const { subtasks, ...taskDbPayload } = newTask;
       
-      try { const { error } = await supabase.from('tasks').insert(taskDbPayload); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'tasks', payload: taskDbPayload }); }
+      try { 
+          const { error } = await supabase.from('tasks').insert(taskDbPayload); 
+          if (error) throw error; 
+      } catch (e) { 
+          queueAction({ type: 'INSERT', table: 'tasks', payload: taskDbPayload }); 
+      }
   };
 
   const createHabit = async (habitData: any) => {
@@ -357,10 +371,15 @@ const App: React.FC = () => {
       setGoals(updatedGoals);
       saveToCache(CACHE_KEYS.GOALS, updatedGoals);
       
-      // CRITICAL FIX: Ensure no extra fields like subobjectives (though optional, safe to be sure)
+      // CRITICAL FIX: Ensure no extra fields like subobjectives
       const { subobjectives, ...goalDbPayload } = newGoal;
 
-      try { const { error } = await supabase.from('goals').insert(goalDbPayload); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'goals', payload: goalDbPayload }); }
+      try { 
+          const { error } = await supabase.from('goals').insert(goalDbPayload); 
+          if (error) throw error; 
+      } catch (e) { 
+          queueAction({ type: 'INSERT', table: 'goals', payload: goalDbPayload }); 
+      }
   };
 
   const toggleTask = async (id: string) => {
@@ -525,52 +544,50 @@ const App: React.FC = () => {
     }
 
     return (
-        <Animated.View 
-            key={currentView} // Clé unique force le re-render et l'animation
-            entering={FadeIn.duration(200)}
-            style={{flex: 1}}
-        >
-            {Content}
-        </Animated.View>
+        <SafeAreaProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <View style={[{ flex: 1 }, bgStyle]}>
+                    <StatusBar 
+                        barStyle={isDarkMode ? "light-content" : "dark-content"} 
+                        backgroundColor="transparent" 
+                        translucent={true} 
+                    />
+                    
+                    <View style={{ flex: 1 }}>
+                        <Animated.View 
+                            key={currentView} 
+                            entering={FadeIn.duration(200)}
+                            style={{flex: 1}}
+                        >
+                            {Content}
+                        </Animated.View>
+                        
+                        {player && (
+                            <LevelUpModal visible={levelUpVisible} newLevel={player.level} onClose={() => setLevelUpVisible(false)} />
+                        )}
+
+                        {currentView !== ViewState.ONBOARDING && user && player && (
+                            <Profile 
+                                visible={profileVisible} 
+                                onClose={() => setProfileVisible(false)} 
+                                user={user} player={player} logout={handleLogout} 
+                                onThemeChange={setIsDarkMode}
+                            />
+                        )}
+
+                        {currentView !== ViewState.ONBOARDING && session && user && (
+                            <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
+                        )}
+                    </View>
+                </View>
+            </GestureHandlerRootView>
+        </SafeAreaProvider>
     );
   };
 
   const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
 
-  return (
-    <SafeAreaProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <View style={[{ flex: 1 }, bgStyle]}>
-                <StatusBar 
-                    barStyle={isDarkMode ? "light-content" : "dark-content"} 
-                    backgroundColor="transparent" 
-                    translucent={true} 
-                />
-                
-                <View style={{ flex: 1 }}>
-                    {renderView()}
-                    
-                    {player && (
-                        <LevelUpModal visible={levelUpVisible} newLevel={player.level} onClose={() => setLevelUpVisible(false)} />
-                    )}
-
-                    {currentView !== ViewState.ONBOARDING && user && player && (
-                        <Profile 
-                            visible={profileVisible} 
-                            onClose={() => setProfileVisible(false)} 
-                            user={user} player={player} logout={handleLogout} 
-                            onThemeChange={setIsDarkMode}
-                        />
-                    )}
-
-                    {currentView !== ViewState.ONBOARDING && session && user && (
-                        <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
-                    )}
-                </View>
-            </View>
-        </GestureHandlerRootView>
-    </SafeAreaProvider>
-  );
+  return renderView(); // Simplify render structure to avoid duplicate providers
 };
 
 export default App;

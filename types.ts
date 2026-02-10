@@ -139,7 +139,7 @@ export interface Quest {
   current_progress: number;
   quest_type: 'daily' | 'weekly' | 'achievement';
   expires_at?: string;
-  icon?: string; // Icon name
+  icon?: string; // Icon name (Used locally, not in DB)
 }
 
 export interface Achievement {
@@ -168,10 +168,9 @@ export interface FocusSession {
   id: string;
   duration: number; // in minutes
   completed_at: string;
-  session_type: string;
   title?: string | null;
-  linked_task_id?: string | null;
   started_at?: string;
+  // NOTE: session_type and linked_task_id removed as they are not in DB schema
 }
 
 export interface JournalEntry {

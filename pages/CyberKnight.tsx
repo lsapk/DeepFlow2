@@ -98,13 +98,33 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
           const newQuestsData = await generateQuests(player.level, "Utilisateur actif");
           if (newQuestsData.length > 0) {
               const questsToInsert = newQuestsData.map(q => ({
-                  user_id: user.id, title: q.title, description: q.description, reward_xp: q.reward_xp,
-                  reward_credits: q.reward_credits, target_value: 1, current_progress: 0, completed: false, quest_type: 'daily'
+                  user_id: user.id, 
+                  title: q.title, 
+                  description: q.description, 
+                  reward_xp: q.reward_xp,
+                  reward_credits: q.reward_credits, 
+                  target_value: 1, 
+                  current_progress: 0, 
+                  completed: false, 
+                  quest_type: 'daily',
+                  category: 'rpg' // FIX: Obligatoire selon le schéma DB
               }));
-              const { data } = await supabase.from('quests').insert(questsToInsert).select();
+              
+              const { data, error } = await supabase.from('quests').insert(questsToInsert).select();
+              
+              if (error) {
+                  console.error("Quest Insert Error", error);
+                  throw error;
+              }
+              
               if (data) setActiveQuests([...activeQuests, ...data]);
           }
-      } catch (e) { Alert.alert("Erreur IA"); } finally { setGenerating(false); }
+      } catch (e) { 
+          Alert.alert("Erreur", "Impossible de générer les quêtes pour le moment."); 
+          console.error(e);
+      } finally { 
+          setGenerating(false); 
+      }
   };
 
   const buyItem = async (item: ShopItem) => {

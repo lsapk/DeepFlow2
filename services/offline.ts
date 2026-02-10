@@ -40,6 +40,16 @@ export const loadFromCache = async (key: string) => {
 
 // --- QUEUE MANAGERS ---
 export const addToQueue = async (action: { type: string, payload: any, table?: string }) => {
+    // Sanitize immediately before adding to queue if possible
+    if (action.table === 'tasks' && action.payload.subtasks) {
+        const { subtasks, ...cleanPayload } = action.payload;
+        action.payload = cleanPayload;
+    }
+    if (action.table === 'goals' && action.payload.subobjectives) {
+        const { subobjectives, ...cleanPayload } = action.payload;
+        action.payload = cleanPayload;
+    }
+
     const queue = await loadFromCache(QUEUE_KEY) || [];
     queue.push({ ...action, timestamp: Date.now() });
     await saveToCache(QUEUE_KEY, queue);
@@ -58,10 +68,23 @@ export const processQueue = async (): Promise<number> => {
     console.log(`Processing ${queue.length} offline actions...`);
     const remainingQueue = [];
 
-    for (const action of queue) {
+    for (let action of queue) {
         try {
             let error = null;
             
+            // AUTO-FIX: Sanitize payload for problematic tables before retry
+            // This unblocks existing queues with bad data
+            if (action.table === 'tasks' && action.payload && action.payload.subtasks) {
+                console.log("Sanitizing task payload in queue...");
+                const { subtasks, ...cleanPayload } = action.payload;
+                action.payload = cleanPayload;
+            }
+            if (action.table === 'goals' && action.payload && action.payload.subobjectives) {
+                console.log("Sanitizing goal payload in queue...");
+                const { subobjectives, ...cleanPayload } = action.payload;
+                action.payload = cleanPayload;
+            }
+
             // Generic handler based on type
             switch (action.type) {
                 case 'INSERT':
