@@ -6,7 +6,7 @@ import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
-import Animated, { useAnimatedStyle, withSpring, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withSpring, useSharedValue, withTiming, FadeIn } from 'react-native-reanimated';
 
 interface BottomNavProps {
   currentView: ViewState;
@@ -36,7 +36,7 @@ const TabIcon = ({ Icon, isActive, color, label }: any) => {
                 />
             </Animated.View>
             {isActive && (
-                <Animated.Text entering={withTiming(1)} style={[styles.label, { color }]}>
+                <Animated.Text entering={FadeIn.duration(200)} style={[styles.label, { color }]}>
                     {label}
                 </Animated.Text>
             )}
