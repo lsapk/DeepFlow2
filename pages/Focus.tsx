@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation } from 'react-native';
-import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2 } from 'lucide-react-native';
+import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2, MoreHorizontal } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';
@@ -12,10 +12,11 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
-const CIRCLE_SIZE = Math.min(width * 0.70, 280); 
-const STROKE_WIDTH = 12;
+const CIRCLE_SIZE = Math.min(width * 0.75, 300); 
+const STROKE_WIDTH = 8;
 const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -75,8 +76,8 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       if (isActive) {
           pulse.value = withRepeat(
               withSequence(
-                  withTiming(1.03, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-                  withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+                  withTiming(1.02, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+                  withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
               ),
               -1,
               true
@@ -241,7 +242,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   };
 
   const scheduleNotifications = async (seconds: number) => {
-      // 1. Notif de démarrage
       const endDate = new Date(Date.now() + seconds * 1000);
       const endHours = endDate.getHours().toString().padStart(2, '0');
       const endMinutes = endDate.getMinutes().toString().padStart(2, '0');
@@ -252,15 +252,14 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               body: `Session lancée. Fin prévue à ${endHours}:${endMinutes}.`,
               sound: false,
           },
-          trigger: null, // Immédiat
+          trigger: null,
       });
 
-      // 2. Notif de fin
       await Notifications.scheduleNotificationAsync({
           content: {
               title: "Session Terminée ! 🎉",
               body: "Bravo ! Il est temps de faire une pause.",
-              sound: true, // Son de notif par défaut
+              sound: true,
               vibrate: [0, 250, 250, 250],
           },
           trigger: {
@@ -283,7 +282,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       const now = Date.now();
       const endTimestamp = now + (d * 60 * 1000);
       
-      // Persistence
       const sessionData = {
           title: sessionTitle,
           taskId: selectedTaskId,
@@ -292,8 +290,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           startTime: now
       };
       await AsyncStorage.setItem('active_focus_session', JSON.stringify(sessionData));
-
-      // Notifications
       await scheduleNotifications(d * 60);
 
       setDurationMinutes(d);
@@ -315,8 +311,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       setIsActive(false);
       setEndTimeTimestamp(null);
       await AsyncStorage.removeItem('active_focus_session');
-      
-      // Audio et Haptique
       playSuccessSound();
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -352,7 +346,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           Alert.alert("Erreur", "Remplissez le titre et la durée.");
           return;
       }
-      
       const duration = parseInt(manualDuration);
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -366,7 +359,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           } catch(e) {
               completedAt = new Date();
           }
-          
           const startedAt = new Date(completedAt.getTime() - duration * 60000);
 
           const { error } = await supabase.from('focus_sessions').insert({
@@ -404,73 +396,83 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
 
   const renderConfig = () => (
     <ScrollView contentContainerStyle={styles.configScroll} showsVerticalScrollIndicator={false}>
+        
+        {/* TIMER PREVIEW */}
+        <View style={styles.timerPreview}>
+            <Text style={[styles.previewTime, {color: colors.text}]}>
+                {customDuration ? customDuration.padStart(2,'0') : durationMinutes.toString().padStart(2,'0')}:00
+            </Text>
+            <Text style={{color: colors.subText, fontSize: 13, textTransform: 'uppercase', letterSpacing: 2}}>Prêt à commencer</Text>
+        </View>
+
+        {/* TASK INPUT */}
         <View style={styles.section}>
-            <Text style={[styles.label, {color: colors.subText}]}>QU'ALLEZ-VOUS ACCOMPLIR ?</Text>
             <TextInput 
                 style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} 
-                placeholder="Ex: Lecture approfondie, Code..." 
+                placeholder="Sur quoi travaillez-vous ?" 
                 placeholderTextColor={colors.subText}
                 value={sessionTitle}
                 onChangeText={setSessionTitle}
             />
+            {tasks.filter(t => !t.completed).length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskSelector}>
+                    {tasks.filter(t => !t.completed).slice(0,5).map(task => (
+                        <TouchableOpacity 
+                            key={task.id} 
+                            style={[
+                                styles.taskChip, 
+                                { backgroundColor: selectedTaskId === task.id ? colors.accent : colors.card, borderColor: colors.border }
+                            ]}
+                            onPress={() => selectTask(task)}
+                        >
+                            <Text style={[styles.taskChipText, { color: selectedTaskId === task.id ? '#FFF' : colors.text }]}>
+                                {task.title.length > 20 ? task.title.substring(0,20)+'...' : task.title}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            )}
         </View>
 
+        {/* DURATION PILLS */}
         <View style={styles.section}>
-             <Text style={[styles.label, {color: colors.subText}]}>LIER À UNE TÂCHE (OPTIONNEL)</Text>
-             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskSelector}>
-                 {tasks.filter(t => !t.completed).length === 0 && <Text style={{color: colors.subText}}>Aucune tâche disponible.</Text>}
-                 {tasks.filter(t => !t.completed).map(task => (
-                     <TouchableOpacity 
-                        key={task.id} 
-                        style={[
-                            styles.taskChip, 
-                            { backgroundColor: selectedTaskId === task.id ? colors.accent : colors.card, borderColor: colors.border }
-                        ]}
-                        onPress={() => selectTask(task)}
-                     >
-                         <Text style={[styles.taskChipText, { color: selectedTaskId === task.id ? '#FFF' : colors.text }]}>
-                             {task.title.length > 20 ? task.title.substring(0,20)+'...' : task.title}
-                         </Text>
-                     </TouchableOpacity>
-                 ))}
-             </ScrollView>
-        </View>
-
-        <View style={styles.section}>
-            <Text style={[styles.label, {color: colors.subText}]}>DURÉE (MINUTES)</Text>
             <View style={styles.presetsRow}>
-                {[15, 25, 45, 60].map(m => (
+                {[15, 25, 45, 60, 90].map(m => (
                     <TouchableOpacity 
                         key={m} 
                         onPress={() => { setDurationMinutes(m); setCustomDuration(''); }} 
                         style={[
                             styles.presetBtn, 
-                            { backgroundColor: colors.card, borderColor: colors.border }, 
-                            durationMinutes === m && !customDuration && { backgroundColor: colors.accent, borderColor: colors.accent }
+                            { backgroundColor: colors.card }, 
+                            durationMinutes === m && !customDuration && { backgroundColor: colors.text }
                         ]}
                     >
-                        <Text style={[styles.presetText, { color: durationMinutes === m && !customDuration ? '#FFF' : colors.text }]}>{m}</Text>
+                        <Text style={[
+                            styles.presetText, 
+                            { color: durationMinutes === m && !customDuration ? (isDarkMode ? '#000' : '#FFF') : colors.text }
+                        ]}>
+                            {m}
+                        </Text>
                     </TouchableOpacity>
                 ))}
             </View>
-            <TextInput 
-                style={[styles.input, { marginTop: 10, backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-                placeholder="Durée personnalisée (ex: 90)"
-                placeholderTextColor={colors.subText}
-                keyboardType="numeric"
-                value={customDuration}
-                onChangeText={(t) => { setCustomDuration(t); if(parseInt(t)) setDurationMinutes(parseInt(t)); }}
-            />
         </View>
 
-        <TouchableOpacity style={[styles.startBtn, {backgroundColor: colors.accent}]} onPress={startSession}>
-            <Play size={24} color="#FFF" fill="#FFF" />
-            <Text style={styles.startBtnText}>Démarrer le Focus</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => changeView('MANUAL')} style={styles.manualLink}>
-            <Text style={{color: colors.subText, textDecorationLine: 'underline'}}>Ajouter une session passée manuellement</Text>
-        </TouchableOpacity>
+        {/* ACTION BUTTONS */}
+        <View style={styles.footerActions}>
+            <TouchableOpacity style={styles.playButton} onPress={startSession}>
+                <Play size={32} color="#FFF" fill="#FFF" style={{marginLeft: 4}} />
+            </TouchableOpacity>
+            
+            <View style={styles.secondaryActions}>
+                <TouchableOpacity onPress={() => changeView('MANUAL')} style={[styles.secBtn, {backgroundColor: colors.card}]}>
+                    <Plus size={20} color={colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => changeView('HISTORY')} style={[styles.secBtn, {backgroundColor: colors.card}]}>
+                    <List size={20} color={colors.text} />
+                </TouchableOpacity>
+            </View>
+        </View>
     </ScrollView>
   );
 
@@ -478,7 +480,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
     <View style={styles.content}>
         <Animated.View style={[styles.timerContainer, animatedCircleStyle]}>
             <AnimatedSvg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
-                <Circle cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS} stroke={colors.border} strokeWidth={STROKE_WIDTH} fill="transparent" />
+                <Circle cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS} stroke={isDarkMode ? "#222" : "#EEE"} strokeWidth={STROKE_WIDTH} fill="transparent" />
                 <Circle
                     cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS}
                     stroke={colors.accent} strokeWidth={STROKE_WIDTH} fill="transparent"
@@ -492,21 +494,18 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                 <Text style={[styles.timeText, { color: colors.text }]}>{formatTime(timeLeft)}</Text>
                 <Text style={[styles.statusText, { color: colors.subText }]}>{sessionTitle || 'Concentration'}</Text>
                 {endTimeTimestamp && (
-                    <Text style={{color: colors.subText, fontSize: 12, marginTop: 4}}>
-                        Fin: {new Date(endTimeTimestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    <Text style={{color: colors.subText, fontSize: 12, marginTop: 8, opacity: 0.7}}>
+                        Fin à {new Date(endTimeTimestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </Text>
                 )}
             </View>
         </Animated.View>
 
-        <View style={styles.controls}>
-            <TouchableOpacity onPress={stopSession} style={styles.controlBtnSecondary}>
-                <X size={24} color="#FFF" />
-            </TouchableOpacity>
-            {/* Pause button removed because persisting paused state adds complexity, kept simple for MVP */}
-            <View style={{width: 20}} />
-        </View>
-        <Text style={{color: colors.subText, marginTop: 20, fontSize: 12}}>L'app peut être mise en arrière-plan.</Text>
+        <TouchableOpacity onPress={stopSession} style={styles.stopButton}>
+            <X size={28} color="#FFF" />
+        </TouchableOpacity>
+        
+        <Text style={{color: colors.subText, marginTop: 40, fontSize: 12, opacity: 0.5}}>Restez concentré.</Text>
     </View>
   );
 
@@ -514,7 +513,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       <ScrollView contentContainerStyle={styles.configScroll}>
           <Text style={[styles.title, {color: colors.text}]}>Ajout Manuel</Text>
           
-          <Text style={[styles.label, {color: colors.subText}]}>TITRE</Text>
+          <Text style={[styles.label, {color: colors.subText}]}>QUOI ?</Text>
           <TextInput 
               style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
               value={manualTitle}
@@ -523,7 +522,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               placeholderTextColor={colors.subText}
           />
 
-          <Text style={[styles.label, {color: colors.subText}]}>DURÉE (MIN)</Text>
+          <Text style={[styles.label, {color: colors.subText}]}>COMBIEN DE TEMPS (MIN) ?</Text>
           <TextInput 
               style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
               value={manualDuration}
@@ -531,93 +530,61 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               keyboardType="numeric"
           />
 
-          <Text style={[styles.label, {color: colors.subText}]}>DATE (YYYY-MM-DDTHH:MM:SS)</Text>
-          <TextInput 
-              style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
-              value={manualDate}
-              onChangeText={setManualDate}
-              placeholder="Ex: 2024-03-20T14:00:00"
-              placeholderTextColor={colors.subText}
-          />
-
-          <TouchableOpacity style={[styles.startBtn, {backgroundColor: colors.accent}]} onPress={saveManualSession}>
-              <Save size={20} color="#FFF" />
-              <Text style={styles.startBtnText}>Enregistrer</Text>
+          <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={saveManualSession}>
+              <Text style={styles.startBtnText}>Enregistrer la session</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity onPress={() => changeView('CONFIG')} style={styles.manualLink}>
-            <Text style={{color: colors.accent}}>Retour</Text>
+          <TouchableOpacity onPress={() => changeView('CONFIG')} style={styles.backLink}>
+            <Text style={{color: colors.subText}}>Annuler</Text>
           </TouchableOpacity>
       </ScrollView>
   );
 
   const renderHistory = () => (
       <View style={styles.historyContainer}>
-          <View style={[styles.statsCard, {backgroundColor: colors.card, borderColor: colors.border}]}>
-              <View style={{alignItems: 'center'}}>
-                  <Text style={[styles.statValue, {color: colors.text}]}>{history.length}</Text>
-                  <Text style={[styles.statLabel, {color: colors.subText}]}>Sessions</Text>
-              </View>
-              <View style={[styles.divider, {backgroundColor: colors.border}]} />
-              <View style={{alignItems: 'center'}}>
-                  <Text style={[styles.statValue, {color: colors.text}]}>{Math.floor(totalTime)}m</Text>
-                  <Text style={[styles.statLabel, {color: colors.subText}]}>Total Focus</Text>
-              </View>
+          <View style={styles.historyHeaderRow}>
+              <Text style={[styles.historyTitle, {color: colors.text}]}>Dernières Sessions</Text>
+              <Text style={{color: colors.accent, fontWeight: '700'}}>{Math.floor(totalTime/60)}h {Math.floor(totalTime%60)}m</Text>
           </View>
-
-          <Text style={[styles.historyTitle, {color: colors.text}]}>Historique Récent</Text>
+          
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 40}}>
-              {history.length === 0 && <Text style={{color: colors.subText, textAlign: 'center', marginTop: 20}}>Aucune session récente.</Text>}
-              {history.map(session => {
-                  let dateStr = 'Date inconnue';
-                  let timeStr = '';
-                  
-                  if (session.completed_at) {
-                      const d = new Date(session.completed_at);
-                      // Affichage complet de la date et heure réelle
-                      dateStr = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
-                      timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                  }
-                  
-                  return (
-                      <View key={session.id} style={[styles.historyItem, { backgroundColor: colors.card }]}>
-                          <View style={{flex: 1}}>
-                              <Text style={[styles.hTitle, {color: colors.text}]}>{session.title || 'Session Focus'}</Text>
-                              <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
-                                <Calendar size={12} color={colors.subText} />
-                                <Text style={[styles.hDate, {color: colors.subText}]}>{dateStr} à {timeStr}</Text>
-                              </View>
-                          </View>
-                          <View style={[styles.hDurationBadge, {backgroundColor: colors.border}]}>
-                              <Text style={[styles.hDuration, {color: colors.text}]}>{session.duration} min</Text>
-                          </View>
+              {history.length === 0 && <Text style={{color: colors.subText, textAlign: 'center', marginTop: 40}}>Aucune session récente.</Text>}
+              {history.map((session, index) => (
+                  <View key={index} style={[styles.historyRow, { borderBottomColor: colors.border }]}>
+                      <View style={[styles.historyIcon, {backgroundColor: colors.card}]}>
+                          <CheckCircle2 size={16} color={colors.accent} />
                       </View>
-                  );
-              })}
+                      <View style={{flex: 1}}>
+                          <Text style={[styles.hTitle, {color: colors.text}]}>{session.title || 'Focus'}</Text>
+                          <Text style={[styles.hDate, {color: colors.subText}]}>
+                              {session.completed_at ? new Date(session.completed_at).toLocaleDateString() : '-'}
+                          </Text>
+                      </View>
+                      <Text style={[styles.hDuration, {color: colors.text}]}>{session.duration} min</Text>
+                  </View>
+              ))}
           </ScrollView>
+          <TouchableOpacity onPress={() => changeView('CONFIG')} style={styles.closeHistoryBtn}>
+              <X size={24} color={colors.text} />
+          </TouchableOpacity>
       </View>
   );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+        
+        {/* Custom Header */}
         <View style={styles.header}>
-            <View style={styles.headerTitleContainer}>
-                <Text style={[styles.headerTitle, {color: colors.text}]}>Mode Focus</Text>
-            </View>
-
-             <View style={[styles.modeTabs, {backgroundColor: isDarkMode ? '#1C1C1E' : '#E5E5EA'}]}>
-                 <TouchableOpacity onPress={() => changeView('CONFIG')} style={[styles.tab, (viewMode === 'CONFIG' || viewMode === 'MANUAL') && {backgroundColor: colors.card}]}>
-                     <Timer size={16} color={(viewMode === 'CONFIG' || viewMode === 'MANUAL') ? colors.text : colors.subText} />
-                 </TouchableOpacity>
-                 <TouchableOpacity onPress={() => changeView('HISTORY')} style={[styles.tab, viewMode === 'HISTORY' && {backgroundColor: colors.card}]}>
-                     <List size={16} color={viewMode === 'HISTORY' ? colors.text : colors.subText} />
-                 </TouchableOpacity>
-             </View>
+            <TouchableOpacity onPress={onExit} style={styles.closeBtn}>
+                <X size={24} color={colors.subText} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, {color: colors.text}]}>
+                {viewMode === 'RUNNING' ? 'FOCUS MODE' : 'TIMER'}
+            </Text>
+            <TouchableOpacity onPress={() => changeView(viewMode === 'HISTORY' ? 'CONFIG' : 'HISTORY')}>
+                <MoreHorizontal size={24} color={colors.subText} />
+            </TouchableOpacity>
         </View>
-
-        <TouchableOpacity onPress={onExit} style={styles.backButton}>
-            <Text style={{color: colors.subText, fontSize: 14}}>Fermer</Text>
-        </TouchableOpacity>
 
         {viewMode === 'CONFIG' && renderConfig()}
         {viewMode === 'RUNNING' && renderRunning()}
@@ -636,48 +603,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    marginBottom: 0,
-    height: 60,
-  },
-  backButton: {
-      position: 'absolute',
-      top: 20, 
-      left: 20,
-      zIndex: 10
-  },
-  headerTitleContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      paddingLeft: 40, // Offset back button
+    paddingVertical: 10,
+    marginBottom: 10,
   },
   headerTitle: {
-      fontSize: 20,
+      fontSize: 12,
       fontWeight: '700',
-      textAlign: 'left',
+      letterSpacing: 2,
   },
-  modeTabs: {
-      flexDirection: 'row',
-      borderRadius: 12,
+  closeBtn: {
       padding: 4,
-      zIndex: 50,
-  },
-  tab: {
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      borderRadius: 8,
-  },
-  title: {
-      fontSize: 28,
-      fontWeight: '700',
-      marginBottom: 30,
   },
   configScroll: {
       paddingHorizontal: 20,
-      paddingBottom: 150,
+      paddingBottom: 50,
+  },
+  timerPreview: {
+      alignItems: 'center',
+      marginVertical: 40,
+  },
+  previewTime: {
+      fontSize: 72,
+      fontWeight: '200',
+      fontVariant: ['tabular-nums'],
+      marginBottom: 10,
   },
   section: {
-      marginBottom: 24,
+      marginBottom: 30,
   },
   label: {
       fontSize: 12,
@@ -686,31 +638,30 @@ const styles = StyleSheet.create({
       letterSpacing: 0.5,
   },
   input: {
-      borderRadius: 12,
-      padding: 16,
-      fontSize: 16,
+      borderRadius: 16,
+      padding: 18,
+      fontSize: 18,
       borderWidth: 1,
   },
   presetsRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      gap: 8,
+      gap: 10,
   },
   presetBtn: {
       flex: 1,
       height: 50,
-      borderRadius: 12,
+      borderRadius: 25,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
   },
   presetText: {
-      fontWeight: '600',
+      fontWeight: '700',
       fontSize: 16,
   },
   taskSelector: {
+      marginTop: 12,
       flexDirection: 'row',
-      paddingVertical: 4,
   },
   taskChip: {
       paddingHorizontal: 16,
@@ -723,29 +674,34 @@ const styles = StyleSheet.create({
       fontWeight: '600',
       fontSize: 13,
   },
-  startBtn: {
-      flexDirection: 'row',
+  footerActions: {
+      alignItems: 'center',
+      marginTop: 20,
+  },
+  playButton: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: '#007AFF',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 18,
-      borderRadius: 16,
-      marginTop: 20,
-      gap: 12,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.30,
-      shadowRadius: 4.65,
-      elevation: 8,
+      shadowColor: "#007AFF",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+      elevation: 10,
+      marginBottom: 30,
   },
-  startBtnText: {
-      color: '#FFF',
-      fontSize: 18,
-      fontWeight: '700',
+  secondaryActions: {
+      flexDirection: 'row',
+      gap: 20,
   },
-  manualLink: {
+  secBtn: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
       alignItems: 'center',
-      marginTop: 20,
-      padding: 10,
+      justifyContent: 'center',
   },
   
   // Running Mode
@@ -767,10 +723,10 @@ const styles = StyleSheet.create({
   },
   timerTextContainer: {
     alignItems: 'center',
-    position: 'absolute', // Make text absolute to stay centered regardless of scale
+    position: 'absolute',
   },
   timeText: {
-    fontSize: 60,
+    fontSize: 64,
     fontWeight: '200',
     fontVariant: ['tabular-nums'],
   },
@@ -778,27 +734,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginTop: 8,
+    opacity: 0.8,
   },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 30,
+  stopButton: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: 'rgba(255, 59, 48, 0.2)', // Semi-transparent red
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#FF3B30',
   },
-  controlBtnSecondary: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FF3B30',
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  // Manual Mode
+  title: {
+      fontSize: 24,
+      fontWeight: '700',
+      marginBottom: 30,
   },
-  playBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+  saveBtn: {
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 20,
+  },
+  startBtnText: {
+      color: '#FFF',
+      fontSize: 17,
+      fontWeight: '700',
+  },
+  backLink: {
+      alignItems: 'center',
+      marginTop: 20,
+      padding: 10,
   },
 
   // History Mode
@@ -806,55 +776,53 @@ const styles = StyleSheet.create({
       flex: 1,
       paddingHorizontal: 20,
   },
-  statsCard: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      alignItems: 'center',
-      padding: 16,
-      borderRadius: 16,
-      borderWidth: 1,
-      marginBottom: 20,
-  },
-  divider: {
-      width: 1,
-      height: 40,
-  },
-  statValue: {
-      fontSize: 20,
-      fontWeight: '700',
-  },
-  statLabel: {
-      fontSize: 12,
-  },
-  historyTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      marginBottom: 16,
-  },
-  historyItem: {
+  historyHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: 16,
-      borderRadius: 16,
-      marginBottom: 10,
+      marginBottom: 20,
+      marginTop: 10,
+  },
+  historyTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+  },
+  historyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+  },
+  historyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
   },
   hTitle: {
       fontSize: 16,
       fontWeight: '600',
-      marginBottom: 4,
+      marginBottom: 2,
   },
   hDate: {
       fontSize: 12,
   },
-  hDurationBadge: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 8,
-  },
   hDuration: {
       fontWeight: '700',
-      fontSize: 14,
+      fontSize: 16,
+  },
+  closeHistoryBtn: {
+      position: 'absolute',
+      bottom: 40,
+      alignSelf: 'center',
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(128,128,128,0.2)',
   },
 });
 

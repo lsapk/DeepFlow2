@@ -121,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   return (
     <Animated.View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
       
-      {/* HEADER */}
+      {/* HEADER - zIndex augmenté pour garantir le clic sur le profil */}
       <View style={styles.header}>
         <View>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
@@ -132,7 +132,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </View>
             <Text style={[styles.greetingTitle, { color: colors.text }]}>{greeting}, {firstName}</Text>
         </View>
-        <TouchableOpacity onPress={openProfile} style={styles.avatarContainer} activeOpacity={0.7}>
+        <TouchableOpacity 
+            onPress={() => {
+                Haptics.selectionAsync();
+                openProfile();
+            }} 
+            style={styles.avatarContainer} 
+            activeOpacity={0.7}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+        >
             <Image 
                 source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
                 style={styles.avatar} 
@@ -181,7 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                                 strokeLinecap="round"
                                 fill="transparent"
                                 rotation="-90"
-                                origin={`${size / 2}, ${size / 2}`}
+                                origin={`${size / 2}, ${size/2}`}
                             />
                          </Svg>
                          <Target size={24} color={isDarkMode ? '#FFF' : '#000'} />
@@ -323,6 +331,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     marginBottom: 10,
+    zIndex: 100, // CRUCIAL : Assure que le header est au-dessus du reste
+    elevation: 10,
   },
   greetingSub: {
       fontSize: 11,
@@ -338,6 +348,7 @@ const styles = StyleSheet.create({
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.2,
       shadowRadius: 5,
+      // Pas de overflow: hidden ici sinon l'ombre est coupée
   },
   avatar: {
     width: 44,

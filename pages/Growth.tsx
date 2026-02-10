@@ -70,36 +70,57 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [isCreationMode, setIsCreationMode] = useState(false);
   
   // Real Analysis Data
-  const [lifeWheelData, setLifeWheelData] = useState<number[]>([20, 20, 20, 20, 20, 20]); // Default flat
+  const [lifeWheelData, setLifeWheelData] = useState<number[]>([20, 20, 20, 20, 20, 20]);
   const [focusHistory, setFocusHistory] = useState<any[]>([]);
+  const [habitCompletions, setHabitCompletions] = useState<any[]>([]);
   const [isAnalyzingWheel, setIsAnalyzingWheel] = useState(false);
 
-  // --- FETCH REAL DATA ---
+  // --- FETCH DEEP REAL DATA ---
   useEffect(() => {
-      const fetchFocusData = async () => {
-          const { data } = await supabase.from('focus_sessions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-          if (data) setFocusHistory(data);
-          setLoading(false);
-      };
-      
-      // Calculate initial wheel based on goals categories if possible
-      const calculateInitialWheel = () => {
-          // Simple heuristic based on active goals categories if available
-          // For now, default flat is fine, user triggers AI for deep analysis
+      const fetchDeepData = async () => {
+          setLoading(true);
+          try {
+              // 1. Fetch Focus Sessions (Last 30 days)
+              const thirtyDaysAgo = new Date();
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              
+              const { data: focusData } = await supabase
+                  .from('focus_sessions')
+                  .select('*')
+                  .eq('user_id', user.id)
+                  .gte('created_at', thirtyDaysAgo.toISOString())
+                  .order('created_at', { ascending: false });
+              
+              if (focusData) setFocusHistory(focusData);
+
+              // 2. Fetch Habit Completions (Last 30 days) for heatmap
+              const { data: habitComp } = await supabase
+                  .from('habit_completions')
+                  .select('*')
+                  .eq('user_id', user.id)
+                  .gte('completed_date', thirtyDaysAgo.toISOString().split('T')[0]);
+              
+              if (habitComp) setHabitCompletions(habitComp);
+
+          } catch (e) {
+              console.log("Error fetching deep data", e);
+          } finally {
+              setLoading(false);
+          }
       };
 
-      fetchFocusData();
+      fetchDeepData();
       
       if (messages.length === 0) {
-          setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. Je peux analyser tes données ou t'aider à t'organiser.\n\n* Pose-moi une question sur ta productivité.\n* Demande-moi d'ajouter une tâche ou un objectif.` }]);
+          setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. Je peux analyser tes données réelles ou t'aider à t'organiser.\n\n* Pose-moi une question sur ta chronobiologie.\n* Demande-moi d'ajouter un objectif.` }]);
       }
   }, []);
 
   // --- COMPUTED STATS (REAL) ---
   const stats = useMemo(() => {
       const totalTasks = tasks.length || 1;
-      const completedTasks = tasks.filter(t => t.completed).length;
-      const taskRate = Math.round((completedTasks / totalTasks) * 100);
+      const completedTasks = tasks.filter(t => t.completed);
+      const taskRate = Math.round((completedTasks.length / totalTasks) * 100);
       
       const activeHabits = habits.filter(h => !h.is_archived);
       const avgStreak = activeHabits.length > 0 
@@ -109,27 +130,58 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       // Score global calculated from REAL performance
       const productivityScore = Math.min(100, Math.round((taskRate * 0.4) + (Math.min(avgStreak, 30) * 1.5) + (player.level * 1.5)));
 
-      // Weekly Activity based on Focus Sessions count per day of week (REAL DATA)
+      // 1. Real Activity Chart (Focus minutes + Tasks completed)
       const weeklyActivity = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
+      
+      // Add Focus Minutes
       focusHistory.forEach(session => {
           const d = new Date(session.created_at);
           const day = d.getDay(); // 0 is Sunday
-          const adjustedDay = day === 0 ? 6 : day - 1; // 0 is Monday
-          weeklyActivity[adjustedDay] += session.duration || 25;
+          const adjustedDay = day === 0 ? 6 : day - 1; 
+          weeklyActivity[adjustedDay] += (session.duration || 0);
+      });
+      // Add Tasks Bonus (arbitrary 15 min per task)
+      completedTasks.forEach(task => {
+          const d = new Date(task.created_at); // Fallback to created if completed_at missing
+          const day = d.getDay();
+          const adjustedDay = day === 0 ? 6 : day - 1;
+          weeklyActivity[adjustedDay] += 15;
       });
       
-      // Normalize weekly activity for bar chart height (max 100)
       const maxActivity = Math.max(...weeklyActivity, 1);
       const normalizedWeekly = weeklyActivity.map(v => (v / maxActivity) * 100);
 
-      return { productivityScore, taskRate, avgStreak, weeklyActivity: normalizedWeekly, completedTasks };
-  }, [tasks, habits, player.level, focusHistory]);
+      // 2. Real Consistency Heatmap (Last 30 days)
+      const consistencyMap: Record<string, number> = {};
+      const addToMap = (dateStr: string) => {
+          if (!dateStr) return;
+          const k = dateStr.split('T')[0];
+          consistencyMap[k] = (consistencyMap[k] || 0) + 1;
+      };
+
+      focusHistory.forEach(s => addToMap(s.created_at));
+      habitCompletions.forEach(h => addToMap(h.completed_date));
+      // Assume completed tasks were done recently (simplified as DB might not have completed_at on old schema)
+      // If task has explicit date we use it
+      completedTasks.forEach(t => addToMap(t.created_at));
+
+      return { productivityScore, taskRate, avgStreak, weeklyActivity: normalizedWeekly, completedTasksCount: completedTasks.length, consistencyMap };
+  }, [tasks, habits, player.level, focusHistory, habitCompletions]);
 
   const refreshWheelAnalysis = async () => {
       setIsAnalyzingWheel(true);
       playMenuClick();
-      // Use real data context
-      const scores = await generateLifeWheelAnalysis({ tasks: tasks.slice(0, 20), habits, goals, recentFocus: focusHistory.slice(0, 10) });
+      
+      // Build Full Context
+      const deepContext = {
+          tasks: tasks.slice(0, 30),
+          habits,
+          goals,
+          recentFocus: focusHistory.slice(0, 20),
+          journalCount: 5 // Placeholder count if journal unavailable in props
+      };
+
+      const scores = await generateLifeWheelAnalysis(deepContext);
       if (scores) {
           setLifeWheelData(scores);
           playSuccess();
@@ -305,7 +357,13 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       
       // Create path based on buckets
       const step = w / 3;
-      const path = `M 0 ${h - (buckets[0]/maxBucket)*h} L ${step} ${h - (buckets[1]/maxBucket)*h} L ${step*2} ${h - (buckets[2]/maxBucket)*h} L ${w} ${h - (buckets[3]/maxBucket)*h}`;
+      // Using Bezier approximation for smoother curve or straight lines
+      const p0 = {x: 0, y: h - (buckets[0]/maxBucket)*h};
+      const p1 = {x: step, y: h - (buckets[1]/maxBucket)*h};
+      const p2 = {x: step*2, y: h - (buckets[2]/maxBucket)*h};
+      const p3 = {x: w, y: h - (buckets[3]/maxBucket)*h};
+
+      const path = `M ${p0.x} ${p0.y} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} L ${p3.x} ${p3.y}`;
 
       return (
           <View style={{marginTop: 10}}>
@@ -325,6 +383,37 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                   <Text style={{color: colors.subText, fontSize: 10}}>Soir</Text>
                   <Text style={{color: colors.subText, fontSize: 10}}>Nuit</Text>
               </View>
+          </View>
+      );
+  };
+
+  const renderConsistency = () => {
+      // 30 days grid
+      const grid = Array.from({length: 30}).map((_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (29 - i));
+          const key = d.toISOString().split('T')[0];
+          const count = stats.consistencyMap[key] || 0;
+          return { date: d, count };
+      });
+
+      return (
+          <View style={styles.heatmapGrid}>
+              {grid.map((day, i) => {
+                  const intensity = Math.min(1, day.count / 5); // 5 actions = max intensity
+                  return (
+                      <View 
+                          key={i} 
+                          style={[
+                              styles.heatmapCell, 
+                              { 
+                                  backgroundColor: intensity > 0 ? colors.orange : (isDarkMode ? '#333' : '#E5E5EA'), 
+                                  opacity: intensity > 0 ? 0.3 + (intensity * 0.7) : 1 
+                              }
+                          ]} 
+                      />
+                  );
+              })}
           </View>
       );
   };
@@ -380,7 +469,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             {renderProductivityRing()}
                             <View style={styles.kpiRow}>
                                 <View style={styles.kpiItem}>
-                                    <Text style={[styles.kpiValue, {color: colors.primary}]}>{stats.completedTasks}</Text>
+                                    <Text style={[styles.kpiValue, {color: colors.primary}]}>{stats.completedTasksCount}</Text>
                                     <Text style={[styles.kpiLabel, {color: colors.subText}]}>Tâches</Text>
                                 </View>
                                 <View style={[styles.kpiSeparator, {backgroundColor: colors.border}]} />
@@ -413,7 +502,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                         </View>
                         {renderSpiderChart()}
                         <Text style={[styles.analysisText, {color: colors.subText}]}>
-                            Cette analyse est générée par IA basée sur vos tâches et habitudes. Rafraîchissez pour une nouvelle analyse.
+                            Cette analyse est générée par IA en lisant vos tâches, habitudes, et focus. Rafraîchissez pour recalculer.
                         </Text>
                     </View>
                 )}
@@ -427,31 +516,16 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             </View>
                             {renderChronobiology()}
                             <Text style={[styles.analysisText, {color: colors.subText, marginTop: 15}]}>
-                                Basé sur vos horaires de sessions Focus passées.
+                                Basé sur vos horaires réels de sessions Focus.
                             </Text>
                         </View>
 
                         <View style={[styles.card, {backgroundColor: colors.card}]}>
                             <View style={styles.cardHeader}>
-                                <Text style={[styles.cardTitle, {color: colors.text}]}>Consistance</Text>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Consistance (30 jours)</Text>
                                 <Target size={18} color={colors.orange} />
                             </View>
-                            <View style={styles.heatmapGrid}>
-                                {Array.from({length: 30}).map((_, i) => {
-                                    // Simulated heatmap based on if we have ANY focus session that day index relative to now
-                                    // For now just random visualization of consistency as placeholder for advanced sql
-                                    const active = Math.random() > 0.4;
-                                    return (
-                                        <View 
-                                            key={i} 
-                                            style={[
-                                                styles.heatmapCell, 
-                                                { backgroundColor: active ? colors.orange : (isDarkMode ? '#333' : '#E5E5EA'), opacity: active ? Math.random() * 0.5 + 0.5 : 1 }
-                                            ]} 
-                                        />
-                                    )
-                                })}
-                            </View>
+                            {renderConsistency()}
                         </View>
                     </>
                 )}
