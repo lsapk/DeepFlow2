@@ -1,14 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, LayoutAnimation } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, LayoutAnimation, Keyboard } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, Goal } from '../types';
-import { Send, MessageSquare, PlusCircle, Sparkles } from 'lucide-react-native';
-import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
+import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit } from 'lucide-react-native';
+import { generateActionableCoaching } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../services/supabase';
 import { playMenuClick, playSuccess } from '../services/sound';
 import SkeletonAnalysis from '../components/SkeletonAnalysis';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Markdown from 'react-native-markdown-display';
 
 interface GrowthProps {
   player: PlayerProfile;
@@ -28,6 +27,7 @@ interface GrowthProps {
 
 const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false }) => {
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
   
   const colors = {
       bg: isDarkMode ? '#000' : '#F2F2F7',
@@ -39,7 +39,20 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       accent: '#C4B5FD',
       button: '#007AFF',
       createMode: '#10B981', // Vert pour création
-      chatMode: '#3B82F6'    // Bleu pour chat
+      chatMode: '#3B82F6',    // Bleu pour chat
+      userBubble: '#007AFF',
+      aiBubble: isDarkMode ? '#2C2C2E' : '#E5E5EA'
+  };
+
+  // Styles Markdown dynamiques selon le thème
+  const markdownStyles = {
+      body: { color: colors.text, fontSize: 15, lineHeight: 22 },
+      heading1: { color: colors.accent, fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
+      heading2: { color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 10, marginBottom: 5 },
+      strong: { color: colors.accent, fontWeight: 'bold' },
+      list_item_bullet: { color: colors.text, fontSize: 15 },
+      paragraph: { marginBottom: 10 },
+      code_inline: { backgroundColor: isDarkMode ? '#333' : '#ddd', borderRadius: 4, paddingHorizontal: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   };
 
   const [loading, setLoading] = useState(true);
@@ -48,29 +61,18 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
-  
-  // Analytics
-  const [radarData, setRadarData] = useState([20,20,20,20,20,20]);
 
   useEffect(() => {
-      const initData = async () => {
-          checkAndRunAIAnalysis();
-          setLoading(false);
-      };
-      initData();
+      // Simulation chargement initial
+      setTimeout(() => setLoading(false), 500);
       
       const timer = setTimeout(() => {
           if (messages.length === 0) {
-              setMessages([{ role: 'ai', text: `Bonjour **${user.display_name?.split(' ')[0]}** ! 👋\n\nJe suis prêt. Activez le mode **Création** pour que j'agisse directement sur ton agenda, ou reste en mode Discussion pour du coaching.` }]);
+              setMessages([{ role: 'ai', text: `### Salut ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. \n\n🔹 Utilise le mode **Discussion** pour des conseils.\n🔹 Utilise le mode **Création** pour ajouter des tâches ou habitudes.\n\n*Comment puis-je t'aider aujourd'hui ?*` }]);
           }
-      }, 1000);
+      }, 800);
       return () => clearTimeout(timer);
   }, []);
-
-  const checkAndRunAIAnalysis = async () => {
-      // (Logique d'analyse inchangée pour économiser l'espace, focus sur le chat)
-      setRadarData([60, 40, 70, 50, 80, 30]); // Placeholder visuel
-  };
 
   const switchTab = (tab: any) => {
       playMenuClick();
@@ -86,11 +88,15 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
       setLoadingAi(true);
       
+      // Scroll to bottom
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+      
       try {
           const context: any = {};
           if (!isCreationMode) {
-             context.user = { name: user.display_name };
-             context.tasks = tasks.slice(0, 5).map(t => t.title);
+             context.user = { name: user.display_name, level: player.level };
+             context.tasks = tasks.slice(0, 5).map(t => ({ title: t.title, priority: t.priority }));
+             context.habits = habits.map(h => ({ title: h.title, streak: h.streak }));
           }
 
           const response = await generateActionableCoaching(userMsg, context, isCreationMode);
@@ -102,9 +108,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
               playSuccess();
           }
       } catch (e) {
-          setMessages(prev => [...prev, { role: 'ai', text: "Erreur de connexion au cerveau." }]);
+          setMessages(prev => [...prev, { role: 'ai', text: "🚫 *Erreur de connexion au cerveau.*" }]);
       } finally {
           setLoadingAi(false);
+          setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
       }
   };
 
@@ -115,14 +122,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       if (action === 'CREATE_HABIT') label = `Créer l'habitude : "${data.title}"`;
       if (action === 'CREATE_GOAL') label = `Créer l'objectif : "${data.title}"`;
 
-      Alert.alert("Action IA Détectée", label, [
+      Alert.alert("Action IA Détectée ⚡", label, [
           { text: "Annuler", style: "cancel" },
           { text: "Confirmer", onPress: () => {
               if (action === 'CREATE_TASK') onAddTask(data.title, data.priority || 'medium');
               if (action === 'CREATE_HABIT') onAddHabit(data.title);
               if (action === 'CREATE_GOAL') onAddGoal(data.title);
               
-              setMessages(prev => [...prev, { role: 'ai', text: `✅ C'est fait ! J'ai créé "${data.title}".` }]);
+              setMessages(prev => [...prev, { role: 'ai', text: `✅ C'est fait ! J'ai créé **"${data.title}"**.` }]);
               playSuccess();
           }}
       ]);
@@ -132,26 +139,32 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   return (
     <KeyboardAvoidingView 
-        style={{flex: 1}} 
+        style={{flex: 1, backgroundColor: colors.bg}} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Ajusté pour éviter que la BottomNav cache l'input
     >
-        <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top, backgroundColor: colors.bg }]}>
+        <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top }]}>
         
-        {/* TAB HEADER */}
-        <View style={[styles.tabBar, {borderColor: colors.border}]}>
-            <TouchableOpacity onPress={() => switchTab('AI_COACH')} style={[styles.tabItem, activeTab === 'AI_COACH' && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
-                <Text style={[styles.tabText, activeTab === 'AI_COACH' && {color: colors.text}]}>CHAI IA</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => switchTab('ANALYTICS')} style={[styles.tabItem, activeTab === 'ANALYTICS' && {borderBottomColor: colors.accent, borderBottomWidth: 2}]}>
-                <Text style={[styles.tabText, activeTab === 'ANALYTICS' && {color: colors.text}]}>ANALYSES</Text>
-            </TouchableOpacity>
+        {/* HEADER */}
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+            <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                <BrainCircuit size={28} color={colors.accent} />
+                <Text style={[styles.headerTitle, {color: colors.text}]}>Assistant IA</Text>
+            </View>
+            <View style={styles.tabContainer}>
+                <TouchableOpacity onPress={() => switchTab('AI_COACH')} style={[styles.tabItem, activeTab === 'AI_COACH' && {backgroundColor: colors.card}]}>
+                    <Text style={[styles.tabText, {color: activeTab === 'AI_COACH' ? colors.text : colors.subText}]}>Chat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => switchTab('ANALYTICS')} style={[styles.tabItem, activeTab === 'ANALYTICS' && {backgroundColor: colors.card}]}>
+                    <Text style={[styles.tabText, {color: activeTab === 'ANALYTICS' ? colors.text : colors.subText}]}>Data</Text>
+                </TouchableOpacity>
+            </View>
         </View>
 
         {activeTab === 'ANALYTICS' && (
              <ScrollView contentContainerStyle={styles.scrollContent}>
-                <Text style={{color: colors.subText, textAlign: 'center', marginTop: 40}}>
-                    Analyses détaillées de votre productivité bientôt disponibles.
+                <Text style={{color: colors.subText, textAlign: 'center', marginTop: 100}}>
+                    📊 Analyses détaillées bientôt disponibles.
                 </Text>
              </ScrollView>
         )}
@@ -159,42 +172,54 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         {activeTab === 'AI_COACH' && (
             <>
                 <ScrollView 
+                    ref={scrollViewRef}
                     style={styles.chatContainer} 
                     contentContainerStyle={{paddingBottom: 20}}
-                    ref={ref => ref?.scrollToEnd({animated: true})}
+                    keyboardShouldPersistTaps="handled"
                 >
                     {messages.map((m, i) => (
-                        <View key={i} style={[styles.bubble, m.role === 'user' ? [styles.bubbleUser, {backgroundColor: colors.button}] : [styles.bubbleAi, {backgroundColor: colors.card}]]}>
-                            <Text style={{color: m.role === 'user' ? '#FFF' : colors.text, fontSize: 15}}>{m.text}</Text>
+                        <View key={i} style={[
+                            styles.bubble, 
+                            m.role === 'user' 
+                                ? [styles.bubbleUser, {backgroundColor: colors.userBubble}] 
+                                : [styles.bubbleAi, {backgroundColor: colors.aiBubble}]
+                        ]}>
+                            {m.role === 'user' ? (
+                                <Text style={{color: '#FFF', fontSize: 16}}>{m.text}</Text>
+                            ) : (
+                                <Markdown style={markdownStyles as any}>
+                                    {m.text}
+                                </Markdown>
+                            )}
                         </View>
                     ))}
                     {loadingAi && (
                         <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, margin: 20}}>
                             <ActivityIndicator size="small" color={colors.accent} />
-                            <Text style={{color: colors.subText, fontSize: 12}}>DeepFlow réfléchit...</Text>
+                            <Text style={{color: colors.subText, fontSize: 12}}>DeepFlow analyse...</Text>
                         </View>
                     )}
                 </ScrollView>
                 
-                {/* INPUT AREA WITH MODE SWITCH */}
+                {/* INPUT AREA FIXE */}
                 <View style={[styles.inputWrapper, {backgroundColor: colors.card, borderTopColor: colors.border}]}>
                     
-                    {/* MODE SWITCHER - More Visible */}
+                    {/* MODE SWITCHER */}
                     <View style={styles.modeSwitchContainer}>
                         <TouchableOpacity 
                             style={[styles.modePill, !isCreationMode && {backgroundColor: colors.chatMode}]} 
                             onPress={() => setIsCreationMode(false)}
                         >
-                            <MessageSquare size={14} color={!isCreationMode ? "#FFF" : colors.subText} />
-                            <Text style={[styles.modeText, {color: !isCreationMode ? "#FFF" : colors.subText}]}>Discussion</Text>
+                            <MessageSquare size={14} color={!isCreationMode ? "#FFF" : "rgba(255,255,255,0.5)"} />
+                            <Text style={[styles.modeText, {color: "#FFF"}]}>Discussion</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity 
                             style={[styles.modePill, isCreationMode && {backgroundColor: colors.createMode}]} 
                             onPress={() => setIsCreationMode(true)}
                         >
-                            <PlusCircle size={14} color={isCreationMode ? "#FFF" : colors.subText} />
-                            <Text style={[styles.modeText, {color: isCreationMode ? "#FFF" : colors.subText}]}>Création</Text>
+                            <PlusCircle size={14} color={isCreationMode ? "#FFF" : "rgba(255,255,255,0.5)"} />
+                            <Text style={[styles.modeText, {color: "#FFF"}]}>Création</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -203,9 +228,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             style={[styles.input, {backgroundColor: colors.inputBg, color: colors.text, borderColor: isCreationMode ? colors.createMode : 'transparent', borderWidth: isCreationMode ? 1 : 0}]} 
                             value={chatInput} 
                             onChangeText={setChatInput} 
-                            placeholder={isCreationMode ? "Ex: Ajoute une tâche 'Sport'..." : "Posez une question..."}
+                            placeholder={isCreationMode ? "Ex: Ajoute 'Sport' demain..." : "Posez une question..."}
                             placeholderTextColor={colors.subText}
                             multiline
+                            maxHeight={100}
                         />
                         <TouchableOpacity 
                             onPress={sendMessage} 
@@ -226,24 +252,26 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 20 },
-  tabItem: { marginRight: 20, paddingVertical: 14 },
-  tabText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.5, color: '#8E8E93' },
+  header: { paddingHorizontal: 20, paddingBottom: 15, paddingTop: 10, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '800' },
+  tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 10, padding: 3 },
+  tabItem: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
+  tabText: { fontSize: 12, fontWeight: '700' },
   scrollContent: { padding: 20 },
   
-  chatContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
-  bubble: { padding: 14, borderRadius: 18, marginBottom: 12, maxWidth: '85%' },
+  chatContainer: { flex: 1, paddingHorizontal: 16, paddingTop: 20 },
+  bubble: { padding: 14, borderRadius: 18, marginBottom: 12, maxWidth: '88%' },
   bubbleUser: { alignSelf: 'flex-end', borderBottomRightRadius: 2 },
   bubbleAi: { alignSelf: 'flex-start', borderBottomLeftRadius: 2 },
   
-  inputWrapper: { padding: 16, borderTopWidth: 1, gap: 12 },
-  modeSwitchContainer: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 4 },
-  modePill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, gap: 6, backgroundColor: 'rgba(0,0,0,0.05)' },
-  modeText: { fontSize: 12, fontWeight: '600' },
+  inputWrapper: { padding: 16, paddingBottom: 30, borderTopWidth: 1, gap: 12 }, // Padding bottom extra pour la sécurité
+  modeSwitchContainer: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 0 },
+  modePill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, gap: 6, backgroundColor: '#333' },
+  modeText: { fontSize: 12, fontWeight: '700' },
   
   inputRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
-  input: { flex: 1, minHeight: 44, borderRadius: 22, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontSize: 16 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 0 }
+  input: { flex: 1, minHeight: 48, borderRadius: 24, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, fontSize: 16 },
+  sendBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 0 }
 });
 
 export default Growth;
