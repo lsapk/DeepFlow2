@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Modal, Alert, ActivityIndicator, LayoutAnimation, TextInput, Linking, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Alert, ActivityIndicator, LayoutAnimation, TextInput, Platform, BackHandler } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings, AiPermissions } from '../types';
 import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
 
 interface ProfileProps {
   user: UserProfile;
@@ -22,11 +23,6 @@ const DEFAULT_AI_PERMISSIONS: AiPermissions = {
     journal: false,
     focus: true,
     profile: true
-};
-
-const LEGAL_DOCS = {
-    TERMS: `CONDITIONS GÉNÉRALES D'UTILISATION (CGU)...`,
-    PRIVACY: `POLITIQUE DE CONFIDENTIALITÉ...`
 };
 
 const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange }) => {
@@ -48,10 +44,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const [editName, setEditName] = useState(user.display_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
 
-  const [legalModal, setLegalModal] = useState<{visible: boolean, title: string, content: string}>({
-      visible: false, title: '', content: ''
-  });
-
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
@@ -61,6 +53,24 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       goalsAchieved: 0,
       focusMinutes: 0
   });
+
+  // Handle Android Back Button
+  useEffect(() => {
+      const backAction = () => {
+          if (visible) {
+              onClose();
+              return true;
+          }
+          return false;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+          "hardwareBackPress",
+          backAction
+      );
+
+      return () => backHandler.remove();
+  }, [visible]);
 
   useEffect(() => {
       if (visible) {
@@ -148,33 +158,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
           setIsEditing(false);
       }
       setLoading(false);
-  };
-
-  const executeDeleteAccount = async () => {
-        if (deleteConfirmationText !== "SUPPRIMER") {
-            Alert.alert("Erreur", "Vous devez taper 'SUPPRIMER' en majuscules pour confirmer.");
-            return;
-        }
-        setDeleteModalVisible(false);
-        setLoading(true);
-        try {
-            await Promise.all([
-                supabase.from('tasks').delete().eq('user_id', user.id),
-                supabase.from('habits').delete().eq('user_id', user.id),
-                supabase.from('goals').delete().eq('user_id', user.id),
-                supabase.from('journal_entries').delete().eq('user_id', user.id),
-                supabase.from('daily_reflections').delete().eq('user_id', user.id),
-                supabase.from('focus_sessions').delete().eq('user_id', user.id),
-                supabase.from('user_settings').delete().eq('id', user.id),
-                supabase.from('player_profiles').delete().eq('user_id', user.id),
-                supabase.from('user_profiles').delete().eq('id', user.id)
-            ]);
-            logout();
-        } catch (e) {
-            Alert.alert("Erreur", "Une erreur est survenue lors de la suppression.");
-        } finally {
-            setLoading(false);
-        }
   };
 
   const switchTab = (tab: any) => {
@@ -269,50 +252,49 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       </View>
   );
 
+  if (!visible) return null;
+
   return (
-    <>
-        <Modal 
-            visible={visible} 
-            animationType="slide" 
-            transparent={false} // CRUCIAL FIX FOR ANDROID
-            onRequestClose={onClose} 
-        >
-            <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? 20 : insets.top }]}>
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Mon Espace</Text>
-                    <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                        <Text style={styles.closeText}>Fermer</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.tabBar}>
-                    {(['PROFILE', 'SETTINGS', 'STATS'] as const).map(tab => (
-                        <TouchableOpacity 
-                            key={tab} 
-                            style={[styles.tabItem, activeTab === tab && styles.activeTabItem]} 
-                            onPress={() => switchTab(tab)}
-                        >
-                            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                                {tab === 'PROFILE' ? 'Profil' : tab === 'SETTINGS' ? 'Réglages' : 'Stats'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#FFF" />
-                    </View>
-                ) : (
-                    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                        {activeTab === 'PROFILE' && renderProfileTab()}
-                        {activeTab === 'SETTINGS' && renderSettingsTab()}
-                        {activeTab === 'STATS' && renderStatsTab()}
-                    </ScrollView>
-                )}
+    <Animated.View 
+        entering={SlideInDown.duration(300)}
+        exiting={SlideOutDown.duration(300)}
+        style={styles.overlay}
+    >
+        <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? 20 : insets.top }]}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Mon Espace</Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                    <Text style={styles.closeText}>Fermer</Text>
+                </TouchableOpacity>
             </View>
-        </Modal>
-    </>
+
+            <View style={styles.tabBar}>
+                {(['PROFILE', 'SETTINGS', 'STATS'] as const).map(tab => (
+                    <TouchableOpacity 
+                        key={tab} 
+                        style={[styles.tabItem, activeTab === tab && styles.activeTabItem]} 
+                        onPress={() => switchTab(tab)}
+                    >
+                        <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                            {tab === 'PROFILE' ? 'Profil' : tab === 'SETTINGS' ? 'Réglages' : 'Stats'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#FFF" />
+                </View>
+            ) : (
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {activeTab === 'PROFILE' && renderProfileTab()}
+                    {activeTab === 'SETTINGS' && renderSettingsTab()}
+                    {activeTab === 'STATS' && renderStatsTab()}
+                </ScrollView>
+            )}
+        </View>
+    </Animated.View>
   );
 };
 
@@ -341,7 +323,20 @@ const StatCard = ({ label, value, icon: Icon, color }: any) => (
 );
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' }, // Noir par défaut pour éviter l'effet "écran sombre"
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    elevation: 9999,
+    backgroundColor: '#000', // Solid black to fix "dark screen" issue
+  },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#000' 
+  }, 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 20, marginTop: 10 },
   headerTitle: { fontSize: 28, fontWeight: '700', color: '#FFF' },
   closeBtn: {},
