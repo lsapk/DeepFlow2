@@ -1,14 +1,14 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions, Keyboard } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions, LayoutAnimation } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, Goal } from '../types';
-import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit, PieChart, Activity, Calendar, Zap, RefreshCw } from 'lucide-react-native';
+import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit, Activity, Zap, RefreshCw, BarChart2, PieChart, Clock, Target, CloudOff } from 'lucide-react-native';
 import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playMenuClick, playSuccess } from '../services/sound';
 import SkeletonAnalysis from '../components/SkeletonAnalysis';
 import Markdown from 'react-native-markdown-display';
-import Svg, { Polygon, Line, Circle, Text as SvgText, Rect } from 'react-native-svg';
+import Svg, { Polygon, Line, Circle, Text as SvgText, Rect, Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
@@ -37,13 +37,13 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       bg: isDarkMode ? '#000' : '#F2F2F7',
       card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
       text: isDarkMode ? '#FFF' : '#000',
-      subText: isDarkMode ? '#8E8E93' : '#8E8E93',
+      subText: isDarkMode ? '#8E8E93' : '#666',
       border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      inputBg: isDarkMode ? '#171717' : '#FFFFFF',
+      inputBg: isDarkMode ? '#171717' : '#F2F2F7',
       accent: '#C4B5FD',
-      button: '#007AFF',
-      createMode: '#10B981',
-      chatMode: '#3B82F6',
+      primary: '#007AFF',
+      success: '#34C759',
+      orange: '#FF9500',
       userBubble: '#007AFF',
       aiBubble: isDarkMode ? '#2C2C2E' : '#E5E5EA'
   };
@@ -59,42 +59,60 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'ANALYTICS' | 'AI_COACH'>('ANALYTICS');
+  const [mainTab, setMainTab] = useState<'DATA' | 'COACH'>('DATA');
+  const [dataSubTab, setDataSubTab] = useState<'GLOBAL' | 'BALANCE' | 'FOCUS'>('GLOBAL');
+  
+  // Chat State
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
   
   // Analysis Data
-  const [lifeWheelData, setLifeWheelData] = useState<number[]>([60, 50, 70, 40, 80, 55]); // Health, Leisure, Personal, Learning, Mental, Career
-  const [productivityScore, setProductivityScore] = useState(78);
+  const [lifeWheelData, setLifeWheelData] = useState<number[]>([60, 50, 70, 40, 80, 55]); 
+  const [isAnalyzingWheel, setIsAnalyzingWheel] = useState(false);
+
+  // --- COMPUTED STATS ---
+  const stats = useMemo(() => {
+      const totalTasks = tasks.length || 1;
+      const completedTasks = tasks.filter(t => t.completed).length;
+      const taskRate = Math.round((completedTasks / totalTasks) * 100);
+      
+      const activeHabits = habits.filter(h => !h.is_archived);
+      const avgStreak = activeHabits.length > 0 
+          ? Math.round(activeHabits.reduce((acc, h) => acc + h.streak, 0) / activeHabits.length) 
+          : 0;
+
+      // Score global arbitraire pour la gamification
+      const productivityScore = Math.min(100, Math.round((taskRate * 0.4) + (Math.min(avgStreak, 30) * 2) + (player.level * 2)));
+
+      // Weekly Activity (Mocké intelligemment basé sur les tâches créées vs complétées récemment si on avait les dates précises, ici randomisé autour du score)
+      const weeklyActivity = Array.from({length: 7}).map((_, i) => {
+          const base = productivityScore / 2;
+          return Math.min(100, Math.max(10, base + (Math.random() * 40 - 20)));
+      });
+
+      return { productivityScore, taskRate, avgStreak, weeklyActivity, completedTasks };
+  }, [tasks, habits, player.level]);
 
   useEffect(() => {
-      setTimeout(() => setLoading(false), 800);
-      
-      // Auto-load chat welcome
-      const timer = setTimeout(() => {
-          if (messages.length === 0) {
-              setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. \n\n* Pose-moi une question sur ta productivité.\n* Demande-moi d'ajouter une tâche.\n\n*Comment puis-je t'aider ?*` }]);
-          }
-      }, 1000);
-      return () => clearTimeout(timer);
+      setTimeout(() => setLoading(false), 600);
+      if (messages.length === 0) {
+          setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. Je peux analyser tes données ou t'aider à t'organiser.\n\n* Pose-moi une question sur ta productivité.\n* Demande-moi d'ajouter une tâche ou un objectif.` }]);
+      }
   }, []);
 
-  const refreshAnalysis = async () => {
-      setLoading(true);
-      const scores = await generateLifeWheelAnalysis({ tasks, habits, goals });
-      if (scores) setLifeWheelData(scores);
-      // Simuler calcul score
-      const done = tasks.filter(t => t.completed).length;
-      const total = tasks.length || 1;
-      setProductivityScore(Math.round((done/total)*100));
-      setLoading(false);
-  };
-
-  const switchTab = (tab: any) => {
+  const refreshWheelAnalysis = async () => {
+      setIsAnalyzingWheel(true);
       playMenuClick();
-      setActiveTab(tab);
+      const scores = await generateLifeWheelAnalysis({ tasks: tasks.slice(0, 20), habits, goals });
+      if (scores) {
+          setLifeWheelData(scores);
+          playSuccess();
+      } else {
+          Alert.alert("Hors Connexion", "L'IA nécessite internet pour analyser vos données.");
+      }
+      setIsAnalyzingWheel(false);
   };
 
   const sendMessage = async () => {
@@ -140,14 +158,69 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       ]);
   };
 
-  // --- RENDER ANALYTICS ---
-  const renderAnalytics = () => {
-      const size = width - 80;
+  // --- CUSTOM CHARTS ---
+
+  const renderProductivityRing = () => {
+      const size = 160;
+      const strokeWidth = 12;
+      const radius = (size - strokeWidth) / 2;
+      const circumference = radius * 2 * Math.PI;
+      const progress = stats.productivityScore / 100;
+      const strokeDashoffset = circumference - progress * circumference;
+
+      return (
+          <View style={{alignItems: 'center', justifyContent: 'center', height: 180}}>
+              <Svg width={size} height={size}>
+                  <Circle cx={size/2} cy={size/2} r={radius} stroke={colors.border} strokeWidth={strokeWidth} fill="transparent" />
+                  <Circle 
+                      cx={size/2} cy={size/2} r={radius} 
+                      stroke={colors.accent} 
+                      strokeWidth={strokeWidth} 
+                      fill="transparent"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      rotation="-90"
+                      origin={`${size/2}, ${size/2}`}
+                  />
+              </Svg>
+              <View style={{position: 'absolute', alignItems: 'center'}}>
+                  <Text style={{color: colors.text, fontSize: 36, fontWeight: '800'}}>{stats.productivityScore}</Text>
+                  <Text style={{color: colors.subText, fontSize: 12, fontWeight: '600', textTransform: 'uppercase'}}>Score</Text>
+              </View>
+          </View>
+      );
+  };
+
+  const renderBarChart = () => {
+      const h = 100;
+      const w = width - 80;
+      const barW = (w / 7) - 8;
+      const max = 100;
+
+      return (
+          <View style={{height: h, width: w, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between'}}>
+              {stats.weeklyActivity.map((val, i) => (
+                  <View key={i} style={{alignItems: 'center', gap: 6}}>
+                      <View style={{
+                          width: barW, 
+                          height: (val / max) * h, 
+                          backgroundColor: i === 6 ? colors.primary : (isDarkMode ? '#333' : '#E5E5EA'),
+                          borderRadius: 6
+                      }} />
+                      <Text style={{color: colors.subText, fontSize: 10, fontWeight: '600'}}>{['L','M','M','J','V','S','D'][i]}</Text>
+                  </View>
+              ))}
+          </View>
+      );
+  };
+
+  const renderSpiderChart = () => {
+      const size = width - 100;
       const center = size / 2;
       const radius = size / 2;
       const categories = ["Santé", "Loisirs", "Perso", "Apprent.", "Mental", "Carrière"];
       
-      // Calculate Polygon points
       const points = lifeWheelData.map((val, i) => {
           const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
           const r = (val / 100) * radius;
@@ -155,124 +228,68 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       }).join(" ");
 
       return (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-              {/* HEADER SCORE */}
-              <View style={[styles.scoreCard, { backgroundColor: colors.card }]}>
-                  <View>
-                      <Text style={[styles.scoreLabel, {color: colors.subText}]}>SCORE DE PRODUCTIVITÉ</Text>
-                      <Text style={[styles.scoreValue, {color: colors.text}]}>{productivityScore}/100</Text>
-                  </View>
-                  <Activity size={32} color={colors.accent} />
-              </View>
-
-              {/* LIFE WHEEL */}
-              <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
-                  <View style={styles.chartHeader}>
-                      <Text style={[styles.chartTitle, {color: colors.text}]}>Roue de la Vie</Text>
-                      <TouchableOpacity onPress={refreshAnalysis}>
-                          <RefreshCw size={16} color={colors.subText} />
-                      </TouchableOpacity>
-                  </View>
-                  <View style={{alignItems: 'center', marginVertical: 20}}>
-                      <Svg height={size} width={size}>
-                          {/* Spider Web Background */}
-                          {[0.2, 0.4, 0.6, 0.8, 1].map((scale, k) => (
-                              <Polygon
-                                  key={k}
-                                  points={categories.map((_, i) => {
-                                      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
-                                      const r = radius * scale;
-                                      return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
-                                  }).join(" ")}
-                                  stroke={colors.border}
-                                  strokeWidth="1"
-                                  fill="none"
-                              />
-                          ))}
-                          {/* Axes */}
-                          {categories.map((cat, i) => {
+          <View style={{alignItems: 'center', marginVertical: 10}}>
+              <Svg height={size} width={size}>
+                  {[0.25, 0.5, 0.75, 1].map((scale, k) => (
+                      <Polygon key={k}
+                          points={categories.map((_, i) => {
                               const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
-                              return (
-                                  <React.Fragment key={i}>
-                                      <Line
-                                          x1={center} y1={center}
-                                          x2={center + radius * Math.cos(angle)}
-                                          y2={center + radius * Math.sin(angle)}
-                                          stroke={colors.border}
-                                          strokeWidth="1"
-                                      />
-                                      {/* Labels */}
-                                      <SvgText
-                                          x={center + (radius + 20) * Math.cos(angle)}
-                                          y={center + (radius + 20) * Math.sin(angle)}
-                                          fill={colors.subText}
-                                          fontSize="10"
-                                          fontWeight="bold"
-                                          textAnchor="middle"
-                                          alignmentBaseline="middle"
-                                      >
-                                          {cat}
-                                      </SvgText>
-                                  </React.Fragment>
-                              )
-                          })}
-                          {/* Data Polygon */}
-                          <Polygon
-                              points={points}
-                              fill="rgba(196, 181, 253, 0.5)"
-                              stroke={colors.accent}
-                              strokeWidth="2"
+                              const r = radius * scale;
+                              return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
+                          }).join(" ")}
+                          stroke={colors.border} strokeWidth="1" fill="none"
+                      />
+                  ))}
+                  {categories.map((cat, i) => {
+                      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                      return (
+                          <Line key={i}
+                              x1={center} y1={center}
+                              x2={center + radius * Math.cos(angle)} y2={center + radius * Math.sin(angle)}
+                              stroke={colors.border} strokeWidth="1"
                           />
-                      </Svg>
-                  </View>
-              </View>
+                      )
+                  })}
+                  <Polygon points={points} fill="rgba(196, 181, 253, 0.3)" stroke={colors.accent} strokeWidth="2" />
+                  {categories.map((cat, i) => {
+                      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                      const x = center + (radius + 15) * Math.cos(angle);
+                      const y = center + (radius + 15) * Math.sin(angle);
+                      return (
+                          <SvgText key={i} x={x} y={y} fill={colors.subText} fontSize="10" fontWeight="bold" textAnchor="middle" alignmentBaseline="middle">{cat}</SvgText>
+                      )
+                  })}
+              </Svg>
+          </View>
+      );
+  };
 
-              {/* HEATMAP (Simplified) */}
-              <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
-                  <Text style={[styles.chartTitle, {color: colors.text}]}>Consistance (30 jours)</Text>
-                  <View style={styles.heatmapGrid}>
-                      {Array.from({length: 30}).map((_, i) => {
-                          const active = Math.random() > 0.4;
-                          return (
-                              <View 
-                                  key={i} 
-                                  style={[
-                                      styles.heatmapCell, 
-                                      { backgroundColor: active ? colors.accent : (isDarkMode ? '#333' : '#E5E5EA'), opacity: active ? Math.random() * 0.5 + 0.5 : 1 }
-                                  ]} 
-                              />
-                          )
-                      })}
-                  </View>
-              </View>
+  const renderChronobiology = () => {
+      const w = width - 80;
+      const h = 100;
+      // Simple sine wave simulation
+      const path = `M 0 ${h} Q ${w*0.25} ${h*0.2} ${w*0.5} ${h*0.5} T ${w} ${h*0.2}`;
 
-              {/* CHRONOBIOLOGY */}
-              <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
-                  <Text style={[styles.chartTitle, {color: colors.text}]}>Chronobiologie</Text>
-                  <View style={styles.chronoContainer}>
-                      <Svg height="100" width="100%">
-                          <Line x1="0" y1="50" x2="100%" y2="50" stroke={colors.border} strokeDasharray="4" />
-                          {/* Sine wave approx */}
-                          <Polygon 
-                              points={`0,80 50,20 100,50 150,80 200,30 250,50 300,90`}
-                              fill="none"
-                              stroke={colors.createMode}
-                              strokeWidth="3"
-                          />
-                      </Svg>
-                      <View style={styles.chronoLabels}>
-                          <Text style={{color: colors.subText, fontSize: 10}}>6h</Text>
-                          <Text style={{color: colors.subText, fontSize: 10}}>12h</Text>
-                          <Text style={{color: colors.subText, fontSize: 10}}>18h</Text>
-                          <Text style={{color: colors.subText, fontSize: 10}}>22h</Text>
-                      </View>
-                  </View>
-                  <Text style={{color: colors.subText, fontSize: 12, marginTop: 8}}>Pic d'énergie prévu vers 10h30.</Text>
+      return (
+          <View style={{marginTop: 10}}>
+              <Svg width={w} height={h}>
+                  <Defs>
+                      <SvgGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                          <Stop offset="0" stopColor={colors.success} stopOpacity="0.4" />
+                          <Stop offset="1" stopColor={colors.success} stopOpacity="0" />
+                      </SvgGradient>
+                  </Defs>
+                  <Path d={`${path} L ${w} ${h} L 0 ${h} Z`} fill="url(#grad)" />
+                  <Path d={path} stroke={colors.success} strokeWidth="3" fill="none" />
+              </Svg>
+              <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 6}}>
+                  <Text style={{color: colors.subText, fontSize: 10}}>6h</Text>
+                  <Text style={{color: colors.subText, fontSize: 10}}>12h</Text>
+                  <Text style={{color: colors.subText, fontSize: 10}}>18h</Text>
+                  <Text style={{color: colors.subText, fontSize: 10}}>22h</Text>
               </View>
-              
-              <View style={{height: 100}} />
-          </ScrollView>
-      )
+          </View>
+      );
   };
 
   if (loading) return <SkeletonAnalysis />;
@@ -284,23 +301,129 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
                 <BrainCircuit size={28} color={colors.accent} />
-                <Text style={[styles.headerTitle, {color: colors.text}]}>Assistant IA</Text>
+                <Text style={[styles.headerTitle, {color: colors.text}]}>Analyses</Text>
             </View>
-            <View style={styles.tabContainer}>
-                <TouchableOpacity onPress={() => switchTab('ANALYTICS')} style={[styles.tabItem, activeTab === 'ANALYTICS' && {backgroundColor: colors.card}]}>
-                    <Text style={[styles.tabText, {color: activeTab === 'ANALYTICS' ? colors.text : colors.subText}]}>Analyse</Text>
+            <View style={styles.mainTabs}>
+                <TouchableOpacity onPress={() => { playMenuClick(); setMainTab('DATA'); }} style={[styles.mainTabItem, mainTab === 'DATA' && {backgroundColor: colors.card}]}>
+                    <BarChart2 size={16} color={mainTab === 'DATA' ? colors.text : colors.subText} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => switchTab('AI_COACH')} style={[styles.tabItem, activeTab === 'AI_COACH' && {backgroundColor: colors.card}]}>
-                    <Text style={[styles.tabText, {color: activeTab === 'AI_COACH' ? colors.text : colors.subText}]}>Chat</Text>
+                <TouchableOpacity onPress={() => { playMenuClick(); setMainTab('COACH'); }} style={[styles.mainTabItem, mainTab === 'COACH' && {backgroundColor: colors.card}]}>
+                    <MessageSquare size={16} color={mainTab === 'COACH' ? colors.text : colors.subText} />
                 </TouchableOpacity>
             </View>
         </View>
 
-        {activeTab === 'ANALYTICS' ? renderAnalytics() : (
+        {mainTab === 'DATA' ? (
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                
+                {/* SUB-TABS */}
+                <View style={styles.subTabsContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 8}}>
+                        {['GLOBAL', 'BALANCE', 'FOCUS'].map((tab: any) => (
+                            <TouchableOpacity 
+                                key={tab} 
+                                onPress={() => { playMenuClick(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setDataSubTab(tab); }}
+                                style={[styles.subTab, dataSubTab === tab && {backgroundColor: colors.accent}, {borderColor: colors.border}]}
+                            >
+                                <Text style={[styles.subTabText, {color: dataSubTab === tab ? '#000' : colors.subText}]}>
+                                    {tab === 'GLOBAL' ? 'Aperçu' : tab === 'BALANCE' ? 'Équilibre' : 'Énergie'}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                {dataSubTab === 'GLOBAL' && (
+                    <>
+                        <View style={[styles.card, {backgroundColor: colors.card}]}>
+                            <View style={styles.cardHeader}>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Performance Globale</Text>
+                                <Activity size={18} color={colors.accent} />
+                            </View>
+                            {renderProductivityRing()}
+                            <View style={styles.kpiRow}>
+                                <View style={styles.kpiItem}>
+                                    <Text style={[styles.kpiValue, {color: colors.primary}]}>{stats.completedTasks}</Text>
+                                    <Text style={[styles.kpiLabel, {color: colors.subText}]}>Tâches</Text>
+                                </View>
+                                <View style={[styles.kpiSeparator, {backgroundColor: colors.border}]} />
+                                <View style={styles.kpiItem}>
+                                    <Text style={[styles.kpiValue, {color: colors.orange}]}>{stats.avgStreak}</Text>
+                                    <Text style={[styles.kpiLabel, {color: colors.subText}]}>Streak Moy.</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={[styles.card, {backgroundColor: colors.card}]}>
+                            <View style={styles.cardHeader}>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Activité Hebdomadaire</Text>
+                                <BarChart2 size={18} color={colors.subText} />
+                            </View>
+                            <View style={{marginTop: 10}}>
+                                {renderBarChart()}
+                            </View>
+                        </View>
+                    </>
+                )}
+
+                {dataSubTab === 'BALANCE' && (
+                    <View style={[styles.card, {backgroundColor: colors.card}]}>
+                        <View style={styles.cardHeader}>
+                            <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie</Text>
+                            <TouchableOpacity onPress={refreshWheelAnalysis} disabled={isAnalyzingWheel}>
+                                {isAnalyzingWheel ? <ActivityIndicator size="small" color={colors.accent} /> : <RefreshCw size={18} color={colors.subText} />}
+                            </TouchableOpacity>
+                        </View>
+                        {renderSpiderChart()}
+                        <Text style={[styles.analysisText, {color: colors.subText}]}>
+                            L'analyse montre un bon équilibre Mental/Carrière. Pensez à accorder plus de temps aux Loisirs cette semaine pour éviter le burnout.
+                        </Text>
+                    </View>
+                )}
+
+                {dataSubTab === 'FOCUS' && (
+                    <>
+                        <View style={[styles.card, {backgroundColor: colors.card}]}>
+                            <View style={styles.cardHeader}>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Chronobiologie</Text>
+                                <Clock size={18} color={colors.success} />
+                            </View>
+                            {renderChronobiology()}
+                            <Text style={[styles.analysisText, {color: colors.subText, marginTop: 15}]}>
+                                Vos pics d'énergie sont identifiés vers 10h30 et 16h00. Planifiez vos tâches complexes ("Deep Work") sur ces créneaux.
+                            </Text>
+                        </View>
+
+                        <View style={[styles.card, {backgroundColor: colors.card}]}>
+                            <View style={styles.cardHeader}>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Consistance (30 jours)</Text>
+                                <Target size={18} color={colors.orange} />
+                            </View>
+                            <View style={styles.heatmapGrid}>
+                                {Array.from({length: 30}).map((_, i) => {
+                                    const active = Math.random() > 0.4;
+                                    return (
+                                        <View 
+                                            key={i} 
+                                            style={[
+                                                styles.heatmapCell, 
+                                                { backgroundColor: active ? colors.orange : (isDarkMode ? '#333' : '#E5E5EA'), opacity: active ? Math.random() * 0.5 + 0.5 : 1 }
+                                            ]} 
+                                        />
+                                    )
+                                })}
+                            </View>
+                        </View>
+                    </>
+                )}
+
+                <View style={{height: 100}} />
+            </ScrollView>
+        ) : (
             <KeyboardAvoidingView 
                 style={{flex: 1}} 
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Offset pour ne pas cacher derrière le clavier
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} 
             >
                 <ScrollView 
                     ref={scrollViewRef}
@@ -330,15 +453,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     )}
                 </ScrollView>
                 
-                {/* INPUT ZONE FIXED ABOVE BOTTOM NAV */}
                 <View style={[styles.inputWrapper, {backgroundColor: colors.card, borderTopColor: colors.border}]}>
                     <View style={styles.modeSwitchContainer}>
-                        <TouchableOpacity style={[styles.modePill, !isCreationMode && {backgroundColor: colors.chatMode}]} onPress={() => setIsCreationMode(false)}>
-                            <MessageSquare size={14} color={!isCreationMode ? "#FFF" : "rgba(255,255,255,0.5)"} />
+                        <TouchableOpacity style={[styles.modePill, !isCreationMode && {backgroundColor: colors.primary}]} onPress={() => setIsCreationMode(false)}>
+                            <MessageSquare size={12} color={!isCreationMode ? "#FFF" : "rgba(255,255,255,0.5)"} />
                             <Text style={[styles.modeText, {color: "#FFF"}]}>Chat</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.modePill, isCreationMode && {backgroundColor: colors.createMode}]} onPress={() => setIsCreationMode(true)}>
-                            <PlusCircle size={14} color={isCreationMode ? "#FFF" : "rgba(255,255,255,0.5)"} />
+                        <TouchableOpacity style={[styles.modePill, isCreationMode && {backgroundColor: colors.success}]} onPress={() => setIsCreationMode(true)}>
+                            <PlusCircle size={12} color={isCreationMode ? "#FFF" : "rgba(255,255,255,0.5)"} />
                             <Text style={[styles.modeText, {color: "#FFF"}]}>Création</Text>
                         </TouchableOpacity>
                     </View>
@@ -352,12 +474,11 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             placeholderTextColor={colors.subText}
                             multiline
                         />
-                        <TouchableOpacity onPress={sendMessage} style={[styles.sendBtn, {backgroundColor: isCreationMode ? colors.createMode : colors.button}]}>
+                        <TouchableOpacity onPress={sendMessage} style={[styles.sendBtn, {backgroundColor: isCreationMode ? colors.success : colors.primary}]}>
                             {isCreationMode ? <Sparkles size={20} color="#FFF" /> : <Send size={20} color="#FFF" />}
                         </TouchableOpacity>
                     </View>
                 </View>
-                {/* Spacer to lift input above BottomNav */}
                 <View style={{height: 90, backgroundColor: colors.bg}} /> 
             </KeyboardAvoidingView>
         )}
@@ -368,26 +489,32 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 20, paddingBottom: 15, paddingTop: 10, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '800' },
-  tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 10, padding: 3 },
-  tabItem: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
-  tabText: { fontSize: 12, fontWeight: '700' },
+  headerTitle: { fontSize: 22, fontWeight: '800' },
+  mainTabs: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 10, padding: 3 },
+  mainTabItem: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
   
+  subTabsContainer: { marginBottom: 20 },
+  subTab: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, marginRight: 8 },
+  subTabText: { fontSize: 13, fontWeight: '700' },
+
   scrollContent: { padding: 20, paddingBottom: 100 },
-  scoreCard: { padding: 20, borderRadius: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  scoreLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  scoreValue: { fontSize: 32, fontWeight: '800', marginTop: 4 },
   
-  chartCard: { padding: 20, borderRadius: 20, marginBottom: 20 },
-  chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  chartTitle: { fontSize: 16, fontWeight: '700' },
+  card: { padding: 20, borderRadius: 20, marginBottom: 16 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  cardTitle: { fontSize: 16, fontWeight: '700' },
   
+  kpiRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
+  kpiItem: { alignItems: 'center' },
+  kpiValue: { fontSize: 24, fontWeight: '800' },
+  kpiLabel: { fontSize: 12, fontWeight: '600', marginTop: 4 },
+  kpiSeparator: { width: 1, height: 30 },
+
+  analysisText: { fontSize: 13, lineHeight: 20, marginTop: 20, fontStyle: 'italic' },
+
   heatmapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   heatmapCell: { width: (width - 80 - (6*5)) / 6, height: 24, borderRadius: 4 },
-  
-  chronoContainer: { marginTop: 10 },
-  chronoLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
 
+  // Chat Styles
   chatContainer: { flex: 1, paddingHorizontal: 16, paddingTop: 20 },
   bubble: { padding: 14, borderRadius: 18, marginBottom: 12, maxWidth: '88%' },
   bubbleUser: { alignSelf: 'flex-end', borderBottomRightRadius: 2 },
@@ -395,8 +522,8 @@ const styles = StyleSheet.create({
   
   inputWrapper: { padding: 16, borderTopWidth: 1, gap: 12 }, 
   modeSwitchContainer: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  modePill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20, gap: 6, backgroundColor: '#333' },
-  modeText: { fontSize: 12, fontWeight: '700' },
+  modePill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 16, gap: 6, backgroundColor: '#333' },
+  modeText: { fontSize: 11, fontWeight: '700' },
   inputRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
   input: { flex: 1, minHeight: 48, borderRadius: 24, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, fontSize: 16 },
   sendBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }

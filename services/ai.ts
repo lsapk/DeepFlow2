@@ -56,7 +56,8 @@ export const generateActionableCoaching = async (
 ): Promise<{ text: string, action?: any }> => {
   if (!ai) return { text: "⚠️ IA non configurée (Clé manquante)." };
 
-  await logAiUsage('chat');
+  // Tentative légère de logging, échec silencieux si hors ligne
+  logAiUsage('chat').catch(() => {});
   
   try {
     let systemInstruction = `
@@ -106,14 +107,15 @@ export const generateActionableCoaching = async (
     return { text: responseText };
 
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return { text: "⚠️ Erreur réseau ou configuration IA." };
+    // Gestion d'erreur spécifique pour le mode hors ligne
+    console.log("Gemini API Error (likely offline):", error);
+    return { text: "🚫 **Mode Hors Ligne**\n\nJe ne peux pas répondre car vous n'êtes pas connecté à internet. Vos données sont sauvegardées localement." };
   }
 };
 
 export const generateLifeWheelAnalysis = async (fullContext: any): Promise<number[] | null> => {
     if (!ai) return null;
-    await logAiUsage('analysis');
+    logAiUsage('analysis').catch(() => {});
 
     try {
         const prompt = `
@@ -153,14 +155,14 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
         ];
 
     } catch (e) {
-        console.error("AI Wheel Analysis Error", e);
+        // Retourner null permet à l'UI de gérer le fallback silencieusement
         return null;
     }
 };
 
 export const generateSubtasks = async (taskTitle: string): Promise<string[]> => {
     if (!ai) return [];
-    await logAiUsage('analysis');
+    logAiUsage('analysis').catch(() => {});
 
     try {
         const prompt = `
@@ -216,7 +218,6 @@ export const generateQuests = async (userLevel: number, context: string): Promis
         const data = JSON.parse(text);
         return Array.isArray(data) ? data : [];
     } catch (e) {
-        console.error("Generate Quests Error", e);
         return [];
     }
 };

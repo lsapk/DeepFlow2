@@ -1,9 +1,12 @@
+
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Platform } from 'react-native';
 import { LayoutDashboard, CalendarRange, BookOpen, TrendingUp, Zap } from 'lucide-react-native';
 import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import Animated, { useAnimatedStyle, withSpring, useSharedValue, withTiming } from 'react-native-reanimated';
 
 interface BottomNavProps {
   currentView: ViewState;
@@ -11,15 +14,45 @@ interface BottomNavProps {
   isDarkMode?: boolean;
 }
 
+const TabIcon = ({ Icon, isActive, color, label }: any) => {
+    const scale = useSharedValue(1);
+
+    React.useEffect(() => {
+        scale.value = withSpring(isActive ? 1.2 : 1, { damping: 12 });
+    }, [isActive]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
+    return (
+        <View style={styles.tabContent}>
+            <Animated.View style={animatedStyle}>
+                <Icon 
+                    size={24} 
+                    color={color} 
+                    strokeWidth={isActive ? 2.5 : 2}
+                    fill={isActive ? `${color}20` : 'transparent'} // Subtil fill
+                />
+            </Animated.View>
+            {isActive && (
+                <Animated.Text entering={withTiming(1)} style={[styles.label, { color }]}>
+                    {label}
+                </Animated.Text>
+            )}
+        </View>
+    );
+};
+
 const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode = true }) => {
   const insets = useSafeAreaInsets();
   
   const navItems = [
-    { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Aujourd\'hui', hint: 'Aller au tableau de bord' },
-    { view: ViewState.PLANNING, icon: CalendarRange, label: 'Planifier', hint: 'Gérer le calendrier et les objectifs' },
-    { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true, hint: 'Démarrer une session de concentration' },
-    { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal', hint: 'Accéder au journal et aux réflexions' },
-    { view: ViewState.EVOLUTION, icon: TrendingUp, label: 'Évolution', hint: 'Voir les statistiques et le profil gamifié' },
+    { view: ViewState.TODAY, icon: LayoutDashboard, label: 'Home' },
+    { view: ViewState.PLANNING, icon: CalendarRange, label: 'Plan' },
+    { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true },
+    { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal' },
+    { view: ViewState.EVOLUTION, icon: TrendingUp, label: 'Évo' },
   ];
 
   const handlePress = (view: ViewState) => {
@@ -27,113 +60,127 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
       setView(view);
   };
 
-  const backgroundColor = isDarkMode ? 'rgba(28, 28, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-  const borderTopColor = isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-  const activeColor = '#007AFF';
-  const inactiveColor = isDarkMode ? '#8E8E93' : '#999999';
+  const activeColor = isDarkMode ? '#FFFFFF' : '#000000';
+  const inactiveColor = isDarkMode ? '#666666' : '#999999';
 
   return (
-    <View style={[
-        styles.container, 
-        { 
-            backgroundColor: backgroundColor,
-            borderTopColor: borderTopColor,
-            paddingBottom: Math.max(insets.bottom, 20),
-            height: 80 + Math.max(insets.bottom, 0) 
-        }
-    ]}>
-      {navItems.map((item) => {
-        const Icon = item.icon;
-        const isActive = currentView === item.view;
+    <View style={[styles.wrapper, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
+        <BlurView 
+            intensity={Platform.OS === 'ios' ? 80 : 50} 
+            tint={isDarkMode ? 'dark' : 'light'} 
+            style={[styles.container, isDarkMode ? styles.darkBorder : styles.lightBorder]}
+        >
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentView === item.view;
 
-        if (item.isSpecial) {
+            if (item.isSpecial) {
+                return (
+                    <TouchableOpacity
+                        key={item.view}
+                        onPress={() => handlePress(item.view)}
+                        style={styles.specialTabWrapper}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.specialTab}>
+                            <Icon size={24} color="#FFFFFF" fill="#FFFFFF" />
+                        </View>
+                    </TouchableOpacity>
+                );
+            }
+
             return (
-                <TouchableOpacity
-                    key={item.view}
-                    onPress={() => handlePress(item.view)}
-                    style={styles.specialTabWrapper}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel={item.label}
-                    accessibilityHint={item.hint}
-                    accessibilityState={{ selected: isActive }}
-                >
-                    <View style={styles.specialTab}>
-                        <Icon size={28} color="#FFFFFF" fill="#FFFFFF" />
-                    </View>
-                </TouchableOpacity>
+              <TouchableOpacity
+                key={item.view}
+                onPress={() => handlePress(item.view)}
+                style={styles.tab}
+                activeOpacity={0.7}
+              >
+                <TabIcon 
+                    Icon={Icon} 
+                    isActive={isActive} 
+                    color={isActive ? activeColor : inactiveColor}
+                    label={item.label}
+                />
+              </TouchableOpacity>
             );
-        }
-
-        return (
-          <TouchableOpacity
-            key={item.view}
-            onPress={() => handlePress(item.view)}
-            style={styles.tab}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={item.label}
-            accessibilityHint={item.hint}
-            accessibilityState={{ selected: isActive }}
-          >
-            <Icon 
-                size={24} 
-                color={isActive ? activeColor : inactiveColor} 
-                strokeWidth={isActive ? 2.5 : 2}
-            />
-            <Text style={[styles.label, { color: isActive ? activeColor : inactiveColor }]}>
-                {item.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+          })}
+        </BlurView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    borderTopWidth: 0.5,
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  wrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    alignItems: 'center',
     zIndex: 100,
+    paddingHorizontal: 16,
+  },
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 70, // Plus compact
+    width: '100%',
+    maxWidth: 400, // Limite la largeur sur tablette
+    borderRadius: 35, // Pilule
+    paddingHorizontal: 6,
+    overflow: 'hidden',
+  },
+  darkBorder: {
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.15)',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  lightBorder: {
+      borderWidth: 1,
+      borderColor: 'rgba(0,0,0,0.05)',
+      backgroundColor: 'rgba(255,255,255,0.8)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+      elevation: 5,
   },
   tab: {
+    flex: 1,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    height: 50,
+  },
+  tabContent: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
   },
   label: {
       fontSize: 10,
-      marginTop: 4,
-      fontWeight: '500',
+      fontWeight: '700',
+      position: 'absolute',
+      bottom: -16, // Cache le texte ou le montre subtilement
   },
   specialTabWrapper: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      marginTop: -20, // Lift it up
+      top: -15, // Floating effect
+      paddingHorizontal: 8,
   },
   specialTab: {
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: '#007AFF',
+      backgroundColor: '#007AFF', // Deep Blue
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: '#007AFF',
-      shadowOffset: { width: 0, height: 4 },
+      shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.4,
-      shadowRadius: 8,
-      elevation: 8,
+      shadowRadius: 12,
+      elevation: 10,
+      borderWidth: 4,
+      borderColor: 'rgba(0,0,0,0.2)', // Bordure subtile pour le contraste
   },
 });
 

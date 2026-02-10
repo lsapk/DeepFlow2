@@ -58,10 +58,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
 
   const firstName = user.display_name?.split(' ')[0] || 'Voyageur';
 
-  // Logic Habits: Filter out archived and ensure day match
+  // Logic Habits
   const todaysHabits = habits.filter(h => {
-      if (h.is_archived) return false; // Important: Exclude archived
-      if (!h.days_of_week || h.days_of_week.length === 0) return true; // Daily default
+      if (h.is_archived) return false; 
+      if (!h.days_of_week || h.days_of_week.length === 0) return true; 
       return h.days_of_week.includes(dayOfWeek);
   });
   
@@ -96,8 +96,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (productivityScore / 100) * circumference;
 
-  // --- OPTIMIZED NAVIGATION ---
-  // Using requestAnimationFrame ensures the touch feedback renders BEFORE the heavy view switch occurs
   const handleNav = useCallback((view: ViewState) => {
       requestAnimationFrame(() => {
           setView(view);
@@ -105,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   }, [setView]);
 
   const handleToggleHabit = (id: string) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); // Faster feedback
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       toggleHabit(id);
   }
 
@@ -168,14 +166,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                     </View>
                     <View style={styles.ringContainer}>
                          <Svg width={size} height={size} style={{position: 'absolute'}}>
-                            {/* Background Track */}
                             <Circle 
                                 cx={size / 2} cy={size / 2} r={radius} 
                                 stroke={isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"} 
                                 strokeWidth={strokeWidth}
                                 fill="transparent"
                             />
-                            {/* Progress Ring */}
                             <Circle 
                                 cx={size / 2} cy={size / 2} r={radius} 
                                 stroke={isDarkMode ? "#60A5FA" : "#6366F1"} 
@@ -296,7 +292,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                             style={[styles.taskRow, index < activeTasks.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} 
                             onPress={() => handleToggleTask(task.id)}
                             activeOpacity={0.6}
-                            hitSlop={{top: 0, bottom: 0, left: 0, right: 10}} // easier to tap right side
+                            hitSlop={{top: 0, bottom: 0, left: 0, right: 10}} 
                         >
                             <View style={[styles.checkbox, { borderColor: colors.textSub }]}>
                                 {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
@@ -365,6 +361,11 @@ const styles = StyleSheet.create({
       borderRadius: 24,
       overflow: 'hidden',
       padding: 20,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+      elevation: 5,
   },
   heroContent: {
       flex: 1,
@@ -404,6 +405,11 @@ const styles = StyleSheet.create({
       padding: 16,
       justifyContent: 'space-between',
       alignItems: 'flex-start',
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 5,
+      elevation: 2,
   },
   iconCircle: {
       width: 36,
@@ -458,6 +464,11 @@ const styles = StyleSheet.create({
       borderRadius: 20,
       padding: 14,
       justifyContent: 'space-between',
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
   },
   habitIcon: {
       width: 32,
@@ -488,6 +499,11 @@ const styles = StyleSheet.create({
   taskList: {
       borderRadius: 24,
       paddingVertical: 4,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
   },
   taskRow: {
       flexDirection: 'row',

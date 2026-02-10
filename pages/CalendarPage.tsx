@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Calendar as CalendarIcon, MapPin, Clock, AlignLeft, LogIn } from 'lucide-react-native';
@@ -95,15 +96,18 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         const startOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() - 1, 1).toISOString();
         const endOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() + 2, 0).toISOString();
 
-        const { data } = await supabase
-            .from('habit_completions')
-            .select('*')
-            .eq('user_id', user.id)
-            .gte('completed_date', startOfMonth)
-            .lte('completed_date', endOfMonth);
-        
-        if (data) {
-            setHabitHistory(data);
+        try {
+            const { data, error } = await supabase
+                .from('habit_completions')
+                .select('*')
+                .eq('user_id', user.id)
+                .gte('completed_date', startOfMonth)
+                .lte('completed_date', endOfMonth);
+            
+            if (error) throw error;
+            if (data) setHabitHistory(data);
+        } catch (e) {
+            console.log("Offline habit history sync failed - using local data only");
         }
     };
 
@@ -141,8 +145,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 setGoogleEvents(formatted);
             }
         } catch (error) {
-            console.error("Google Calendar Error", error);
-            // Alert.alert("Erreur", "Impossible de récupérer les événements Google.");
+            console.log("Google Calendar Offline or Error");
+            // Silent fail to keep UI clean
         } finally {
             setIsLoadingGoogle(false);
         }
