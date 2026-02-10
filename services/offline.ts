@@ -1,3 +1,4 @@
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 
@@ -79,7 +80,10 @@ export const processQueue = async (): Promise<number> => {
                     break;
             }
 
-            if (error) throw error;
+            if (error) {
+                console.error(`Supabase Error (${action.type} on ${action.table}):`, error.message);
+                throw error;
+            }
 
         } catch (e) {
             console.warn("Failed to process action, keeping in queue:", action.type);

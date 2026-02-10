@@ -1,6 +1,6 @@
 
 import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
 import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -119,37 +119,42 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   };
 
   return (
-    <Animated.View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       
-      {/* HEADER - zIndex augmenté pour garantir le clic sur le profil */}
-      <View style={styles.header}>
-        <View>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
-                <Text style={[styles.greetingSub, {color: colors.textSub}]}>
-                    {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
-                </Text>
-                {renderSyncIcon()}
-            </View>
-            <Text style={[styles.greetingTitle, { color: colors.text }]}>{greeting}, {firstName}</Text>
-        </View>
-        <TouchableOpacity 
-            onPress={() => {
-                Haptics.selectionAsync();
-                openProfile();
-            }} 
-            style={styles.avatarContainer} 
-            activeOpacity={0.7}
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-        >
-            <Image 
-                source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
-                style={styles.avatar} 
-                transition={200}
-            />
-        </TouchableOpacity>
+      {/* HEADER - Safe Area Padding + Standard Flex Row */}
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 10, paddingBottom: 10, backgroundColor: colors.bg }]}>
+          <View style={styles.headerLeft}>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
+                  <Text style={[styles.greetingSub, {color: colors.textSub}]}>
+                      {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
+                  </Text>
+                  {renderSyncIcon()}
+              </View>
+              <Text style={[styles.greetingTitle, { color: colors.text }]}>{greeting}, {firstName}</Text>
+          </View>
+          
+          <TouchableOpacity 
+              onPress={() => {
+                  console.log("Profile clicked");
+                  Haptics.selectionAsync();
+                  openProfile();
+              }} 
+              style={styles.avatarTouchArea}
+              activeOpacity={0.6}
+              hitSlop={{top: 20, bottom: 20, left: 20, right: 20}} // Zone tactile très large
+          >
+              <Image 
+                  source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} 
+                  style={styles.avatar} 
+                  transition={200}
+              />
+          </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContent]} 
+        showsVerticalScrollIndicator={false}
+      >
         
         {/* HERO SECTION: BENTO GRID */}
         <View style={styles.bentoGrid}>
@@ -157,7 +162,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             {/* LARGE HERO: PRODUCTIVITY */}
             <TouchableOpacity 
                 style={[styles.bentoHero, { backgroundColor: colors.cardBg }]}
-                activeOpacity={0.8}
+                activeOpacity={0.9}
                 onPress={() => handleNav(ViewState.EVOLUTION)}
             >
                 <LinearGradient
@@ -226,13 +231,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </View>
         </View>
 
-        {/* HABITS SECTION (Horizontal) - FAST ANIMATION */}
+        {/* HABITS SECTION */}
         <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
             <TouchableOpacity 
                 style={styles.sectionHeaderBtn} 
                 onPress={() => handleNav(ViewState.HABITS)}
                 activeOpacity={0.6}
-                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
             >
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Habitudes</Text>
                 <View style={styles.seeAllContainer}>
@@ -273,13 +277,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
             </ScrollView>
         </Animated.View>
 
-        {/* TASKS LIST - FAST ANIMATION */}
+        {/* TASKS LIST */}
         <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
             <TouchableOpacity 
                 style={styles.sectionHeaderBtn} 
                 onPress={() => handleNav(ViewState.TASKS)}
                 activeOpacity={0.6}
-                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
             >
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Tâches Prioritaires</Text>
                 <View style={styles.seeAllContainer}>
@@ -300,7 +303,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                             style={[styles.taskRow, index < activeTasks.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]} 
                             onPress={() => handleToggleTask(task.id)}
                             activeOpacity={0.6}
-                            hitSlop={{top: 0, bottom: 0, left: 0, right: 10}} 
                         >
                             <View style={[styles.checkbox, { borderColor: colors.textSub }]}>
                                 {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
@@ -316,7 +318,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
         </Animated.View>
 
       </ScrollView>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -324,15 +326,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginBottom: 10,
-    zIndex: 100, // CRUCIAL : Assure que le header est au-dessus du reste
-    elevation: 10,
+    zIndex: 10,
+  },
+  headerLeft: {
+      flex: 1,
   },
   greetingSub: {
       fontSize: 11,
@@ -343,12 +345,8 @@ const styles = StyleSheet.create({
       fontSize: 24,
       fontWeight: '700',
   },
-  avatarContainer: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 5,
-      // Pas de overflow: hidden ici sinon l'ombre est coupée
+  avatarTouchArea: {
+      padding: 5,
   },
   avatar: {
     width: 44,
@@ -360,6 +358,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 130, 
     paddingHorizontal: 20,
+    paddingTop: 10,
   },
   
   // BENTO GRID
@@ -448,7 +447,7 @@ const styles = StyleSheet.create({
       justifyContent: 'space-between',
       marginBottom: 14,
       paddingHorizontal: 4,
-      paddingVertical: 4, // Bigger hit area
+      paddingVertical: 4,
   },
   sectionTitle: {
       fontSize: 18,

@@ -69,9 +69,11 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
   
-  // Real Analysis Data
+  // Deep Real Data
   const [lifeWheelData, setLifeWheelData] = useState<number[]>([20, 20, 20, 20, 20, 20]);
   const [focusHistory, setFocusHistory] = useState<any[]>([]);
+  const [journalHistory, setJournalHistory] = useState<any[]>([]);
+  const [reflectionHistory, setReflectionHistory] = useState<any[]>([]);
   const [habitCompletions, setHabitCompletions] = useState<any[]>([]);
   const [isAnalyzingWheel, setIsAnalyzingWheel] = useState(false);
 
@@ -80,27 +82,21 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       const fetchDeepData = async () => {
           setLoading(true);
           try {
-              // 1. Fetch Focus Sessions (Last 30 days)
               const thirtyDaysAgo = new Date();
               thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-              
-              const { data: focusData } = await supabase
-                  .from('focus_sessions')
-                  .select('*')
-                  .eq('user_id', user.id)
-                  .gte('created_at', thirtyDaysAgo.toISOString())
-                  .order('created_at', { ascending: false });
-              
-              if (focusData) setFocusHistory(focusData);
+              const isoDate = thirtyDaysAgo.toISOString();
 
-              // 2. Fetch Habit Completions (Last 30 days) for heatmap
-              const { data: habitComp } = await supabase
-                  .from('habit_completions')
-                  .select('*')
-                  .eq('user_id', user.id)
-                  .gte('completed_date', thirtyDaysAgo.toISOString().split('T')[0]);
-              
-              if (habitComp) setHabitCompletions(habitComp);
+              const [focusRes, journalRes, reflectionRes, habitRes] = await Promise.all([
+                  supabase.from('focus_sessions').select('*').eq('user_id', user.id).gte('created_at', isoDate).order('created_at', { ascending: false }),
+                  supabase.from('journal_entries').select('created_at, mood, title, content').eq('user_id', user.id).gte('created_at', isoDate),
+                  supabase.from('daily_reflections').select('created_at, answer, question').eq('user_id', user.id).gte('created_at', isoDate),
+                  supabase.from('habit_completions').select('*').eq('user_id', user.id).gte('completed_date', isoDate.split('T')[0])
+              ]);
+
+              if (focusRes.data) setFocusHistory(focusRes.data);
+              if (journalRes.data) setJournalHistory(journalRes.data);
+              if (reflectionRes.data) setReflectionHistory(reflectionRes.data);
+              if (habitRes.data) setHabitCompletions(habitRes.data);
 
           } catch (e) {
               console.log("Error fetching deep data", e);
@@ -112,73 +108,58 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       fetchDeepData();
       
       if (messages.length === 0) {
-          setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. Je peux analyser tes données réelles ou t'aider à t'organiser.\n\n* Pose-moi une question sur ta chronobiologie.\n* Demande-moi d'ajouter un objectif.` }]);
+          setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. Je peux analyser vos données réelles (Journal, Focus, Tâches) ou vous aider à vous organiser.` }]);
       }
   }, []);
 
   // --- COMPUTED STATS (REAL) ---
   const stats = useMemo(() => {
+      // 1. Productivity Score
       const totalTasks = tasks.length || 1;
       const completedTasks = tasks.filter(t => t.completed);
       const taskRate = Math.round((completedTasks.length / totalTasks) * 100);
-      
       const activeHabits = habits.filter(h => !h.is_archived);
-      const avgStreak = activeHabits.length > 0 
-          ? Math.round(activeHabits.reduce((acc, h) => acc + h.streak, 0) / activeHabits.length) 
-          : 0;
-
-      // Score global calculated from REAL performance
+      const avgStreak = activeHabits.length > 0 ? Math.round(activeHabits.reduce((acc, h) => acc + h.streak, 0) / activeHabits.length) : 0;
       const productivityScore = Math.min(100, Math.round((taskRate * 0.4) + (Math.min(avgStreak, 30) * 1.5) + (player.level * 1.5)));
 
-      // 1. Real Activity Chart (Focus minutes + Tasks completed)
-      const weeklyActivity = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
-      
-      // Add Focus Minutes
+      // 2. Activity Chart (Weekly)
+      const weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
       focusHistory.forEach(session => {
           const d = new Date(session.created_at);
           const day = d.getDay(); // 0 is Sunday
           const adjustedDay = day === 0 ? 6 : day - 1; 
           weeklyActivity[adjustedDay] += (session.duration || 0);
       });
-      // Add Tasks Bonus (arbitrary 15 min per task)
-      completedTasks.forEach(task => {
-          const d = new Date(task.created_at); // Fallback to created if completed_at missing
-          const day = d.getDay();
-          const adjustedDay = day === 0 ? 6 : day - 1;
-          weeklyActivity[adjustedDay] += 15;
-      });
-      
       const maxActivity = Math.max(...weeklyActivity, 1);
       const normalizedWeekly = weeklyActivity.map(v => (v / maxActivity) * 100);
 
-      // 2. Real Consistency Heatmap (Last 30 days)
+      // 3. Consistency Map (All actions)
       const consistencyMap: Record<string, number> = {};
       const addToMap = (dateStr: string) => {
           if (!dateStr) return;
           const k = dateStr.split('T')[0];
           consistencyMap[k] = (consistencyMap[k] || 0) + 1;
       };
-
       focusHistory.forEach(s => addToMap(s.created_at));
       habitCompletions.forEach(h => addToMap(h.completed_date));
-      // Assume completed tasks were done recently (simplified as DB might not have completed_at on old schema)
-      // If task has explicit date we use it
+      journalHistory.forEach(j => addToMap(j.created_at));
+      reflectionHistory.forEach(r => addToMap(r.created_at));
       completedTasks.forEach(t => addToMap(t.created_at));
 
       return { productivityScore, taskRate, avgStreak, weeklyActivity: normalizedWeekly, completedTasksCount: completedTasks.length, consistencyMap };
-  }, [tasks, habits, player.level, focusHistory, habitCompletions]);
+  }, [tasks, habits, player.level, focusHistory, habitCompletions, journalHistory, reflectionHistory]);
 
   const refreshWheelAnalysis = async () => {
       setIsAnalyzingWheel(true);
       playMenuClick();
       
-      // Build Full Context
       const deepContext = {
-          tasks: tasks.slice(0, 30),
-          habits,
-          goals,
-          recentFocus: focusHistory.slice(0, 20),
-          journalCount: 5 // Placeholder count if journal unavailable in props
+          tasks: tasks.slice(0, 20),
+          habits: habits.filter(h => !h.is_archived),
+          goals: goals.filter(g => !g.completed),
+          recentFocus: focusHistory.slice(0, 10),
+          recentJournal: journalHistory.slice(0, 5),
+          recentReflections: reflectionHistory.slice(0, 5)
       };
 
       const scores = await generateLifeWheelAnalysis(deepContext);
@@ -186,7 +167,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           setLifeWheelData(scores);
           playSuccess();
       } else {
-          Alert.alert("Hors Connexion", "L'IA nécessite internet pour analyser vos données.");
+          Alert.alert("Hors Connexion", "Impossible d'analyser les données sans internet.");
       }
       setIsAnalyzingWheel(false);
   };
@@ -341,23 +322,29 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const renderChronobiology = () => {
-      // Calculate REAL chronobiology based on focus history time
+      // Calculate REAL chronobiology based on ALL activities
       const buckets = [0, 0, 0, 0]; // 6h, 12h, 18h, 22h simplified
-      focusHistory.forEach(s => {
-          const hour = new Date(s.created_at).getHours();
+      
+      const processTime = (dateStr: string) => {
+          if (!dateStr) return;
+          const hour = new Date(dateStr).getHours();
           if (hour >= 6 && hour < 12) buckets[0]++;
           else if (hour >= 12 && hour < 18) buckets[1]++;
           else if (hour >= 18 && hour < 22) buckets[2]++;
           else buckets[3]++;
-      });
+      };
+
+      focusHistory.forEach(s => processTime(s.created_at));
+      journalHistory.forEach(j => processTime(j.created_at));
+      reflectionHistory.forEach(r => processTime(r.created_at));
+      tasks.filter(t => t.completed).forEach(t => processTime(t.created_at));
+
       const maxBucket = Math.max(...buckets, 1);
       
       const w = width - 80;
       const h = 100;
       
-      // Create path based on buckets
       const step = w / 3;
-      // Using Bezier approximation for smoother curve or straight lines
       const p0 = {x: 0, y: h - (buckets[0]/maxBucket)*h};
       const p1 = {x: step, y: h - (buckets[1]/maxBucket)*h};
       const p2 = {x: step*2, y: h - (buckets[2]/maxBucket)*h};
@@ -482,7 +469,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
                         <View style={[styles.card, {backgroundColor: colors.card}]}>
                             <View style={styles.cardHeader}>
-                                <Text style={[styles.cardTitle, {color: colors.text}]}>Activité Focus (Semaine)</Text>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Activité Totale (30j)</Text>
                                 <BarChart2 size={18} color={colors.subText} />
                             </View>
                             <View style={{marginTop: 10}}>
@@ -495,14 +482,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                 {dataSubTab === 'BALANCE' && (
                     <View style={[styles.card, {backgroundColor: colors.card}]}>
                         <View style={styles.cardHeader}>
-                            <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie</Text>
+                            <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie (IA)</Text>
                             <TouchableOpacity onPress={refreshWheelAnalysis} disabled={isAnalyzingWheel}>
                                 {isAnalyzingWheel ? <ActivityIndicator size="small" color={colors.accent} /> : <RefreshCw size={18} color={colors.subText} />}
                             </TouchableOpacity>
                         </View>
                         {renderSpiderChart()}
                         <Text style={[styles.analysisText, {color: colors.subText}]}>
-                            Cette analyse est générée par IA en lisant vos tâches, habitudes, et focus. Rafraîchissez pour recalculer.
+                            Analyse basée sur : Tâches, Habitudes, Objectifs, Journal et Réflexions des 30 derniers jours.
                         </Text>
                     </View>
                 )}
@@ -511,12 +498,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     <>
                         <View style={[styles.card, {backgroundColor: colors.card}]}>
                             <View style={styles.cardHeader}>
-                                <Text style={[styles.cardTitle, {color: colors.text}]}>Chronobiologie</Text>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Chronobiologie Réelle</Text>
                                 <Clock size={18} color={colors.success} />
                             </View>
                             {renderChronobiology()}
                             <Text style={[styles.analysisText, {color: colors.subText, marginTop: 15}]}>
-                                Basé sur vos horaires réels de sessions Focus.
+                                Basé sur vos heures d'activité (Création de tâches, écriture, focus).
                             </Text>
                         </View>
 

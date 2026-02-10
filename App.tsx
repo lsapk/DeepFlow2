@@ -138,20 +138,16 @@ const App: React.FC = () => {
           const remaining = await processQueue();
           
           if (remaining > 0) {
-              // Try to fetch data anyway, maybe only upload is blocked but read is fine?
-              // Or maybe it's just a data conflict. We won't block the app.
               console.warn("Queue not empty, but attempting fetch.");
           }
           
           // 2. Download fresh data
           await fetchData(userId);
           
-          // If fetch succeeded, we are synced (unless queue failed badly)
           setSyncStatus('SYNCED');
           
       } catch (e) {
           console.log("Sync failed (likely network)", e);
-          // Only set OFFLINE_PENDING if specifically a network issue, otherwise keep current state
           setSyncStatus('OFFLINE_PENDING');
       }
   };
@@ -238,7 +234,6 @@ const App: React.FC = () => {
           })
           .subscribe((status) => {
               if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                  // Don't auto-set offline mode here as it can be flaky on resume
                   console.log("Realtime disconnected");
               }
           });
@@ -310,8 +305,6 @@ const App: React.FC = () => {
 
     } catch (error) {
       console.log("Fetch error:", error);
-      // Only set offline if specifically a network request failed significantly
-      // setSyncStatus('OFFLINE_PENDING'); 
     }
   };
 
@@ -326,16 +319,22 @@ const App: React.FC = () => {
       await addToQueue(action);
   };
 
-  // --- CRUD ACTIONS (Existing logic kept) ---
+  // --- CRUD ACTIONS ---
+  
   const createTask = async (title: string, priority: any, goalId?: string, dueDate?: string) => {
       if (!user) return;
       const newTask: Task = {
           id: generateId(), user_id: user.id, title, description: null, priority, linked_goal_id: goalId, due_date: dueDate || null, completed: false, created_at: new Date().toISOString(), sort_order: 0, subtasks: []
       };
+      
       const updatedTasks = [newTask, ...tasks];
       setTasks(updatedTasks);
       saveToCache(CACHE_KEYS.TASKS, updatedTasks);
-      try { const { error } = await supabase.from('tasks').insert(newTask); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'tasks', payload: newTask }); }
+      
+      // CRITICAL FIX: Destructure to remove 'subtasks' array before inserting to DB
+      const { subtasks, ...taskDbPayload } = newTask;
+      
+      try { const { error } = await supabase.from('tasks').insert(taskDbPayload); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'tasks', payload: taskDbPayload }); }
   };
 
   const createHabit = async (habitData: any) => {
@@ -357,7 +356,11 @@ const App: React.FC = () => {
       const updatedGoals = [...goals, newGoal];
       setGoals(updatedGoals);
       saveToCache(CACHE_KEYS.GOALS, updatedGoals);
-      try { const { error } = await supabase.from('goals').insert(newGoal); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'goals', payload: newGoal }); }
+      
+      // CRITICAL FIX: Ensure no extra fields like subobjectives (though optional, safe to be sure)
+      const { subobjectives, ...goalDbPayload } = newGoal;
+
+      try { const { error } = await supabase.from('goals').insert(goalDbPayload); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'goals', payload: goalDbPayload }); }
   };
 
   const toggleTask = async (id: string) => {

@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.75, 300); 
-const STROKE_WIDTH = 8;
+const STROKE_WIDTH = 12;
 const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -31,7 +31,7 @@ interface FocusProps {
 
 const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, openMenu }) => {
   const insets = useSafeAreaInsets();
-  useKeepAwake(); // Prevents screen from sleeping
+  useKeepAwake();
 
   const [viewMode, setViewMode] = useState<'CONFIG' | 'RUNNING' | 'HISTORY' | 'MANUAL'>('CONFIG');
   
@@ -76,8 +76,8 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       if (isActive) {
           pulse.value = withRepeat(
               withSequence(
-                  withTiming(1.02, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-                  withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+                  withTiming(1.02, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+                  withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) })
               ),
               -1,
               true
@@ -94,7 +94,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   // --- RESTORE SESSION ON MOUNT ---
   useEffect(() => {
       checkActiveSession();
-      // Demander la permission pour les notifs
       Notifications.requestPermissionsAsync();
   }, []);
 
@@ -107,7 +106,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               const remaining = Math.floor((session.endTime - now) / 1000);
 
               if (remaining > 0) {
-                  // Session is still active
                   setSessionTitle(session.title);
                   setSelectedTaskId(session.taskId);
                   setDurationMinutes(session.duration);
@@ -116,8 +114,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                   setIsActive(true);
                   setViewMode('RUNNING');
               } else {
-                  // Session finished while app was closed/backgrounded
-                  // We treat this as a completed session
                   handleOfflineCompletion(session);
               }
           }
@@ -129,7 +125,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   const handleOfflineCompletion = async (session: any) => {
       await AsyncStorage.removeItem('active_focus_session');
       
-      // Save to DB
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
           const completedAt = new Date(session.endTime).toISOString();
@@ -143,7 +138,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               title: session.title || 'Session Focus',
           });
 
-          // Award XP
           let xpAmount = REWARDS.FOCUS_SHORT;
           if (session.duration >= 45) xpAmount = REWARDS.FOCUS_DEEP;
           else if (session.duration >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
@@ -163,7 +157,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       fetchHistory();
   };
 
-  // --- BACKGROUND & TIMER HANDLING ---
   useEffect(() => {
       let interval: any;
 
@@ -405,8 +398,34 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
             <Text style={{color: colors.subText, fontSize: 13, textTransform: 'uppercase', letterSpacing: 2}}>Prêt à commencer</Text>
         </View>
 
+        {/* DURATION PILLS */}
+        <View style={styles.section}>
+            <Text style={[styles.label, {color: colors.subText}]}>DURÉE (MIN)</Text>
+            <View style={styles.presetsRow}>
+                {[15, 25, 45, 60].map(m => (
+                    <TouchableOpacity 
+                        key={m} 
+                        onPress={() => { setDurationMinutes(m); setCustomDuration(''); }} 
+                        style={[
+                            styles.presetBtn, 
+                            { backgroundColor: colors.card, borderColor: colors.border }, 
+                            durationMinutes === m && !customDuration && { backgroundColor: colors.text, borderColor: colors.text }
+                        ]}
+                    >
+                        <Text style={[
+                            styles.presetText, 
+                            { color: durationMinutes === m && !customDuration ? (isDarkMode ? '#000' : '#FFF') : colors.text }
+                        ]}>
+                            {m}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+
         {/* TASK INPUT */}
         <View style={styles.section}>
+            <Text style={[styles.label, {color: colors.subText}]}>OBJECTIF</Text>
             <TextInput 
                 style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]} 
                 placeholder="Sur quoi travaillez-vous ?" 
@@ -434,30 +453,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
             )}
         </View>
 
-        {/* DURATION PILLS */}
-        <View style={styles.section}>
-            <View style={styles.presetsRow}>
-                {[15, 25, 45, 60, 90].map(m => (
-                    <TouchableOpacity 
-                        key={m} 
-                        onPress={() => { setDurationMinutes(m); setCustomDuration(''); }} 
-                        style={[
-                            styles.presetBtn, 
-                            { backgroundColor: colors.card }, 
-                            durationMinutes === m && !customDuration && { backgroundColor: colors.text }
-                        ]}
-                    >
-                        <Text style={[
-                            styles.presetText, 
-                            { color: durationMinutes === m && !customDuration ? (isDarkMode ? '#000' : '#FFF') : colors.text }
-                        ]}>
-                            {m}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </View>
-
         {/* ACTION BUTTONS */}
         <View style={styles.footerActions}>
             <TouchableOpacity style={styles.playButton} onPress={startSession}>
@@ -478,9 +473,15 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
 
   const renderRunning = () => (
     <View style={styles.content}>
+        {/* Immersive Background */}
+        <LinearGradient
+            colors={['#0F172A', '#000000']}
+            style={StyleSheet.absoluteFill}
+        />
+        
         <Animated.View style={[styles.timerContainer, animatedCircleStyle]}>
             <AnimatedSvg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
-                <Circle cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS} stroke={isDarkMode ? "#222" : "#EEE"} strokeWidth={STROKE_WIDTH} fill="transparent" />
+                <Circle cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS} stroke={"#1E293B"} strokeWidth={STROKE_WIDTH} fill="transparent" />
                 <Circle
                     cx={CIRCLE_SIZE / 2} cy={CIRCLE_SIZE / 2} r={RADIUS}
                     stroke={colors.accent} strokeWidth={STROKE_WIDTH} fill="transparent"
@@ -491,13 +492,8 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                 />
             </AnimatedSvg>
             <View style={styles.timerTextContainer}>
-                <Text style={[styles.timeText, { color: colors.text }]}>{formatTime(timeLeft)}</Text>
-                <Text style={[styles.statusText, { color: colors.subText }]}>{sessionTitle || 'Concentration'}</Text>
-                {endTimeTimestamp && (
-                    <Text style={{color: colors.subText, fontSize: 12, marginTop: 8, opacity: 0.7}}>
-                        Fin à {new Date(endTimeTimestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </Text>
-                )}
+                <Text style={[styles.timeText, { color: '#FFF' }]}>{formatTime(timeLeft)}</Text>
+                <Text style={[styles.statusText, { color: '#94A3B8' }]}>{sessionTitle || 'Concentration'}</Text>
             </View>
         </Animated.View>
 
@@ -505,7 +501,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
             <X size={28} color="#FFF" />
         </TouchableOpacity>
         
-        <Text style={{color: colors.subText, marginTop: 40, fontSize: 12, opacity: 0.5}}>Restez concentré.</Text>
+        <Text style={{color: '#64748B', marginTop: 40, fontSize: 12, opacity: 0.7, letterSpacing: 1}}>RESTEZ CONCENTRÉ</Text>
     </View>
   );
 
@@ -573,18 +569,20 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         
-        {/* Custom Header */}
-        <View style={styles.header}>
-            <TouchableOpacity onPress={onExit} style={styles.closeBtn}>
-                <X size={24} color={colors.subText} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, {color: colors.text}]}>
-                {viewMode === 'RUNNING' ? 'FOCUS MODE' : 'TIMER'}
-            </Text>
-            <TouchableOpacity onPress={() => changeView(viewMode === 'HISTORY' ? 'CONFIG' : 'HISTORY')}>
-                <MoreHorizontal size={24} color={colors.subText} />
-            </TouchableOpacity>
-        </View>
+        {/* Custom Header (Hidden in Running mode) */}
+        {viewMode !== 'RUNNING' && (
+            <View style={styles.header}>
+                <TouchableOpacity onPress={onExit} style={styles.closeBtn}>
+                    <X size={24} color={colors.subText} />
+                </TouchableOpacity>
+                <Text style={[styles.headerTitle, {color: colors.text}]}>
+                    {viewMode === 'HISTORY' ? 'HISTORIQUE' : 'FOCUS MODE'}
+                </Text>
+                <TouchableOpacity onPress={() => changeView(viewMode === 'HISTORY' ? 'CONFIG' : 'HISTORY')}>
+                    <MoreHorizontal size={24} color={colors.subText} />
+                </TouchableOpacity>
+            </View>
+        )}
 
         {viewMode === 'CONFIG' && renderConfig()}
         {viewMode === 'RUNNING' && renderRunning()}
@@ -623,19 +621,20 @@ const styles = StyleSheet.create({
       marginVertical: 40,
   },
   previewTime: {
-      fontSize: 72,
+      fontSize: 80,
       fontWeight: '200',
       fontVariant: ['tabular-nums'],
       marginBottom: 10,
+      includeFontPadding: false,
   },
   section: {
       marginBottom: 30,
   },
   label: {
-      fontSize: 12,
-      fontWeight: '600',
-      marginBottom: 10,
-      letterSpacing: 0.5,
+      fontSize: 11,
+      fontWeight: '700',
+      marginBottom: 12,
+      letterSpacing: 1,
   },
   input: {
       borderRadius: 16,
@@ -654,6 +653,7 @@ const styles = StyleSheet.create({
       borderRadius: 25,
       alignItems: 'center',
       justifyContent: 'center',
+      borderWidth: 1,
   },
   presetText: {
       fontWeight: '700',
@@ -726,12 +726,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   timeText: {
-    fontSize: 64,
+    fontSize: 72,
     fontWeight: '200',
     fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
   },
   statusText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '500',
     marginTop: 8,
     opacity: 0.8,
