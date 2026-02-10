@@ -8,6 +8,7 @@ import { generateSubtasks } from '../services/ai';
 import * as Haptics from 'expo-haptics';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface TasksProps {
   tasks: Task[];
@@ -25,17 +26,15 @@ interface TasksProps {
 }
 
 const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
-  // OPTIMIZATION 1: Deferred rendering for instant navigation response
+  const insets = useSafeAreaInsets(); // Hook pour gérer les marges de sécurité (encoche, barre home)
+  
   const [isReady, setIsReady] = useState(false);
-
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
-  // Quick Add State
   const [quickTitle, setQuickTitle] = useState('');
   const [quickPriority, setQuickPriority] = useState<Task['priority']>('medium');
 
-  // Edit Form State
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formPriority, setFormPriority] = useState<Task['priority']>('medium');
@@ -51,7 +50,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
       accent: '#007AFF',
       danger: '#FF3B30',
-      warning: '#FF9500',
       success: '#34C759',
       priorityHigh: '#FF3B30',
       priorityMed: '#FF9500',
@@ -59,7 +57,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   };
 
   useEffect(() => {
-    // Wait for navigation animation to finish before rendering the heavy list
     const task = InteractionManager.runAfterInteractions(() => {
       setIsReady(true);
     });
@@ -132,8 +129,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
               }
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("Magic Split", `${subtasks.length} sous-tâches générées !`);
-              // Note: Expanded state is now local to TaskItem, so we can't force open it easily from here without refs, 
-              // but the data update will trigger the item to re-render.
           } else {
               Alert.alert("Info", "L'IA n'a pas pu diviser cette tâche.");
           }
@@ -219,7 +214,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
             data={activeTasks}
             renderItem={renderItem}
             keyExtractor={item => item.id}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 200 }]} // Extra padding pour éviter que le dernier élément soit caché
             ListFooterComponent={ListFooter}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -230,10 +225,19 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
           />
       )}
 
+      {/* QUICK ADD CONTAINER WITH DYNAMIC PADDING */}
       <KeyboardAvoidingView 
-          behavior={Platform.OS === "ios" ? "padding" : "height"} 
-          keyboardVerticalOffset={Platform.OS === "ios" ? 85 : 0}
-          style={[styles.quickAddContainer, { backgroundColor: colors.cardBg, borderTopColor: colors.border }]}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          style={[
+              styles.quickAddWrapper, 
+              { 
+                  backgroundColor: colors.cardBg, 
+                  borderTopColor: colors.border,
+                  // Position dynamique : Barre de nav (70px) + Marge (10px) + Safe Area (insets.bottom)
+                  bottom: 70 + insets.bottom + 10 
+              }
+          ]}
       >
           <View style={styles.quickAddInner}>
               <TouchableOpacity onPress={() => setQuickPriority(p => p === 'low' ? 'medium' : p === 'medium' ? 'high' : 'low')} style={[styles.quickPriorityBtn, { borderColor: getPriorityColor(quickPriority) }]}>
@@ -253,6 +257,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
           </View>
       </KeyboardAvoidingView>
 
+      {/* MODAL (Unchanged) */}
       <Modal visible={editModalVisible} transparent={true} animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
           <BlurView intensity={20} tint="dark" style={styles.modalOverlay}>
               <View style={[styles.modalContent, {backgroundColor: colors.cardBg}]}>
@@ -294,6 +299,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   );
 };
 
+// ... SubtaskItem and TaskItem components remain the same ...
 const SwipeableRow = ({ children, onSwipeLeft, onSwipeRight }: any) => {
     const renderRightActions = () => onSwipeLeft ? <TouchableOpacity style={styles.rightAction} onPress={onSwipeLeft}><Trash2 size={24} color="#FFF" /></TouchableOpacity> : null;
     const renderLeftActions = () => onSwipeRight ? <TouchableOpacity style={styles.leftAction} onPress={onSwipeRight}><Check size={24} color="#FFF" /></TouchableOpacity> : null;
@@ -332,7 +338,6 @@ const SubtaskItem = React.memo(({ sub, taskId, colors, toggleSubtask, deleteSubt
     );
 });
 
-// OPTIMIZATION 2: Local state for expansion to avoid re-rendering entire parent list
 const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColor, createSubtask, toggleSubtask, deleteSubtask }: any) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -352,7 +357,6 @@ const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColo
                 </View>
             </TouchableOpacity>
             
-            {/* Conditional Rendering without AnimateHeight for maximum speed */}
             {isExpanded && (
                 <View style={[styles.subtaskList, {borderTopColor: colors.border}]}>
                     {task.description ? <Text style={[styles.taskDescPreview, {color: colors.textSub}]}>{task.description}</Text> : null}
@@ -377,7 +381,6 @@ const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColo
         </View>
     )
 }, (prev, next) => {
-    // Precise re-render control: Only re-render if data changes significantly
     return (
         prev.task === next.task && 
         prev.task.subtasks === next.task.subtasks && 
@@ -391,7 +394,8 @@ const styles = StyleSheet.create({
   largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
   subtitle: { fontSize: 15, fontWeight: '500', marginTop: 4 },
   
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: 20 },
+  
   completedGroup: { marginTop: 30 },
   groupHeader: { fontSize: 13, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   
@@ -405,18 +409,31 @@ const styles = StyleSheet.create({
   
   subtaskList: { padding: 16, borderTopWidth: 1, backgroundColor: 'rgba(0,0,0,0.02)' },
   taskDescPreview: { fontSize: 14, marginBottom: 12, fontStyle: 'italic' },
-  subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5 }, // Increased padding for touch target
+  subtaskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5 },
   subCheck: { width: 18, height: 18, borderRadius: 6, borderWidth: 1.5, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
   subCheckInner: { width: 10, height: 10, borderRadius: 2 },
   subtaskText: { fontSize: 15, flex: 1 },
   subtaskTextDone: { opacity: 0.5, textDecorationLine: 'line-through' },
   addSubtaskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
-  subInput: { flex: 1, fontSize: 15, marginRight: 10, height: 40 }, // Explicit height
+  subInput: { flex: 1, fontSize: 15, marginRight: 10, height: 40 },
   
   leftAction: { backgroundColor: '#34C759', justifyContent: 'center', alignItems: 'flex-end', flex: 1, paddingRight: 20, borderRadius: 12 },
   rightAction: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'flex-start', flex: 1, paddingLeft: 20, borderRadius: 12 },
   
-  quickAddContainer: { borderTopWidth: 1, paddingTop: 10, paddingBottom: 30, paddingHorizontal: 16 },
+  quickAddWrapper: { 
+      position: 'absolute', 
+      left: 0, 
+      right: 0, 
+      borderTopWidth: 1, 
+      paddingTop: 10, 
+      paddingBottom: 15, 
+      paddingHorizontal: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 5,
+  },
   quickAddInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   quickPriorityBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   priorityDot: { width: 12, height: 12, borderRadius: 6 },

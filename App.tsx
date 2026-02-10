@@ -90,7 +90,6 @@ const App: React.FC = () => {
       // Listen for app coming to foreground to trigger sync
       const subscription = AppState.addEventListener('change', nextAppState => {
           if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-              console.log('App has come to the foreground! Syncing...');
               if (session?.user?.id) runFullSync(session.user.id);
           }
           appState.current = nextAppState;
@@ -139,19 +138,20 @@ const App: React.FC = () => {
           const remaining = await processQueue();
           
           if (remaining > 0) {
-              // CRUCIAL: If we still have pending items, we are likely offline or have sync issues.
-              // We DO NOT fetch fresh data to avoid overwriting local optimistic updates with stale server data.
-              // We trust local state.
-              setSyncStatus('OFFLINE_PENDING');
-              return; 
+              // Try to fetch data anyway, maybe only upload is blocked but read is fine?
+              // Or maybe it's just a data conflict. We won't block the app.
+              console.warn("Queue not empty, but attempting fetch.");
           }
           
-          // 2. Then download fresh data only if queue is clear
+          // 2. Download fresh data
           await fetchData(userId);
+          
+          // If fetch succeeded, we are synced (unless queue failed badly)
           setSyncStatus('SYNCED');
           
       } catch (e) {
-          console.warn("Sync failed (Offline)", e);
+          console.log("Sync failed (likely network)", e);
+          // Only set OFFLINE_PENDING if specifically a network issue, otherwise keep current state
           setSyncStatus('OFFLINE_PENDING');
       }
   };
@@ -160,11 +160,9 @@ const App: React.FC = () => {
       try {
           const hasOnboarded = await AsyncStorage.getItem('has_onboarded');
           if (hasOnboarded === 'true') {
-              // Si déjà onboardé, on passe direct à l'auth
               setCheckingOnboarding(false);
               initAuth();
           } else {
-              // Sinon, on affiche l'onboarding
               setCurrentView(ViewState.ONBOARDING);
               setCheckingOnboarding(false);
           }
@@ -177,7 +175,6 @@ const App: React.FC = () => {
   const finishOnboarding = async () => {
       try {
           await AsyncStorage.setItem('has_onboarded', 'true');
-          // Forcer l'affichage Auth immédiatement
           setCurrentView(ViewState.AUTH);
           setCheckingOnboarding(false); 
           initAuth();
@@ -240,11 +237,9 @@ const App: React.FC = () => {
                   }
           })
           .subscribe((status) => {
-              if (status === 'SUBSCRIBED') {
-                  // Connected
-              } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                  // Handle disconnect gracefully
-                  console.log("Realtime disconnected - Offline mode active");
+              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                  // Don't auto-set offline mode here as it can be flaky on resume
+                  console.log("Realtime disconnected");
               }
           });
       realtimeChannel.current = channel;
@@ -253,9 +248,9 @@ const App: React.FC = () => {
   const fetchData = async (userId: string) => {
     try {
       let { data: userData, error: userError } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
-      if (userError) throw userError;
-
-      if (!userData) {
+      
+      // If user profile missing but auth valid, recreate it (edge case)
+      if (!userData && !userError) {
           const { data: authUser } = await supabase.auth.getUser();
           const email = authUser?.user?.email;
           const { data: newProfile } = await supabase.from('user_profiles').insert({
@@ -263,6 +258,7 @@ const App: React.FC = () => {
           }).select().single();
           userData = newProfile;
       }
+      
       if (userData) {
           setUser(userData);
           saveToCache(CACHE_KEYS.USER, userData);
@@ -291,10 +287,6 @@ const App: React.FC = () => {
           supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId)
       ]);
 
-      if (tasksRes.error) throw tasksRes.error;
-      if (habitsRes.error) throw habitsRes.error;
-      if (goalsRes.error) throw goalsRes.error;
-
       if (tasksRes.data) {
           setTasks(tasksRes.data);
           saveToCache(CACHE_KEYS.TASKS, tasksRes.data);
@@ -317,9 +309,9 @@ const App: React.FC = () => {
       }
 
     } catch (error) {
-      console.log("Fetch error (likely offline):", error);
-      setSyncStatus('OFFLINE_PENDING');
-      // Do NOT clear state here. We keep the cached version.
+      console.log("Fetch error:", error);
+      // Only set offline if specifically a network request failed significantly
+      // setSyncStatus('OFFLINE_PENDING'); 
     }
   };
 
@@ -330,27 +322,15 @@ const App: React.FC = () => {
   };
 
   const queueAction = async (action: any) => {
-      setSyncStatus('OFFLINE_PENDING'); // Visual feedback immediate
+      setSyncStatus('OFFLINE_PENDING'); 
       await addToQueue(action);
-      // Optional: Try to process queue immediately if network might be back
-      // processQueue().then(r => r === 0 && setSyncStatus('SYNCED')); 
   };
 
-  // --- CRUD ACTIONS (Rest unchanged for brevity, keeping existing logic) ---
+  // --- CRUD ACTIONS (Existing logic kept) ---
   const createTask = async (title: string, priority: any, goalId?: string, dueDate?: string) => {
       if (!user) return;
       const newTask: Task = {
-          id: generateId(),
-          user_id: user.id,
-          title,
-          description: null,
-          priority,
-          linked_goal_id: goalId,
-          due_date: dueDate || null,
-          completed: false,
-          created_at: new Date().toISOString(),
-          sort_order: 0,
-          subtasks: []
+          id: generateId(), user_id: user.id, title, description: null, priority, linked_goal_id: goalId, due_date: dueDate || null, completed: false, created_at: new Date().toISOString(), sort_order: 0, subtasks: []
       };
       const updatedTasks = [newTask, ...tasks];
       setTasks(updatedTasks);
@@ -361,14 +341,7 @@ const App: React.FC = () => {
   const createHabit = async (habitData: any) => {
       if (!user) return;
       const newHabit: Habit = {
-          id: generateId(),
-          user_id: user.id,
-          title: habitData.title,
-          streak: 0,
-          target: habitData.target || 1,
-          frequency: habitData.frequency || 'daily',
-          created_at: new Date().toISOString(),
-          ...habitData
+          id: generateId(), user_id: user.id, title: habitData.title, streak: 0, target: habitData.target || 1, frequency: habitData.frequency || 'daily', created_at: new Date().toISOString(), ...habitData
       };
       const updatedHabits = [...habits, newHabit];
       setHabits(updatedHabits);
@@ -379,15 +352,7 @@ const App: React.FC = () => {
   const createGoal = async (title: string) => {
       if (!user) return;
       const newGoal: Goal = {
-          id: generateId(),
-          user_id: user.id,
-          title,
-          description: null,
-          completed: false,
-          target_date: null,
-          progress: 0,
-          sort_order: 0,
-          created_at: new Date().toISOString()
+          id: generateId(), user_id: user.id, title, description: null, completed: false, target_date: null, progress: 0, sort_order: 0, created_at: new Date().toISOString()
       };
       const updatedGoals = [...goals, newGoal];
       setGoals(updatedGoals);

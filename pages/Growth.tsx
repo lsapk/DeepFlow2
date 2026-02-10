@@ -10,6 +10,7 @@ import SkeletonAnalysis from '../components/SkeletonAnalysis';
 import Markdown from 'react-native-markdown-display';
 import Svg, { Polygon, Line, Circle, Text as SvgText, Rect, Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../services/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -68,11 +69,33 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
   
-  // Analysis Data
-  const [lifeWheelData, setLifeWheelData] = useState<number[]>([60, 50, 70, 40, 80, 55]); 
+  // Real Analysis Data
+  const [lifeWheelData, setLifeWheelData] = useState<number[]>([20, 20, 20, 20, 20, 20]); // Default flat
+  const [focusHistory, setFocusHistory] = useState<any[]>([]);
   const [isAnalyzingWheel, setIsAnalyzingWheel] = useState(false);
 
-  // --- COMPUTED STATS ---
+  // --- FETCH REAL DATA ---
+  useEffect(() => {
+      const fetchFocusData = async () => {
+          const { data } = await supabase.from('focus_sessions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+          if (data) setFocusHistory(data);
+          setLoading(false);
+      };
+      
+      // Calculate initial wheel based on goals categories if possible
+      const calculateInitialWheel = () => {
+          // Simple heuristic based on active goals categories if available
+          // For now, default flat is fine, user triggers AI for deep analysis
+      };
+
+      fetchFocusData();
+      
+      if (messages.length === 0) {
+          setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. Je peux analyser tes données ou t'aider à t'organiser.\n\n* Pose-moi une question sur ta productivité.\n* Demande-moi d'ajouter une tâche ou un objectif.` }]);
+      }
+  }, []);
+
+  // --- COMPUTED STATS (REAL) ---
   const stats = useMemo(() => {
       const totalTasks = tasks.length || 1;
       const completedTasks = tasks.filter(t => t.completed).length;
@@ -83,29 +106,30 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           ? Math.round(activeHabits.reduce((acc, h) => acc + h.streak, 0) / activeHabits.length) 
           : 0;
 
-      // Score global arbitraire pour la gamification
-      const productivityScore = Math.min(100, Math.round((taskRate * 0.4) + (Math.min(avgStreak, 30) * 2) + (player.level * 2)));
+      // Score global calculated from REAL performance
+      const productivityScore = Math.min(100, Math.round((taskRate * 0.4) + (Math.min(avgStreak, 30) * 1.5) + (player.level * 1.5)));
 
-      // Weekly Activity (Mocké intelligemment basé sur les tâches créées vs complétées récemment si on avait les dates précises, ici randomisé autour du score)
-      const weeklyActivity = Array.from({length: 7}).map((_, i) => {
-          const base = productivityScore / 2;
-          return Math.min(100, Math.max(10, base + (Math.random() * 40 - 20)));
+      // Weekly Activity based on Focus Sessions count per day of week (REAL DATA)
+      const weeklyActivity = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
+      focusHistory.forEach(session => {
+          const d = new Date(session.created_at);
+          const day = d.getDay(); // 0 is Sunday
+          const adjustedDay = day === 0 ? 6 : day - 1; // 0 is Monday
+          weeklyActivity[adjustedDay] += session.duration || 25;
       });
+      
+      // Normalize weekly activity for bar chart height (max 100)
+      const maxActivity = Math.max(...weeklyActivity, 1);
+      const normalizedWeekly = weeklyActivity.map(v => (v / maxActivity) * 100);
 
-      return { productivityScore, taskRate, avgStreak, weeklyActivity, completedTasks };
-  }, [tasks, habits, player.level]);
-
-  useEffect(() => {
-      setTimeout(() => setLoading(false), 600);
-      if (messages.length === 0) {
-          setMessages([{ role: 'ai', text: `### Bonjour ${user.display_name?.split(' ')[0]} ! 👋\n\nJe suis **DeepFlow AI**. Je peux analyser tes données ou t'aider à t'organiser.\n\n* Pose-moi une question sur ta productivité.\n* Demande-moi d'ajouter une tâche ou un objectif.` }]);
-      }
-  }, []);
+      return { productivityScore, taskRate, avgStreak, weeklyActivity: normalizedWeekly, completedTasks };
+  }, [tasks, habits, player.level, focusHistory]);
 
   const refreshWheelAnalysis = async () => {
       setIsAnalyzingWheel(true);
       playMenuClick();
-      const scores = await generateLifeWheelAnalysis({ tasks: tasks.slice(0, 20), habits, goals });
+      // Use real data context
+      const scores = await generateLifeWheelAnalysis({ tasks: tasks.slice(0, 20), habits, goals, recentFocus: focusHistory.slice(0, 10) });
       if (scores) {
           setLifeWheelData(scores);
           playSuccess();
@@ -126,7 +150,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
       
       try {
-          const context: any = { user: { name: user.display_name }, tasks: tasks.slice(0,5), habits };
+          const context: any = { user: { name: user.display_name }, tasks: tasks.slice(0,5), habits, focusStats: stats };
           const response = await generateActionableCoaching(userMsg, context, isCreationMode);
           
           if (response.action) {
@@ -204,7 +228,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                   <View key={i} style={{alignItems: 'center', gap: 6}}>
                       <View style={{
                           width: barW, 
-                          height: (val / max) * h, 
+                          height: (val / max) * h || 4, // Min height visual
                           backgroundColor: i === 6 ? colors.primary : (isDarkMode ? '#333' : '#E5E5EA'),
                           borderRadius: 6
                       }} />
@@ -265,10 +289,23 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const renderChronobiology = () => {
+      // Calculate REAL chronobiology based on focus history time
+      const buckets = [0, 0, 0, 0]; // 6h, 12h, 18h, 22h simplified
+      focusHistory.forEach(s => {
+          const hour = new Date(s.created_at).getHours();
+          if (hour >= 6 && hour < 12) buckets[0]++;
+          else if (hour >= 12 && hour < 18) buckets[1]++;
+          else if (hour >= 18 && hour < 22) buckets[2]++;
+          else buckets[3]++;
+      });
+      const maxBucket = Math.max(...buckets, 1);
+      
       const w = width - 80;
       const h = 100;
-      // Simple sine wave simulation
-      const path = `M 0 ${h} Q ${w*0.25} ${h*0.2} ${w*0.5} ${h*0.5} T ${w} ${h*0.2}`;
+      
+      // Create path based on buckets
+      const step = w / 3;
+      const path = `M 0 ${h - (buckets[0]/maxBucket)*h} L ${step} ${h - (buckets[1]/maxBucket)*h} L ${step*2} ${h - (buckets[2]/maxBucket)*h} L ${w} ${h - (buckets[3]/maxBucket)*h}`;
 
       return (
           <View style={{marginTop: 10}}>
@@ -283,10 +320,10 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                   <Path d={path} stroke={colors.success} strokeWidth="3" fill="none" />
               </Svg>
               <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 6}}>
-                  <Text style={{color: colors.subText, fontSize: 10}}>6h</Text>
-                  <Text style={{color: colors.subText, fontSize: 10}}>12h</Text>
-                  <Text style={{color: colors.subText, fontSize: 10}}>18h</Text>
-                  <Text style={{color: colors.subText, fontSize: 10}}>22h</Text>
+                  <Text style={{color: colors.subText, fontSize: 10}}>Matin</Text>
+                  <Text style={{color: colors.subText, fontSize: 10}}>Midi</Text>
+                  <Text style={{color: colors.subText, fontSize: 10}}>Soir</Text>
+                  <Text style={{color: colors.subText, fontSize: 10}}>Nuit</Text>
               </View>
           </View>
       );
@@ -356,7 +393,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
                         <View style={[styles.card, {backgroundColor: colors.card}]}>
                             <View style={styles.cardHeader}>
-                                <Text style={[styles.cardTitle, {color: colors.text}]}>Activité Hebdomadaire</Text>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Activité Focus (Semaine)</Text>
                                 <BarChart2 size={18} color={colors.subText} />
                             </View>
                             <View style={{marginTop: 10}}>
@@ -376,7 +413,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                         </View>
                         {renderSpiderChart()}
                         <Text style={[styles.analysisText, {color: colors.subText}]}>
-                            L'analyse montre un bon équilibre Mental/Carrière. Pensez à accorder plus de temps aux Loisirs cette semaine pour éviter le burnout.
+                            Cette analyse est générée par IA basée sur vos tâches et habitudes. Rafraîchissez pour une nouvelle analyse.
                         </Text>
                     </View>
                 )}
@@ -390,17 +427,19 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             </View>
                             {renderChronobiology()}
                             <Text style={[styles.analysisText, {color: colors.subText, marginTop: 15}]}>
-                                Vos pics d'énergie sont identifiés vers 10h30 et 16h00. Planifiez vos tâches complexes ("Deep Work") sur ces créneaux.
+                                Basé sur vos horaires de sessions Focus passées.
                             </Text>
                         </View>
 
                         <View style={[styles.card, {backgroundColor: colors.card}]}>
                             <View style={styles.cardHeader}>
-                                <Text style={[styles.cardTitle, {color: colors.text}]}>Consistance (30 jours)</Text>
+                                <Text style={[styles.cardTitle, {color: colors.text}]}>Consistance</Text>
                                 <Target size={18} color={colors.orange} />
                             </View>
                             <View style={styles.heatmapGrid}>
                                 {Array.from({length: 30}).map((_, i) => {
+                                    // Simulated heatmap based on if we have ANY focus session that day index relative to now
+                                    // For now just random visualization of consistency as placeholder for advanced sql
                                     const active = Math.random() > 0.4;
                                     return (
                                         <View 
