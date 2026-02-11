@@ -12,12 +12,14 @@ import { supabase } from '../services/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// --- GOOGLE CONFIG ---
+// --- CONFIGURATION GOOGLE ---
 const GOOGLE_CONFIG = {
-    // ID Client Android fourni par l'utilisateur
+    // L'ID Client que vous avez fourni
+    webClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
+    // Note : Pour les builds natifs (APK/IPA), Google demande souvent des IDs spécifiques Android/iOS.
+    // En attendant, nous utilisons le même ID Web qui fonctionne souvent via Expo Go.
     androidClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
-    iosClientId: 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com',
-    webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+    iosClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
 };
 
 interface CalendarPageProps {
@@ -70,7 +72,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         iosClientId: GOOGLE_CONFIG.iosClientId,
         androidClientId: GOOGLE_CONFIG.androidClientId,
         webClientId: GOOGLE_CONFIG.webClientId,
-        scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        scopes: ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events'],
     });
 
     useEffect(() => {
@@ -80,6 +82,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 setGoogleToken(authentication.accessToken);
                 fetchGoogleCalendarEvents(authentication.accessToken);
             }
+        } else if (response?.type === 'error') {
+            console.log("Auth error", response.error);
+            Alert.alert("Erreur Google", "La connexion a échoué. Vérifiez la configuration dans Google Cloud Console.");
         }
     }, [response]);
 
@@ -126,6 +131,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
             const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startDate}&timeMax=${endDate}&singleEvents=true&orderBy=startTime`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            
+            if (!res.ok) throw new Error("Google API Error");
+
             const data = await res.json();
             
             if (data.items) {
@@ -145,8 +153,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 setGoogleEvents(formatted);
             }
         } catch (error) {
-            console.log("Google Calendar Offline or Error");
-            // Silent fail to keep UI clean
+            console.log("Google Calendar Error:", error);
+            // Don't alert user on every fetch, just fail silently or show small indicator
         } finally {
             setIsLoadingGoogle(false);
         }

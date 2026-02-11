@@ -8,10 +8,17 @@
     "scheme": "deepflow",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.deepflow.app"
+      "bundleIdentifier": "com.deepflow.app",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "DeepFlow a besoin d'accéder à votre calendrier pour synchroniser vos tâches."
+      }
     },
     "android": {
-      "package": "com.deepflow.app"
+      "package": "com.deepflow.app",
+      "permissions": [
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
+      ]
     },
     "web": {
       "bundler": "metro"
