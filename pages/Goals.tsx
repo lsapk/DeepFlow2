@@ -104,9 +104,6 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : 20 }]}>
       <View style={styles.header}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
-               <TouchableOpacity onPress={openMenu} style={{marginRight: 15}}>
-                    <Menu size={24} color={colors.text} />
-               </TouchableOpacity>
                <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
           </View>
           <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>

@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   configScroll: {
       paddingHorizontal: 20,
-      paddingBottom: 50,
+      paddingBottom: 140, // Increased bottom padding to avoid overlap with BottomNav
   },
   timerPreview: {
       alignItems: 'center',

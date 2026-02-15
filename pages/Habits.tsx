@@ -246,9 +246,6 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       {/* HEADER iOS Style */}
       <View style={styles.header}>
          <View style={{flexDirection: 'row', alignItems: 'center'}}>
-             <TouchableOpacity onPress={openMenu} style={{marginRight: 15}}>
-                  <Menu size={24} color={colors.text} />
-             </TouchableOpacity>
              <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
          </View>
          <View style={styles.headerRight}>

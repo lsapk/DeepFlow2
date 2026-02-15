@@ -231,9 +231,6 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
       {/* Header Styled Apple */}
       <View style={styles.header}>
         <View style={styles.headerTitleContainer}>
-             <TouchableOpacity onPress={openMenu} style={{marginRight: 10}}>
-                <Menu size={24} color={colors.text} />
-            </TouchableOpacity>
             <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
         </View>
 

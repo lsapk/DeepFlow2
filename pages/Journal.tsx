@@ -151,9 +151,6 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top }]}>
         <View style={styles.header}>
-            <TouchableOpacity onPress={openMenu} style={{marginRight: 10}}>
-                <Menu size={24} color={colors.text} />
-            </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
                 <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
             </View>

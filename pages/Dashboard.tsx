@@ -123,9 +123,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       
       {/* HEADER - Safe Area Padding + Standard Flex Row */}
       <View style={[styles.headerContainer, { paddingTop: insets.top + 10, paddingBottom: 10, backgroundColor: colors.bg }]}>
-          <TouchableOpacity onPress={openMenu} style={{marginRight: 12}}>
-              <Menu size={24} color={colors.text} />
-          </TouchableOpacity>
           <View style={styles.headerLeft}>
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
                   <Text style={[styles.greetingSub, {color: colors.textSub}]}>

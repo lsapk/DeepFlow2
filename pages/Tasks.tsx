@@ -198,9 +198,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-          <TouchableOpacity onPress={openMenu} style={{marginRight: 15}}>
-              <Menu size={24} color={colors.text} />
-          </TouchableOpacity>
           <View>
             <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
             <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>

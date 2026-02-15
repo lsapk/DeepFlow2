@@ -12,11 +12,16 @@ import { supabase } from '../services/supabase';
 WebBrowser.maybeCompleteAuthSession();
 
 // --- CONFIGURATION GOOGLE - Secured via Environment Variables ---
+// Fallback to 'dummy' IDs to prevent app crash if keys are missing in .env
 const GOOGLE_CONFIG = {
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy_web_client_id',
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy_android_client_id',
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy_ios_client_id',
 };
+
+const hasValidGoogleConfig = 
+    GOOGLE_CONFIG.androidClientId !== 'dummy_android_client_id' && 
+    GOOGLE_CONFIG.iosClientId !== 'dummy_ios_client_id';
 
 interface CalendarPageProps {
     tasks: Task[];
@@ -62,7 +67,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     
     const [habitHistory, setHabitHistory] = useState<any[]>([]);
 
-    // Google Auth Request
+    // Google Auth Request - Safely initialized with dummy IDs if real ones missing
     const [request, response, promptAsync] = Google.useAuthRequest({
         iosClientId: GOOGLE_CONFIG.iosClientId,
         androidClientId: GOOGLE_CONFIG.androidClientId,
@@ -152,6 +157,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     };
 
     const handleGoogleConnect = () => {
+        if (!hasValidGoogleConfig) {
+            Alert.alert("Configuration Manquante", "Les clés API Google (Client IDs) ne sont pas configurées dans le fichier .env.");
+            return;
+        }
         if (googleToken) {
             fetchGoogleCalendarEvents(googleToken);
         } else {
@@ -356,9 +365,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top, backgroundColor: colors.bg }]}>
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                    <TouchableOpacity onPress={openMenu} style={{marginRight: 10}}>
-                         <Menu size={24} color={colors.text} />
-                    </TouchableOpacity>
                     <Text style={[styles.headerTitle, { color: colors.text }]}>
                         {viewMode === 'MONTH' 
                             ? currentMonthCursor.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()
@@ -369,8 +375,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 
                 <View style={styles.headerControls}>
                     {!googleToken && (
-                        <TouchableOpacity onPress={handleGoogleConnect} style={[styles.googleBtn, { backgroundColor: 'rgba(234, 67, 53, 0.1)' }]} disabled={isLoadingGoogle}>
-                            {isLoadingGoogle ? <ActivityIndicator size="small" color={colors.googleRed} /> : <CalendarIcon size={20} color={colors.googleRed} />}
+                        <TouchableOpacity onPress={handleGoogleConnect} style={[styles.googleBtn, { backgroundColor: hasValidGoogleConfig ? 'rgba(234, 67, 53, 0.1)' : '#333' }]} disabled={isLoadingGoogle}>
+                            {isLoadingGoogle ? <ActivityIndicator size="small" color={colors.googleRed} /> : <CalendarIcon size={20} color={hasValidGoogleConfig ? colors.googleRed : '#555'} />}
                         </TouchableOpacity>
                     )}
                     <View style={[styles.viewToggle, { backgroundColor: colors.toggleBg }]}>

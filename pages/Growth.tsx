@@ -412,9 +412,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         {/* HEADER */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
-                <TouchableOpacity onPress={openMenu}>
-                     <Menu size={24} color={colors.text} />
-                </TouchableOpacity>
                 <BrainCircuit size={28} color={colors.accent} />
                 <Text style={[styles.headerTitle, {color: colors.text}]}>Analyses</Text>
             </View>

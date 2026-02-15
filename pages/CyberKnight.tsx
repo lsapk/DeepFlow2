@@ -240,9 +240,6 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
   return (
     <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top}]}>
         <View style={styles.header}>
-             <TouchableOpacity onPress={openMenu} style={{marginRight: 10}}>
-                <Menu size={24} color={colors.text} />
-            </TouchableOpacity>
             <View style={{flex: 1, flexDirection: 'row', justifyContent: 'center'}}>
                  <View style={styles.rankBadge}>
                       <Crown size={14} color="#FFF" fill="#FFF" />
