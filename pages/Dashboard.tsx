@@ -1,6 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Platform } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
+import { PlayerProfile, UserProfile, Task, Habit, ViewState, FocusSession } from '../types';
 import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +16,7 @@ interface DashboardProps {
   player: PlayerProfile;
   tasks: Task[];
   habits: Habit[];
+  todayFocusSessions: FocusSession[]; // Nouvelle prop pour le score focus
   toggleHabit: (id: string) => void;
   toggleTask: (id: string) => void;
   openFocus: () => void;
@@ -26,7 +27,7 @@ interface DashboardProps {
   openMenu: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, todayFocusSessions = [], toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
   const insets = useSafeAreaInsets();
   
   const colors = {
@@ -50,20 +51,22 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
   const today = new Date();
   const dayOfWeek = today.getDay(); 
   
+  const firstName = user.display_name?.split(' ')[0] || 'Voyageur';
+  
   // Greeting Logic
   const hour = today.getHours();
   let greeting = 'Bonjour';
   if (hour >= 18) greeting = 'Bonsoir';
   else if (hour >= 12) greeting = 'Bon après-midi';
 
-  const firstName = user.display_name?.split(' ')[0] || 'Voyageur';
-
-  // Logic Habits
-  const todaysHabits = habits.filter(h => {
+  // --- LOGIC SCORE & DATA ---
+  
+  // 1. Habits (Scheduled Today)
+  const todaysHabits = useMemo(() => habits.filter(h => {
       if (h.is_archived) return false; 
       if (!h.days_of_week || h.days_of_week.length === 0) return true; 
       return h.days_of_week.includes(dayOfWeek);
-  });
+  }), [habits, dayOfWeek]);
   
   const sortedHabits = [...todaysHabits].sort((a, b) => {
       const aDone = a.last_completed_at && isSameDay(new Date(a.last_completed_at), today);
@@ -72,22 +75,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       return aDone ? 1 : -1;
   });
 
-  // Logic Tasks
+  // 2. Tasks
   const activeTasks = tasks.filter(t => !t.completed).slice(0, 4); 
+  const completedTasksCount = tasks.filter(t => t.completed).length; // Idéalement filtrer par date de complétion si dispo
+  const totalTasks = tasks.length;
 
-  // Score Logic
-  const completedTasksCount = tasks.filter(t => t.completed).length;
-  const totalTasks = tasks.length || 1;
-  const completionRate = completedTasksCount / totalTasks;
+  // 3. Calcul Score Cohérent
+  const productivityScore = useMemo(() => {
+      // Score Habitudes (30%)
+      const habitsDone = todaysHabits.filter(h => h.last_completed_at && isSameDay(new Date(h.last_completed_at), today)).length;
+      const habitsTotal = todaysHabits.length;
+      const habitScore = habitsTotal > 0 ? (habitsDone / habitsTotal) * 100 : 0; // Si 0 habitudes, ne penalise pas mais ne donne pas de points
+
+      // Score Tâches (40%) - Basé sur le taux de complétion global actuel
+      const taskScore = totalTasks > 0 ? (completedTasksCount / totalTasks) * 100 : 0;
+
+      // Score Focus (30%) - Basé sur minutes (Objectif arbitraire 60 min)
+      const focusMinutes = todayFocusSessions.reduce((acc, session) => acc + session.duration, 0);
+      const focusScore = Math.min(100, (focusMinutes / 60) * 100);
+
+      // Moyenne Pondérée
+      let score = (taskScore * 0.4) + (habitScore * 0.3) + (focusScore * 0.3);
+      
+      // Bonus si aucune habitude prévue
+      if (habitsTotal === 0) score = (taskScore * 0.5) + (focusScore * 0.5);
+
+      return Math.round(score) || 0;
+  }, [todaysHabits, completedTasksCount, totalTasks, todayFocusSessions]);
+
+  // Autres stats
   const averageStreak = habits.length > 0 ? habits.reduce((acc, h) => acc + h.streak, 0) / habits.length : 0;
-  
-  let productivityScore = Math.round(
-      (completionRate * 40) + 
-      (Math.min(averageStreak, 30) / 30 * 20) + 
-      (Math.min(player.level, 50) / 50 * 40)
-  );
-  if (productivityScore < 5 && (completedTasksCount > 0 || averageStreak > 0)) productivityScore = 15; 
-  if (productivityScore > 100) productivityScore = 100;
 
   // SVG Calculations for Score Ring
   const size = 80;
@@ -209,7 +226,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
                     </View>
                     <View>
                         <Text style={[styles.statValue, { color: colors.text }]}>{Math.round(averageStreak)}</Text>
-                        <Text style={[styles.statLabel, { color: colors.textSub }]}>Jours (Moy.)</Text>
+                        <Text style={[styles.statLabel, { color: colors.textSub }]}>Streak Moy.</Text>
                     </View>
                 </View>
 

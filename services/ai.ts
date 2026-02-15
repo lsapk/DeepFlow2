@@ -1,20 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { supabase } from './supabase';
 
-// Security: API Key must be loaded from environment variables
-const API_KEY = process.env.API_KEY;
-
-let ai: GoogleGenAI | null = null;
-
-try {
-    if (API_KEY) {
-        ai = new GoogleGenAI({ apiKey: API_KEY });
-    } else {
-        console.warn("Gemini API Key is missing. AI features will be disabled.");
-    }
-} catch (error) {
-    console.warn("Erreur initialisation Google AI", error);
-}
+// Logique pour s'assurer que la clé est bien chargée
+const getApiKey = () => process.env.API_KEY;
 
 async function logAiUsage(type: 'chat' | 'analysis') {
     try {
@@ -22,7 +10,7 @@ async function logAiUsage(type: 'chat' | 'analysis') {
         if (!user) return;
         const today = new Date().toISOString().split('T')[0];
         
-        const { data: existing, error } = await supabase
+        const { data: existing } = await supabase
             .from('daily_usage')
             .select('*')
             .eq('user_id', user.id)
@@ -43,7 +31,7 @@ async function logAiUsage(type: 'chat' | 'analysis') {
             });
         }
     } catch (e) {
-        console.log("Note: Suivi usage IA ignoré (table manquante ou erreur réseau)");
+        // Silencieux si échec (offline ou table manquante)
     }
 }
 
@@ -52,28 +40,34 @@ export const generateActionableCoaching = async (
   userContext: any,
   isCreationMode: boolean
 ): Promise<{ text: string, action?: any }> => {
-  if (!ai) return { text: "⚠️ IA non configurée (Clé manquante)." };
+  const apiKey = getApiKey();
+  if (!apiKey) {
+      console.warn("API Key manquante dans process.env.API_KEY");
+      return { text: "⚠️ IA non configurée (Clé manquante dans le fichier .env)." };
+  }
 
-  // Tentative légère de logging, échec silencieux si hors ligne
+  const ai = new GoogleGenAI({ apiKey });
+
+  // Tentative légère de logging
   logAiUsage('chat').catch(() => {});
   
   try {
     let systemInstruction = `
-      Tu es DeepFlow, un coach de productivité expert et un système de gestion de vie.
-      Réponds en Français, sois concis et motivant. Utilise le format Markdown.
+      Tu es DeepFlow, un coach de productivité expert.
+      Réponds en Français, sois concis, direct et motivant. Utilise le format Markdown.
     `;
 
     if (isCreationMode) {
         systemInstruction += `
-        IMPORTANT : L'utilisateur veut CRÉER quelque chose dans l'application.
-        Tu DOIS répondre UNIQUEMENT avec un objet JSON (sans markdown autour, juste le JSON brut).
+        IMPORTANT : L'utilisateur veut CRÉER quelque chose.
+        Tu DOIS répondre UNIQUEMENT avec un objet JSON (sans markdown, juste le JSON brut).
         
         Formats acceptés :
-        1. Pour une tâche : { "action": "CREATE_TASK", "data": { "title": "Titre précis", "priority": "high" | "medium" | "low" } }
-        2. Pour une habitude : { "action": "CREATE_HABIT", "data": { "title": "Titre habitude" } }
-        3. Pour un objectif : { "action": "CREATE_GOAL", "data": { "title": "Titre objectif" } }
+        1. Tâche : { "action": "CREATE_TASK", "data": { "title": "Titre", "priority": "high"|"medium"|"low" } }
+        2. Habitude : { "action": "CREATE_HABIT", "data": { "title": "Titre" } }
+        3. Objectif : { "action": "CREATE_GOAL", "data": { "title": "Titre" } }
 
-        Si la demande n'est pas claire, invente un titre pertinent basé sur le contexte.
+        Si la demande est floue, déduis un titre pertinent.
         `;
     } else {
         systemInstruction += `Contexte utilisateur: ${JSON.stringify(userContext)}`;
@@ -92,45 +86,36 @@ export const generateActionableCoaching = async (
 
     if (isCreationMode) {
         try {
-            // Nettoyage au cas où le modèle ajoute du markdown ```json ... ```
             const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
             const actionData = JSON.parse(cleanJson);
             return { text: "Action générée", action: actionData };
         } catch (e) {
-            console.warn("AI JSON parse error", e);
-            return { text: "Je n'ai pas compris ce que vous voulez créer. Essayez : 'Ajoute une tâche...'" };
+            return { text: "Je n'ai pas compris l'action. Essayez : 'Ajoute une tâche...'" };
         }
     }
 
     return { text: responseText };
 
   } catch (error) {
-    // Gestion d'erreur spécifique pour le mode hors ligne
-    console.log("Gemini API Error (likely offline):", error);
-    return { text: "🚫 **Mode Hors Ligne**\n\nJe ne peux pas répondre car vous n'êtes pas connecté à internet. Vos données sont sauvegardées localement." };
+    console.log("Gemini API Error:", error);
+    return { text: "🚫 **Erreur IA**\n\nVérifiez votre connexion internet ou la validité de votre clé API." };
   }
 };
 
 export const generateLifeWheelAnalysis = async (fullContext: any): Promise<number[] | null> => {
-    if (!ai) return null;
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
+    const ai = new GoogleGenAI({ apiKey });
+
     logAiUsage('analysis').catch(() => {});
 
     try {
         const prompt = `
-        Analyse les données suivantes de l'utilisateur (Tâches accomplies, Habitudes, Journal, Réflexions) pour évaluer son équilibre de vie actuel.
+        Analyse ces données utilisateur (Tâches, Habitudes, Journal) pour évaluer l'équilibre de vie.
+        Données: ${JSON.stringify(fullContext).substring(0, 10000)} 
         
-        Données:
-        ${JSON.stringify(fullContext).substring(0, 15000)} 
-        
-        Ta réponse DOIT être un JSON STRICT représentant les scores (0-100) pour ces 6 catégories :
-        {
-            "health": number,
-            "leisure": number,
-            "personal": number,
-            "learning": number,
-            "mental": number,
-            "career": number
-        }
+        Réponds UNIQUEMENT avec un JSON de scores (0-100) :
+        { "health": number, "leisure": number, "personal": number, "learning": number, "mental": number, "career": number }
         `;
 
         const response = await ai.models.generateContent({
@@ -144,12 +129,8 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
 
         const data = JSON.parse(text);
         return [
-            data.health || 20,
-            data.leisure || 20,
-            data.personal || 20,
-            data.learning || 20,
-            data.mental || 20,
-            data.career || 20
+            data.health || 50, data.leisure || 50, data.personal || 50,
+            data.learning || 50, data.mental || 50, data.career || 50
         ];
 
     } catch (e) {
@@ -158,22 +139,17 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
 };
 
 export const generateSubtasks = async (taskTitle: string): Promise<string[]> => {
-    if (!ai) return [];
-    logAiUsage('analysis').catch(() => {});
+    const apiKey = getApiKey();
+    if (!apiKey) return [];
+    const ai = new GoogleGenAI({ apiKey });
 
     try {
-        const prompt = `
-        Découpe la tâche suivante en sous-tâches (max 6).
-        Tâche : "${taskTitle}"
-        Renvoie un tableau JSON de strings.
-        `;
-
+        const prompt = `Découpe cette tâche en sous-tâches (max 5) : "${taskTitle}". Renvoie un tableau JSON de strings.`;
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
-
         const text = response.text;
         if (!text) return [];
         const data = JSON.parse(text);
@@ -184,32 +160,20 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
 };
 
 export const generateQuests = async (userLevel: number, context: string): Promise<any[]> => {
-    if (!ai) return [];
+    const apiKey = getApiKey();
+    if (!apiKey) return [];
+    const ai = new GoogleGenAI({ apiKey });
     
     try {
         const prompt = `
-        Génère 3 quêtes RPG motivantes pour un utilisateur de niveau ${userLevel}.
-        Contexte utilisateur : ${context}
-        
-        Format JSON attendu :
-        [
-            {
-                "title": "Titre épique",
-                "description": "Action concrète à faire",
-                "reward_xp": 50,
-                "reward_credits": 20,
-                "target_value": 1,
-                "quest_type": "daily"
-            }
-        ]
+        Génère 3 quêtes RPG pour un utilisateur niveau ${userLevel}. Contexte: ${context}.
+        Format JSON : [{ "title": "...", "description": "...", "reward_xp": 50, "reward_credits": 20, "target_value": 1, "quest_type": "daily" }]
         `;
-
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
-
         const text = response.text;
         if (!text) return [];
         const data = JSON.parse(text);

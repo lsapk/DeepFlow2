@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
 import LevelUpModal from './components/LevelUpModal';
-import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal, Quest, Subtask, SubObjective } from './types';
+import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal, Quest, Subtask, SubObjective, FocusSession } from './types';
 import Dashboard from './pages/Dashboard';
 import Focus from './pages/Focus';
 import Profile from './pages/Profile';
@@ -57,6 +57,8 @@ const App: React.FC = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [quests, setQuests] = useState<Quest[]>([]);
+  const [todayFocus, setTodayFocus] = useState<FocusSession[]>([]); // New state for live score
+  
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SYNCING' | 'OFFLINE_PENDING'>('SYNCED');
   
@@ -226,6 +228,7 @@ const App: React.FC = () => {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'quests', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` }, () => fetchData(userId)) // Listen for focus
           .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, (payload) => {
                   if (payload.eventType === 'UPDATE') {
                       const newP = payload.new as PlayerProfile;
@@ -251,7 +254,6 @@ const App: React.FC = () => {
     try {
       let { data: userData, error: userError } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
       
-      // If user profile missing but auth valid, recreate it (edge case)
       if (!userData && !userError) {
           const { data: authUser } = await supabase.auth.getUser();
           const email = authUser?.user?.email;
@@ -283,11 +285,14 @@ const App: React.FC = () => {
       const { data: settingsData } = await supabase.from('user_settings').select('theme').eq('id', userId).single();
       if (settingsData && settingsData.theme) setIsDarkMode(settingsData.theme === 'dark');
 
-      const [tasksRes, habitsRes, goalsRes, questsRes] = await Promise.all([
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const [tasksRes, habitsRes, goalsRes, questsRes, focusRes] = await Promise.all([
           supabase.from('tasks').select('*, subtasks(*)').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
           supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId),
-          supabase.from('quests').select('*').eq('user_id', userId).eq('completed', false)
+          supabase.from('quests').select('*').eq('user_id', userId).eq('completed', false),
+          supabase.from('focus_sessions').select('*').eq('user_id', userId).gte('completed_at', todayStr) // Today only
       ]);
 
       if (tasksRes.data) {
@@ -306,8 +311,10 @@ const App: React.FC = () => {
           setQuests(questsRes.data);
           saveToCache(CACHE_KEYS.QUESTS, questsRes.data);
       }
+      if (focusRes.data) {
+          setTodayFocus(focusRes.data);
+      }
 
-      // Restore active focus session if exists
       const savedSession = await AsyncStorage.getItem('active_focus_session');
       if (savedSession) {
           setCurrentView(ViewState.FOCUS_MODE);
@@ -324,7 +331,7 @@ const App: React.FC = () => {
     if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
     setProfileVisible(false);
     setIsSidebarVisible(false);
-    await clearCache(); // SECURE CLEANUP
+    await clearCache();
     await supabase.auth.signOut();
   };
 
@@ -333,7 +340,7 @@ const App: React.FC = () => {
       await addToQueue(action);
   };
 
-  // --- CRUD ACTIONS (Rest of existing functions kept as is) ---
+  // --- CRUD ACTIONS (Same as before) ---
   const createTask = async (title: string, priority: any, goalId?: string, dueDate?: string) => {
       if (!user) return;
       const newTask: Task = {
@@ -373,15 +380,8 @@ const App: React.FC = () => {
       const updatedGoals = [...goals, newGoal];
       setGoals(updatedGoals);
       saveToCache(CACHE_KEYS.GOALS, updatedGoals);
-      
       const { subobjectives, ...goalDbPayload } = newGoal;
-
-      try { 
-          const { error } = await supabase.from('goals').insert(goalDbPayload); 
-          if (error) throw error; 
-      } catch (e) { 
-          queueAction({ type: 'INSERT', table: 'goals', payload: goalDbPayload }); 
-      }
+      try { const { error } = await supabase.from('goals').insert(goalDbPayload); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'goals', payload: goalDbPayload }); }
   };
 
   const toggleTask = async (id: string) => {
@@ -427,67 +427,14 @@ const App: React.FC = () => {
       try { await supabase.from('habits').delete().eq('id', id); } catch (e) { queueAction({ type: 'DELETE', table: 'habits', payload: { id } }); }
   };
 
-  const createSubtask = async (taskId: string, title: string) => {
-      if (!user) return;
-      const newSub: Subtask = { id: generateId(), parent_task_id: taskId, user_id: user.id, title: title, completed: false, sort_order: 0, created_at: new Date().toISOString() };
-      const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: [...(t.subtasks || []), newSub] } : t);
-      setTasks(updatedTasks);
-      saveToCache(CACHE_KEYS.TASKS, updatedTasks);
-      try { await supabase.from('subtasks').insert(newSub); } catch (e) { queueAction({ type: 'INSERT', table: 'subtasks', payload: newSub }); }
-  };
-
-  const toggleSubtask = async (subId: string, taskId: string) => {
-      const task = tasks.find(t => t.id === taskId);
-      const sub = task?.subtasks?.find(s => s.id === subId);
-      if (sub) {
-          const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks?.map(s => s.id === subId ? { ...s, completed: !s.completed } : s) } : t);
-          setTasks(updatedTasks);
-          saveToCache(CACHE_KEYS.TASKS, updatedTasks);
-          try { await supabase.from('subtasks').update({ completed: !sub.completed }).eq('id', subId); } catch (e) { queueAction({ type: 'UPDATE', table: 'subtasks', payload: { id: subId, completed: !sub.completed } }); }
-      }
-  };
-
-  const deleteSubtask = async (subId: string, taskId: string) => {
-      const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks?.filter(s => s.id !== subId) } : t);
-      setTasks(updatedTasks);
-      saveToCache(CACHE_KEYS.TASKS, updatedTasks);
-      try { await supabase.from('subtasks').delete().eq('id', subId); } catch (e) { queueAction({ type: 'DELETE', table: 'subtasks', payload: { id: subId } }); }
-  };
-
-  const deleteGoal = async (id: string) => {
-      const updatedGoals = goals.filter(g => g.id !== id);
-      setGoals(updatedGoals);
-      saveToCache(CACHE_KEYS.GOALS, updatedGoals);
-      try { await supabase.from('goals').delete().eq('id', id); } catch (e) { queueAction({ type: 'DELETE', table: 'goals', payload: { id } }); }
-  };
-
-  const createSubObjective = async (goalId: string, title: string) => {
-      if (!user) return;
-      const newSub: SubObjective = { id: generateId(), parent_goal_id: goalId, user_id: user.id, title, completed: false, sort_order: 0, created_at: new Date().toISOString() };
-      const updatedGoals = goals.map(g => g.id === goalId ? { ...g, subobjectives: [...(g.subobjectives || []), newSub] } : g);
-      setGoals(updatedGoals);
-      saveToCache(CACHE_KEYS.GOALS, updatedGoals);
-      try { await supabase.from('subobjectives').insert(newSub); } catch (e) { queueAction({ type: 'INSERT', table: 'subobjectives', payload: newSub }); }
-  };
-
-  const toggleSubObjective = async (subId: string, goalId: string) => {
-      const goal = goals.find(g => g.id === goalId);
-      const sub = goal?.subobjectives?.find(s => s.id === subId);
-      if (sub) {
-          const updatedGoals = goals.map(g => g.id === goalId ? { ...g, subobjectives: g.subobjectives?.map(s => s.id === subId ? { ...s, completed: !s.completed } : s) } : g);
-          setGoals(updatedGoals);
-          saveToCache(CACHE_KEYS.GOALS, updatedGoals);
-          try { await supabase.from('subobjectives').update({ completed: !sub.completed }).eq('id', subId); } catch (e) { queueAction({ type: 'UPDATE', table: 'subobjectives', payload: { id: subId, completed: !sub.completed } }); }
-      }
-  };
-
-  const deleteSubObjective = async (subId: string, goalId: string) => {
-      const updatedGoals = goals.map(g => g.id === goalId ? { ...g, subobjectives: g.subobjectives?.filter(s => s.id !== subId) } : g);
-      setGoals(updatedGoals);
-      saveToCache(CACHE_KEYS.GOALS, updatedGoals);
-      try { await supabase.from('subobjectives').delete().eq('id', subId); } catch (e) { queueAction({ type: 'DELETE', table: 'subobjectives', payload: { id: subId } }); }
-  };
-
+  // ... (Other CRUD actions: createSubtask, toggleSubtask, deleteSubtask, deleteGoal, createSubObjective, etc. kept same) ...
+  const createSubtask = async (taskId: string, title: string) => { if (!user) return; const newSub: Subtask = { id: generateId(), parent_task_id: taskId, user_id: user.id, title: title, completed: false, sort_order: 0, created_at: new Date().toISOString() }; const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: [...(t.subtasks || []), newSub] } : t); setTasks(updatedTasks); saveToCache(CACHE_KEYS.TASKS, updatedTasks); try { await supabase.from('subtasks').insert(newSub); } catch (e) { queueAction({ type: 'INSERT', table: 'subtasks', payload: newSub }); } };
+  const toggleSubtask = async (subId: string, taskId: string) => { const task = tasks.find(t => t.id === taskId); const sub = task?.subtasks?.find(s => s.id === subId); if (sub) { const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks?.map(s => s.id === subId ? { ...s, completed: !s.completed } : s) } : t); setTasks(updatedTasks); saveToCache(CACHE_KEYS.TASKS, updatedTasks); try { await supabase.from('subtasks').update({ completed: !sub.completed }).eq('id', subId); } catch (e) { queueAction({ type: 'UPDATE', table: 'subtasks', payload: { id: subId, completed: !sub.completed } }); } } };
+  const deleteSubtask = async (subId: string, taskId: string) => { const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks?.filter(s => s.id !== subId) } : t); setTasks(updatedTasks); saveToCache(CACHE_KEYS.TASKS, updatedTasks); try { await supabase.from('subtasks').delete().eq('id', subId); } catch (e) { queueAction({ type: 'DELETE', table: 'subtasks', payload: { id: subId } }); } };
+  const deleteGoal = async (id: string) => { const updatedGoals = goals.filter(g => g.id !== id); setGoals(updatedGoals); saveToCache(CACHE_KEYS.GOALS, updatedGoals); try { await supabase.from('goals').delete().eq('id', id); } catch (e) { queueAction({ type: 'DELETE', table: 'goals', payload: { id } }); } };
+  const createSubObjective = async (goalId: string, title: string) => { if (!user) return; const newSub: SubObjective = { id: generateId(), parent_goal_id: goalId, user_id: user.id, title, completed: false, sort_order: 0, created_at: new Date().toISOString() }; const updatedGoals = goals.map(g => g.id === goalId ? { ...g, subobjectives: [...(g.subobjectives || []), newSub] } : g); setGoals(updatedGoals); saveToCache(CACHE_KEYS.GOALS, updatedGoals); try { await supabase.from('subobjectives').insert(newSub); } catch (e) { queueAction({ type: 'INSERT', table: 'subobjectives', payload: newSub }); } };
+  const toggleSubObjective = async (subId: string, goalId: string) => { const goal = goals.find(g => g.id === goalId); const sub = goal?.subobjectives?.find(s => s.id === subId); if (sub) { const updatedGoals = goals.map(g => g.id === goalId ? { ...g, subobjectives: g.subobjectives?.map(s => s.id === subId ? { ...s, completed: !s.completed } : s) } : g); setGoals(updatedGoals); saveToCache(CACHE_KEYS.GOALS, updatedGoals); try { await supabase.from('subobjectives').update({ completed: !sub.completed }).eq('id', subId); } catch (e) { queueAction({ type: 'UPDATE', table: 'subobjectives', payload: { id: subId, completed: !sub.completed } }); } } };
+  const deleteSubObjective = async (subId: string, goalId: string) => { const updatedGoals = goals.map(g => g.id === goalId ? { ...g, subobjectives: g.subobjectives?.filter(s => s.id !== subId) } : g); setGoals(updatedGoals); saveToCache(CACHE_KEYS.GOALS, updatedGoals); try { await supabase.from('subobjectives').delete().eq('id', subId); } catch (e) { queueAction({ type: 'DELETE', table: 'subobjectives', payload: { id: subId } }); } };
   const deleteJournalEntry = async (id: string) => { try { await supabase.from('journal_entries').delete().eq('id', id); } catch(e) { console.error("Delete journal error", e); } };
   const deleteReflection = async (id: string) => { try { await supabase.from('daily_reflections').delete().eq('id', id); } catch(e) { console.error("Delete reflection error", e); } };
   const aiStartFocus = (m: number) => setCurrentView(ViewState.FOCUS_MODE);
@@ -505,12 +452,11 @@ const App: React.FC = () => {
     const commonProps = { isDarkMode };
     const openMenuHandler = () => setIsSidebarVisible(true);
     
-    // Contenu rendu dans un Wrapper Animé pour la transition
     let Content = null;
 
     switch (currentView) {
       case ViewState.TODAY:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} todayFocusSessions={todayFocus} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
         break;
       case ViewState.PLANNING:
         Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
@@ -543,7 +489,7 @@ const App: React.FC = () => {
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       default:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} todayFocusSessions={todayFocus} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
     }
 
     const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation } from 'react-native';
-import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2, MoreHorizontal } from 'lucide-react-native';
+import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2, MoreHorizontal, History } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';
@@ -54,9 +54,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   // History & Stats
   const [history, setHistory] = useState<FocusSession[]>([]);
   const [totalTime, setTotalTime] = useState(0);
-
-  // Background Timer State
-  const appState = useRef(AppState.currentState);
 
   // Animation Values
   const pulse = useSharedValue(1);
@@ -329,7 +326,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                   Alert.alert("Focus Terminé", `Bravo ! +${xpAmount} XP`);
               }
           } catch (e) {
-              console.log("Offline: Queuing focus session");
               addToQueue({ type: 'INSERT', table: 'focus_sessions', payload: sessionPayload });
               Alert.alert("Terminé (Hors Ligne)", "Session sauvegardée localement.");
           }
@@ -461,31 +457,18 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
             )}
         </View>
 
-        {/* ACTION BUTTONS */}
+        {/* MAIN PLAY BUTTON */}
         <View style={styles.footerActions}>
             <TouchableOpacity style={styles.playButton} onPress={startSession}>
                 <Play size={32} color="#FFF" fill="#FFF" style={{marginLeft: 4}} />
             </TouchableOpacity>
-            
-            <View style={styles.secondaryActions}>
-                <TouchableOpacity onPress={() => changeView('MANUAL')} style={[styles.secBtn, {backgroundColor: colors.card}]}>
-                    <Plus size={20} color={colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => changeView('HISTORY')} style={[styles.secBtn, {backgroundColor: colors.card}]}>
-                    <List size={20} color={colors.text} />
-                </TouchableOpacity>
-            </View>
         </View>
     </ScrollView>
   );
 
   const renderRunning = () => (
     <View style={styles.content}>
-        {/* Immersive Background */}
-        <LinearGradient
-            colors={['#0F172A', '#000000']}
-            style={StyleSheet.absoluteFill}
-        />
+        <LinearGradient colors={['#0F172A', '#000000']} style={StyleSheet.absoluteFill} />
         
         <Animated.View style={[styles.timerContainer, animatedCircleStyle]}>
             <AnimatedSvg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
@@ -577,7 +560,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         
-        {/* Custom Header (Hidden in Running mode) */}
+        {/* Custom Header with Buttons moved here */}
         {viewMode !== 'RUNNING' && (
             <View style={styles.header}>
                 <TouchableOpacity onPress={onExit} style={styles.closeBtn}>
@@ -586,9 +569,16 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                 <Text style={[styles.headerTitle, {color: colors.text}]}>
                     {viewMode === 'HISTORY' ? 'HISTORIQUE' : 'FOCUS MODE'}
                 </Text>
-                <TouchableOpacity onPress={() => changeView(viewMode === 'HISTORY' ? 'CONFIG' : 'HISTORY')}>
-                    <MoreHorizontal size={24} color={colors.subText} />
-                </TouchableOpacity>
+                
+                {/* Right Header Actions: Manual Add & History */}
+                <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={() => changeView('MANUAL')} style={styles.iconBtn}>
+                        <Plus size={24} color={colors.subText} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => changeView(viewMode === 'HISTORY' ? 'CONFIG' : 'HISTORY')} style={styles.iconBtn}>
+                        {viewMode === 'HISTORY' ? <Timer size={24} color={colors.subText} /> : <History size={24} color={colors.subText} />}
+                    </TouchableOpacity>
+                </View>
             </View>
         )}
 
@@ -617,12 +607,19 @@ const styles = StyleSheet.create({
       fontWeight: '700',
       letterSpacing: 2,
   },
+  headerActions: {
+      flexDirection: 'row',
+      gap: 15,
+  },
   closeBtn: {
+      padding: 4,
+  },
+  iconBtn: {
       padding: 4,
   },
   configScroll: {
       paddingHorizontal: 20,
-      paddingBottom: 140, // Increased bottom padding to avoid overlap with BottomNav
+      paddingBottom: 140,
   },
   timerPreview: {
       alignItems: 'center',
@@ -699,17 +696,6 @@ const styles = StyleSheet.create({
       shadowRadius: 12,
       elevation: 10,
       marginBottom: 30,
-  },
-  secondaryActions: {
-      flexDirection: 'row',
-      gap: 20,
-  },
-  secBtn: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      alignItems: 'center',
-      justifyContent: 'center',
   },
   
   // Running Mode
