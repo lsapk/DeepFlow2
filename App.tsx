@@ -333,8 +333,7 @@ const App: React.FC = () => {
       await addToQueue(action);
   };
 
-  // --- CRUD ACTIONS ---
-  
+  // --- CRUD ACTIONS (Rest of existing functions kept as is) ---
   const createTask = async (title: string, priority: any, goalId?: string, dueDate?: string) => {
       if (!user) return;
       const newTask: Task = {
@@ -493,7 +492,7 @@ const App: React.FC = () => {
   const deleteReflection = async (id: string) => { try { await supabase.from('daily_reflections').delete().eq('id', id); } catch(e) { console.error("Delete reflection error", e); } };
   const aiStartFocus = (m: number) => setCurrentView(ViewState.FOCUS_MODE);
 
-  const renderView = () => {
+  const renderContent = () => {
     if (checkingOnboarding || loading) return (
         <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }}>
             <SkeletonDashboard />
@@ -547,60 +546,62 @@ const App: React.FC = () => {
         Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
     }
 
-    return (
-        <SafeAreaProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-                <View style={[{ flex: 1 }, bgStyle]}>
-                    <StatusBar 
-                        barStyle={isDarkMode ? "light-content" : "dark-content"} 
-                        backgroundColor="transparent" 
-                        translucent={true} 
-                    />
-                    
-                    <View style={{ flex: 1 }}>
-                        <Animated.View 
-                            key={currentView} 
-                            entering={FadeIn.duration(200)}
-                            style={{flex: 1}}
-                        >
-                            {Content}
-                        </Animated.View>
-                        
-                        {player && (
-                            <LevelUpModal visible={levelUpVisible} newLevel={player.level} onClose={() => setLevelUpVisible(false)} />
-                        )}
+    const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
 
-                        {currentView !== ViewState.ONBOARDING && user && player && (
-                            <>
-                                <Sidebar 
-                                    visible={isSidebarVisible} 
-                                    onClose={() => setIsSidebarVisible(false)} 
-                                    user={user} 
-                                    setView={setCurrentView} 
-                                    currentView={currentView} 
-                                    onLogout={handleLogout}
-                                />
-                                <Profile 
-                                    visible={profileVisible} 
-                                    onClose={() => setProfileVisible(false)} 
-                                    user={user} player={player} logout={handleLogout} 
-                                    onThemeChange={setIsDarkMode}
-                                />
-                                {session && (
-                                    <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
-                                )}
-                            </>
+    return (
+        <View style={[{ flex: 1 }, bgStyle]}>
+            <StatusBar 
+                barStyle={isDarkMode ? "light-content" : "dark-content"} 
+                backgroundColor="transparent" 
+                translucent={true} 
+            />
+            
+            <View style={{ flex: 1 }}>
+                <Animated.View 
+                    key={currentView} 
+                    entering={FadeIn.duration(200)}
+                    style={{flex: 1}}
+                >
+                    {Content}
+                </Animated.View>
+                
+                {player && (
+                    <LevelUpModal visible={levelUpVisible} newLevel={player.level} onClose={() => setLevelUpVisible(false)} />
+                )}
+
+                {currentView !== ViewState.ONBOARDING && user && player && (
+                    <>
+                        <Sidebar 
+                            visible={isSidebarVisible} 
+                            onClose={() => setIsSidebarVisible(false)} 
+                            user={user} 
+                            setView={setCurrentView} 
+                            currentView={currentView} 
+                            onLogout={handleLogout}
+                        />
+                        <Profile 
+                            visible={profileVisible} 
+                            onClose={() => setProfileVisible(false)} 
+                            user={user} player={player} logout={handleLogout} 
+                            onThemeChange={setIsDarkMode}
+                        />
+                        {session && (
+                            <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
                         )}
-                    </View>
-                </View>
-            </GestureHandlerRootView>
-        </SafeAreaProvider>
+                    </>
+                )}
+            </View>
+        </View>
     );
   };
 
-  const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
-
-  return renderView();
+  return (
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        {renderContent()}
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
+  );
 };
 
 export default App;
