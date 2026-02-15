@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Calendar as CalendarIcon, MapPin, Clock, AlignLeft, LogIn } from 'lucide-react-native';
@@ -14,10 +13,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 // --- CONFIGURATION GOOGLE ---
 const GOOGLE_CONFIG = {
-    // L'ID Client que vous avez fourni
     webClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
-    // Note : Pour les builds natifs (APK/IPA), Google demande souvent des IDs spécifiques Android/iOS.
-    // En attendant, nous utilisons le même ID Web qui fonctionne souvent via Expo Go.
     androidClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
     iosClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
 };
@@ -55,8 +51,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     // View State
     const [viewMode, setViewMode] = useState<'MONTH' | 'WEEK'>('MONTH');
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [currentMonthCursor, setCurrentMonthCursor] = useState(new Date()); // Pour la navigation mois
-    const [weekCursor, setWeekCursor] = useState(new Date()); // Pour la navigation semaine
+    const [currentMonthCursor, setCurrentMonthCursor] = useState(new Date());
+    const [weekCursor, setWeekCursor] = useState(new Date());
     
     // Data State
     const [mergedEvents, setMergedEvents] = useState<CalendarEvent[]>([]);
@@ -64,7 +60,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     const [googleToken, setGoogleToken] = useState<string | null>(null);
     const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
     
-    // Historique complet des habitudes (toutes les dates)
     const [habitHistory, setHabitHistory] = useState<any[]>([]);
 
     // Google Auth Request
@@ -88,18 +83,17 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         }
     }, [response]);
 
-    // FETCH HABIT HISTORY
     useEffect(() => {
         fetchHabitHistory();
-    }, [habits, selectedDate.getMonth()]); // Rafraîchir si changement de mois
+    }, [habits, selectedDate.getMonth()]);
 
     const fetchHabitHistory = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch completions pour le mois courant +/- 1 mois pour couvrir la vue
-        const startOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() - 1, 1).toISOString();
-        const endOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() + 2, 0).toISOString();
+        // Correctly format dates to YYYY-MM-DD for Supabase query
+        const startOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() - 1, 1).toISOString().split('T')[0];
+        const endOfMonth = new Date(currentMonthCursor.getFullYear(), currentMonthCursor.getMonth() + 2, 0).toISOString().split('T')[0];
 
         try {
             const { data, error } = await supabase
@@ -116,12 +110,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         }
     };
 
-    // Data Merging Effect
     useEffect(() => {
         mergeAllEvents();
     }, [selectedDate, tasks, habits, googleEvents, habitHistory]);
 
-    // Helper: Fetch Google Events
     const fetchGoogleCalendarEvents = async (token: string) => {
         setIsLoadingGoogle(true);
         try {
@@ -154,7 +146,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
             }
         } catch (error) {
             console.log("Google Calendar Error:", error);
-            // Don't alert user on every fetch, just fail silently or show small indicator
         } finally {
             setIsLoadingGoogle(false);
         }
@@ -168,7 +159,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         }
     };
 
-    // Helper: Merge Logic
     const mergeAllEvents = () => {
         const events: CalendarEvent[] = [];
         const dayOfWeek = selectedDate.getDay();
@@ -201,12 +191,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         habits.forEach(habit => {
             const isForToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(dayOfWeek);
             
-            // Check if user has archived habit but kept history? For now exclude archived.
             if (isForToday && !habit.is_archived) {
-                // Check HISTORY for completion on this specific date
                 const isCompletedOnDate = habitHistory.some(h => h.habit_id === habit.id && h.completed_date === selectedDateString);
-                
-                // Also check 'today' local cache from Habits (optional redundancy)
                 const isCompletedTodayLive = isSameDay(selectedDate, new Date()) && habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), new Date());
 
                 events.push({
@@ -231,7 +217,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         setMergedEvents(events);
     };
 
-    // --- NAVIGATION HELPERS ---
     const changePeriod = (delta: number) => {
         playMenuClick();
         if (viewMode === 'MONTH') {
@@ -255,26 +240,20 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         const dayOfWeek = date.getDay();
         const dateString = date.toISOString().split('T')[0];
 
-        // Check Google
         const hasGoogle = googleEvents.some(ev => isSameDay(new Date(ev.start_time!), date));
         if (hasGoogle) return { has: true, color: colors.googleRed };
 
-        // Check Task
         const hasTask = tasks.some(t => t.due_date && isSameDay(new Date(t.due_date), date));
         if (hasTask) return { has: true, color: colors.accent };
 
-        // Check Habit (Completed)
         const hasCompletedHabit = habitHistory.some(h => h.completed_date === dateString);
-        if (hasCompletedHabit) return { has: true, color: '#34C759' }; // Green if done
+        if (hasCompletedHabit) return { has: true, color: '#34C759' };
 
-        // Check Habit (Scheduled but not done - optional)
         const hasScheduledHabit = habits.some(h => !h.is_archived && (!h.days_of_week || h.days_of_week.includes(dayOfWeek)));
         if (hasScheduledHabit) return { has: true, color: '#FF9500' };
 
         return { has: false, color: 'transparent' };
     };
-
-    // --- RENDERERS ---
 
     const renderMonthGrid = () => {
         const year = currentMonthCursor.getFullYear();
@@ -321,7 +300,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
     const renderWeekStrip = () => {
         const startOfWeek = new Date(weekCursor);
-        startOfWeek.setDate(weekCursor.getDate() - weekCursor.getDay()); // Sunday start
+        startOfWeek.setDate(weekCursor.getDate() - weekCursor.getDay());
         
         const weekDays = [];
         for(let i=0; i<7; i++) {
@@ -375,7 +354,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
     return (
         <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top, backgroundColor: colors.bg }]}>
-            {/* TOP BAR */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -403,7 +381,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 </View>
             </View>
 
-            {/* NAVIGATION & CALENDAR */}
             <View style={styles.calendarSection}>
                 <View style={styles.navRow}>
                     <TouchableOpacity onPress={() => changePeriod(-1)} style={styles.navBtn}>
@@ -428,7 +405,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 {viewMode === 'MONTH' ? renderMonthGrid() : renderWeekStrip()}
             </View>
 
-            {/* AGENDA LIST */}
             <View style={[styles.agendaContainer, { backgroundColor: colors.agendaBg }]}>
                 <View style={styles.agendaHeader}>
                     <Text style={[styles.agendaDate, { color: colors.text }]}>
@@ -455,7 +431,6 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                                     activeOpacity={0.8} 
                                     onPress={() => {
                                         if (event.type === 'task') toggleTask(event.id);
-                                        // On ne toggle pas les habitudes passées pour éviter les conflits de streak, ou on peut ajouter une logique spécifique
                                         if (event.type === 'habit' && isSameDay(selectedDate, new Date())) toggleHabit(event.id);
                                         if (event.type === 'google') Alert.alert("Google Calendar", event.title);
                                     }}
@@ -505,206 +480,47 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    
-    // Header
-    header: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        paddingHorizontal: 20, 
-        paddingVertical: 10,
-    },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10 },
     headerLeft: { flex: 1 },
     headerTitle: { fontSize: 18, fontWeight: '800' },
     headerControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    googleBtn: {
-        padding: 8,
-        borderRadius: 8,
-    },
-    viewToggle: {
-        flexDirection: 'row',
-        borderRadius: 8,
-        padding: 2,
-    },
-    toggleItem: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 6,
-    },
-    toggleText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-
-    // Calendar Section
-    calendarSection: {
-        paddingBottom: 10,
-    },
-    navRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 10,
-        marginBottom: 10,
-    },
+    googleBtn: { padding: 8, borderRadius: 8 },
+    viewToggle: { flexDirection: 'row', borderRadius: 8, padding: 2 },
+    toggleItem: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
+    toggleText: { fontSize: 12, fontWeight: '600' },
+    calendarSection: { paddingBottom: 10 },
+    navRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, marginBottom: 10 },
     navBtn: { padding: 4 },
     navLabel: { fontSize: 12 },
-    
-    gridHeader: {
-        flexDirection: 'row',
-        marginBottom: 8,
-        paddingHorizontal: 20,
-    },
-    weekDayLabel: {
-        flex: 1,
-        textAlign: 'center',
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    gridContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        paddingHorizontal: 20,
-    },
-    dayCell: {
-        width: '14.28%',
-        aspectRatio: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 2,
-        borderRadius: 20,
-    },
-    dayNum: {
-        fontSize: 15,
-        fontWeight: '500',
-    },
-    dot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        position: 'absolute',
-        bottom: 6,
-    },
-
-    // Week Strip
-    weekStripContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingHorizontal: 10,
-        height: 70,
-    },
-    weekDayItem: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 45,
-        borderRadius: 12,
-    },
-    weekDayName: {
-        fontSize: 10,
-        marginBottom: 4,
-    },
-    weekDayNum: {
-        fontSize: 16,
-        fontWeight: '700',
-    },
-
-    // Agenda
-    agendaContainer: {
-        flex: 1,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingTop: 20,
-        overflow: 'hidden',
-    },
-    agendaHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 16,
-    },
-    agendaDate: {
-        fontSize: 16,
-        fontWeight: '700',
-        textTransform: 'capitalize',
-    },
-    todayBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-    },
-    todayText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    eventsList: {
-        paddingHorizontal: 20,
-    },
-    emptyState: {
-        alignItems: 'center',
-        marginTop: 40,
-    },
-    emptyText: {
-        fontStyle: 'italic',
-        marginBottom: 10,
-    },
-    addEventHint: {
-        marginTop: 10,
-    },
-    eventCard: {
-        flexDirection: 'row',
-        borderRadius: 12,
-        marginBottom: 12,
-        padding: 12,
-        borderLeftWidth: 4,
-    },
-    timeColumn: {
-        width: 50,
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        borderRightWidth: 1,
-        paddingRight: 8,
-        marginRight: 12,
-    },
-    timeText: {
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    endTimeText: {
-        fontSize: 11,
-    },
-    eventContent: {
-        flex: 1,
-        justifyContent: 'center',
-    },
-    eventTitle: {
-        fontSize: 15,
-        fontWeight: '500',
-        flex: 1,
-    },
-    metaRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-        gap: 4,
-    },
-    metaText: {
-        fontSize: 11,
-    },
-    googleBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: 'rgba(234, 67, 53, 0.2)',
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        borderRadius: 4,
-    },
-    googleBadgeText: {
-        color: '#EA4335',
-        fontSize: 8,
-        fontWeight: '700',
-    },
+    gridHeader: { flexDirection: 'row', marginBottom: 8, paddingHorizontal: 20 },
+    weekDayLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600' },
+    gridContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20 },
+    dayCell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 2, borderRadius: 20 },
+    dayNum: { fontSize: 15, fontWeight: '500' },
+    dot: { width: 4, height: 4, borderRadius: 2, position: 'absolute', bottom: 6 },
+    weekStripContainer: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 10, height: 70 },
+    weekDayItem: { alignItems: 'center', justifyContent: 'center', width: 45, borderRadius: 12 },
+    weekDayName: { fontSize: 10, marginBottom: 4 },
+    weekDayNum: { fontSize: 16, fontWeight: '700' },
+    agendaContainer: { flex: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 20, overflow: 'hidden' },
+    agendaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 },
+    agendaDate: { fontSize: 16, fontWeight: '700', textTransform: 'capitalize' },
+    todayBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    todayText: { fontSize: 12, fontWeight: '600' },
+    eventsList: { paddingHorizontal: 20 },
+    emptyState: { alignItems: 'center', marginTop: 40 },
+    emptyText: { fontStyle: 'italic', marginBottom: 10 },
+    addEventHint: { marginTop: 10 },
+    eventCard: { flexDirection: 'row', borderRadius: 12, marginBottom: 12, padding: 12, borderLeftWidth: 4 },
+    timeColumn: { width: 50, alignItems: 'flex-start', justifyContent: 'center', borderRightWidth: 1, paddingRight: 8, marginRight: 12 },
+    timeText: { fontSize: 13, fontWeight: '600' },
+    endTimeText: { fontSize: 11 },
+    eventContent: { flex: 1, justifyContent: 'center' },
+    eventTitle: { fontSize: 15, fontWeight: '500', flex: 1 },
+    metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
+    metaText: { fontSize: 11 },
+    googleBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(234, 67, 53, 0.2)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+    googleBadgeText: { color: '#EA4335', fontSize: 8, fontWeight: '700' },
 });
 
 export default CalendarPage;

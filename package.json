@@ -9,7 +9,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "prebuild": "expo prebuild"
+    "prebuild": "expo prebuild",
+    "fix:assets": "npx expo prebuild --clean",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "expo": "~52.0.0",

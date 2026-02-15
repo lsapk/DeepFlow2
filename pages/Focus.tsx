@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation } from 'react-native';
 import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2, MoreHorizontal } from 'lucide-react-native';
@@ -10,9 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av';
+import { playSuccess } from '../services/sound';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { addToQueue } from '../services/offline';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.75, 300); 
@@ -130,21 +130,26 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           const completedAt = new Date(session.endTime).toISOString();
           const startedAt = new Date(session.startTime).toISOString();
           
-          await supabase.from('focus_sessions').insert({
+          const sessionPayload = {
               user_id: user.id,
               duration: session.duration,
               completed_at: completedAt,
               started_at: startedAt,
               title: session.title || 'Session Focus',
-          });
+          };
 
-          let xpAmount = REWARDS.FOCUS_SHORT;
-          if (session.duration >= 45) xpAmount = REWARDS.FOCUS_DEEP;
-          else if (session.duration >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
+          try {
+              await supabase.from('focus_sessions').insert(sessionPayload);
+              let xpAmount = REWARDS.FOCUS_SHORT;
+              if (session.duration >= 45) xpAmount = REWARDS.FOCUS_DEEP;
+              else if (session.duration >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
 
-          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
-          if (player) {
-              await addXp(user.id, xpAmount, player);
+              const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
+              if (player) {
+                  await addXp(user.id, xpAmount, player);
+              }
+          } catch (e) {
+              addToQueue({ type: 'INSERT', table: 'focus_sessions', payload: sessionPayload });
           }
       }
 
@@ -192,27 +197,31 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   }
 
   const fetchHistory = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      const { data, error } = await supabase
-        .from('focus_sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('completed_at', { ascending: false })
-        .limit(50);
-        
-      if (data) {
-          const sortedData = data.sort((a, b) => {
-              if (!a.completed_at && !b.completed_at) return 0;
-              if (!a.completed_at) return 1;
-              if (!b.completed_at) return -1;
-              return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
-          });
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          
+          const { data, error } = await supabase
+            .from('focus_sessions')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('completed_at', { ascending: false })
+            .limit(50);
+            
+          if (data) {
+              const sortedData = data.sort((a, b) => {
+                  if (!a.completed_at && !b.completed_at) return 0;
+                  if (!a.completed_at) return 1;
+                  if (!b.completed_at) return -1;
+                  return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
+              });
 
-          setHistory(sortedData);
-          const total = sortedData.reduce((acc, curr) => acc + (curr.duration || 0), 0);
-          setTotalTime(total);
+              setHistory(sortedData);
+              const total = sortedData.reduce((acc, curr) => acc + (curr.duration || 0), 0);
+              setTotalTime(total);
+          }
+      } catch (e) {
+          console.log("Offline history fetch failed");
       }
   };
 
@@ -220,17 +229,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       setSelectedTaskId(task.id);
       if (!sessionTitle) {
           setSessionTitle(task.title);
-      }
-  };
-
-  const playSuccessSound = async () => {
-      try {
-          const { sound } = await Audio.Sound.createAsync(
-             { uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' } 
-          );
-          await sound.playAsync();
-      } catch (error) {
-          console.log("Audio play error", error);
       }
   };
 
@@ -304,29 +302,36 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       setIsActive(false);
       setEndTimeTimestamp(null);
       await AsyncStorage.removeItem('active_focus_session');
-      playSuccessSound();
+      playSuccess();
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
           const now = new Date();
           const startedAt = new Date(now.getTime() - durationMinutes * 60000).toISOString();
           
-          await supabase.from('focus_sessions').insert({
+          const sessionPayload = {
               user_id: user.id,
               duration: durationMinutes,
               completed_at: now.toISOString(),
               started_at: startedAt,
               title: sessionTitle || 'Session Focus',
-          });
+          };
 
-          let xpAmount = REWARDS.FOCUS_SHORT;
-          if (durationMinutes >= 45) xpAmount = REWARDS.FOCUS_DEEP;
-          else if (durationMinutes >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
+          try {
+              await supabase.from('focus_sessions').insert(sessionPayload);
+              let xpAmount = REWARDS.FOCUS_SHORT;
+              if (durationMinutes >= 45) xpAmount = REWARDS.FOCUS_DEEP;
+              else if (durationMinutes >= 25) xpAmount = REWARDS.FOCUS_POMODORO;
 
-          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
-          if (player) {
-              await addXp(user.id, xpAmount, player);
-              Alert.alert("Focus Terminé", `Bravo ! +${xpAmount} XP`);
+              const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
+              if (player) {
+                  await addXp(user.id, xpAmount, player);
+                  Alert.alert("Focus Terminé", `Bravo ! +${xpAmount} XP`);
+              }
+          } catch (e) {
+              console.log("Offline: Queuing focus session");
+              addToQueue({ type: 'INSERT', table: 'focus_sessions', payload: sessionPayload });
+              Alert.alert("Terminé (Hors Ligne)", "Session sauvegardée localement.");
           }
       }
       changeView('HISTORY');
@@ -354,23 +359,26 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           }
           const startedAt = new Date(completedAt.getTime() - duration * 60000);
 
-          const { error } = await supabase.from('focus_sessions').insert({
+          const sessionPayload = {
               user_id: user.id,
               duration: duration,
               completed_at: completedAt.toISOString(),
               started_at: startedAt.toISOString(),
               title: manualTitle
-          });
+          };
 
-          if (error) {
-              Alert.alert("Erreur", "Impossible de sauvegarder : " + error.message);
-              return;
+          try {
+              const { error } = await supabase.from('focus_sessions').insert(sessionPayload);
+              if (error) throw error;
+
+              const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
+              if (player) await addXp(user.id, Math.floor(duration / 2), player); 
+              Alert.alert("Succès", "Session ajoutée.");
+          } catch (e) {
+              addToQueue({ type: 'INSERT', table: 'focus_sessions', payload: sessionPayload });
+              Alert.alert("Hors Ligne", "Session ajoutée à la file d'attente.");
           }
-
-          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
-          if (player) await addXp(user.id, Math.floor(duration / 2), player); 
           
-          Alert.alert("Succès", "Session ajoutée.");
           changeView('HISTORY');
       }
   };

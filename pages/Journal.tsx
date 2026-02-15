@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
@@ -6,6 +5,7 @@ import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Menu, Calendar } from 'l
 import { supabase } from '../services/supabase';
 import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { addToQueue, generateId } from '../services/offline';
 
 interface JournalProps {
   userId: string;
@@ -42,12 +42,16 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
   }, [userId]);
 
   const fetchEntries = async () => {
-      const { data } = await supabase
-        .from('journal_entries')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      if (data) setEntries(data);
+      try {
+          const { data } = await supabase
+            .from('journal_entries')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+          if (data) setEntries(data);
+      } catch (e) {
+          console.log("Journal fetch error (offline)", e);
+      }
   };
 
   const confirmDelete = (id: string) => {
@@ -56,10 +60,16 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
           "Cette action est définitive.",
           [
               { text: "Annuler", style: "cancel" },
-              { text: "Supprimer", style: "destructive", onPress: () => {
+              { text: "Supprimer", style: "destructive", onPress: async () => {
+                  setEntries(prev => prev.filter(e => e.id !== id));
                   if (deleteEntry) {
                       deleteEntry(id);
-                      setEntries(prev => prev.filter(e => e.id !== id));
+                  } else {
+                      try {
+                          await supabase.from('journal_entries').delete().eq('id', id);
+                      } catch (e) {
+                          addToQueue({ type: 'DELETE', table: 'journal_entries', payload: { id } });
+                      }
                   }
               }}
           ]
@@ -68,12 +78,8 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 
   const openModal = () => {
       const now = new Date();
-      // Format local simplified for input placeholder
       const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-      
-      // Auto Title like "20 janvier 2026"
       const autoTitle = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-      
       setTitle(autoTitle);
       setDateInput(localIso);
       setModalVisible(true);
@@ -93,10 +99,11 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
           }
       }
 
-      // 1. CREATE OPTIMISTIC ENTRY
-      const tempId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString();
+      // 1. GENERATE SECURE ID
+      const newId = generateId();
+      
       const newEntry: JournalEntry = {
-          id: tempId,
+          id: newId,
           user_id: userId,
           title,
           content,
@@ -105,8 +112,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
           created_at: finalDate
       };
 
-      // 2. UPDATE UI IMMEDIATELY
-      const previousEntries = [...entries];
+      // 2. OPTIMISTIC UPDATE
       setEntries([newEntry, ...entries]);
       setModalVisible(false);
       
@@ -116,34 +122,23 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
       setMood('neutral');
       setTagsInput('');
 
-      // 3. SEND TO SUPABASE
-      const { data, error } = await supabase.from('journal_entries').insert({
-          user_id: userId,
-          title,
-          content,
-          mood,
-          tags: tagsArray,
-          created_at: finalDate
-      }).select().single();
-
-      if (error) {
-          // 4. REVERT ON ERROR
-          setEntries(previousEntries);
-          Alert.alert("Erreur", "Impossible de sauvegarder l'entrée. Vérifiez votre connexion.");
-      } else {
-          // 5. UPDATE ID WITH REAL ID (AND ADD XP)
-          setEntries(prev => prev.map(e => e.id === tempId ? data : e));
+      // 3. SEND TO SUPABASE OR QUEUE
+      try {
+          const { error } = await supabase.from('journal_entries').insert(newEntry);
+          if (error) throw error;
           
+          // Gamification only if online or we can handle it later (skipping complex queuing for XP to keep it simple)
           const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
           if (player) {
               await addXp(userId, REWARDS.JOURNAL, player);
           }
+      } catch (e) {
+          console.log("Offline mode: Queuing journal entry");
+          addToQueue({ type: 'INSERT', table: 'journal_entries', payload: newEntry });
       }
   };
 
   const getMoodIcon = (m: string, size = 20, active = true) => {
-      const color = active ? (m === mood ? '#FFF' : colors.textSub) : colors.textSub;
-      // Active state bg is handled by container, this is icon color
       switch(m) {
           case 'happy': return <Smile size={size} color={active && m === mood ? '#000' : '#4ADE80'} />;
           case 'sad': return <Frown size={size} color={active && m === mood ? '#000' : '#F87171'} />;
@@ -273,169 +268,34 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginTop: 10, 
-    marginBottom: 10,
-    height: 50,
-  },
-  iconBtn: {
-      width: 40,
-      height: 40,
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50, // BUTTONS ON TOP
-  },
-  headerTitleContainer: {
-      flex: 1,
-      justifyContent: 'center',
-  },
-  largeTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'left',
-  },
-  addButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50, // BUTTONS ON TOP
-  },
-  scrollContent: {
-      paddingHorizontal: 20,
-      paddingBottom: 100,
-      gap: 16,
-  },
-  emptyText: {
-      fontStyle: 'italic',
-      textAlign: 'center',
-      marginTop: 20,
-  },
-  card: {
-      borderRadius: 20,
-      padding: 16,
-      flexDirection: 'row',
-      gap: 16,
-  },
-  cardHeader: {
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      width: 50,
-      borderRightWidth: 1,
-      borderRightColor: '#333',
-      paddingRight: 16,
-  },
-  dayNum: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: '#8E8E93',
-  },
-  monthStr: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: '#8E8E93',
-  },
-  moodBadge: {
-      marginTop: 10,
-  },
-  cardBody: {
-      flex: 1,
-  },
-  cardTitle: {
-      fontSize: 17,
-      fontWeight: '600',
-      marginBottom: 2,
-  },
-  timeStr: {
-      fontSize: 12,
-      marginBottom: 8,
-  },
-  cardContent: {
-      fontSize: 15,
-      lineHeight: 20,
-  },
-  
-  // Modal
-  modalOverlay: {
-      flex: 1,
-  },
-  modalContent: {
-      flex: 1,
-      padding: 20,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      marginTop: 60,
-  },
-  modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 30,
-  },
-  modalTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-  },
-  label: {
-      color: '#8E8E93',
-      fontSize: 12,
-      fontWeight: '600',
-      marginBottom: 8,
-      textTransform: 'uppercase',
-  },
-  moodRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 24,
-      padding: 8,
-      borderRadius: 12,
-  },
-  moodBtn: {
-      padding: 10,
-      borderRadius: 10,
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-  },
-  input: {
-      borderRadius: 12,
-      padding: 14,
-      fontSize: 17,
-      marginBottom: 24,
-  },
-  inputWithIcon: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      marginBottom: 24,
-  },
-  textArea: {
-      minHeight: 150,
-  },
-  saveBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 16,
-      borderRadius: 12,
-      marginBottom: 40,
-  },
-  saveBtnText: {
-      color: '#FFF',
-      fontSize: 17,
-      fontWeight: '700',
-  }
+  container: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, marginTop: 10, marginBottom: 10, height: 50 },
+  headerTitleContainer: { flex: 1, justifyContent: 'center' },
+  largeTitle: { fontSize: 22, fontWeight: '700', textAlign: 'left' },
+  addButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', zIndex: 50 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 100, gap: 16 },
+  emptyText: { fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
+  card: { borderRadius: 20, padding: 16, flexDirection: 'row', gap: 16 },
+  cardHeader: { alignItems: 'center', justifyContent: 'space-between', width: 50, borderRightWidth: 1, borderRightColor: '#333', paddingRight: 16 },
+  dayNum: { fontSize: 24, fontWeight: '700', color: '#8E8E93' },
+  monthStr: { fontSize: 12, fontWeight: '600', color: '#8E8E93' },
+  moodBadge: { marginTop: 10 },
+  cardBody: { flex: 1 },
+  cardTitle: { fontSize: 17, fontWeight: '600', marginBottom: 2 },
+  timeStr: { fontSize: 12, marginBottom: 8 },
+  cardContent: { fontSize: 15, lineHeight: 20 },
+  modalOverlay: { flex: 1 },
+  modalContent: { flex: 1, padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, marginTop: 60 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
+  modalTitle: { fontSize: 20, fontWeight: '700' },
+  label: { color: '#8E8E93', fontSize: 12, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' },
+  moodRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, padding: 8, borderRadius: 12 },
+  moodBtn: { padding: 10, borderRadius: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  input: { borderRadius: 12, padding: 14, fontSize: 17, marginBottom: 24 },
+  inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14, marginBottom: 24 },
+  textArea: { minHeight: 150 },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, marginBottom: 40 },
+  saveBtnText: { color: '#FFF', fontSize: 17, fontWeight: '700' }
 });
 
 export default Journal;

@@ -1,10 +1,8 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { supabase } from './supabase';
 
-// EN REACT NATIVE, process.env N'EXISTE PAS PAR DÉFAUT.
-// Utilisation directe de la clé ou via expo-constants (ici hardcodé pour débloquer).
-const API_KEY = "AIzaSyBRsXHPOaFQVcOH9rCKx39uH8Bsu462uGo"; 
+// Security: API Key must be loaded from environment variables
+const API_KEY = process.env.API_KEY;
 
 let ai: GoogleGenAI | null = null;
 
@@ -12,7 +10,7 @@ try {
     if (API_KEY) {
         ai = new GoogleGenAI({ apiKey: API_KEY });
     } else {
-        console.warn("Gemini API Key is missing.");
+        console.warn("Gemini API Key is missing. AI features will be disabled.");
     }
 } catch (error) {
     console.warn("Erreur initialisation Google AI", error);
@@ -82,7 +80,7 @@ export const generateActionableCoaching = async (
     }
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash", 
+        model: "gemini-3-flash-preview", 
         contents: userMessage,
         config: {
             systemInstruction: systemInstruction,
@@ -136,7 +134,7 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
@@ -155,7 +153,6 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
         ];
 
     } catch (e) {
-        // Retourner null permet à l'UI de gérer le fallback silencieusement
         return null;
     }
 };
@@ -172,7 +169,7 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
@@ -208,7 +205,7 @@ export const generateQuests = async (userLevel: number, context: string): Promis
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });

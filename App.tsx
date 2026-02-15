@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StatusBar, Platform, Alert, AppState, AppStateStatus } from 'react-native';
+import { View, StatusBar, Platform, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomNav from './components/BottomNav';
@@ -28,8 +27,8 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import * as NavigationBar from 'expo-navigation-bar';
-import { saveToCache, loadFromCache, addToQueue, processQueue, getQueueSize, CACHE_KEYS, generateId } from './services/offline';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { saveToCache, loadFromCache, addToQueue, processQueue, getQueueSize, CACHE_KEYS, generateId, clearCache } from './services/offline';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 // Configuration Notifications
 Notifications.setNotificationHandler({
@@ -108,6 +107,13 @@ const App: React.FC = () => {
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FF231F7C',
         });
+      }
+      
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
       }
   };
 
@@ -319,6 +325,7 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
     setProfileVisible(false);
+    await clearCache(); // SECURE CLEANUP
     await supabase.auth.signOut();
   };
 
@@ -339,8 +346,6 @@ const App: React.FC = () => {
       setTasks(updatedTasks);
       saveToCache(CACHE_KEYS.TASKS, updatedTasks);
       
-      // CRITICAL FIX: Destructure to remove 'subtasks' array before inserting to DB
-      // Supabase 'tasks' table does not have 'subtasks' column (it's a relation)
       const { subtasks, ...taskDbPayload } = newTask;
       
       try { 
@@ -371,7 +376,6 @@ const App: React.FC = () => {
       setGoals(updatedGoals);
       saveToCache(CACHE_KEYS.GOALS, updatedGoals);
       
-      // CRITICAL FIX: Ensure no extra fields like subobjectives
       const { subobjectives, ...goalDbPayload } = newGoal;
 
       try { 
@@ -525,13 +529,15 @@ const App: React.FC = () => {
           Content = <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={(h) => {}} deleteHabit={deleteHabit} refreshHabits={() => fetchData(user.id)} openMenu={() => {}} {...commonProps} />;
           break;
       case ViewState.GOALS:
-          Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={() => {}} isDarkMode={isDarkMode} />; 
+          // Fixed Routing: Render Goals directly
+          Content = <Goals goals={goals} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={() => {}} isDarkMode={isDarkMode} />;
           break;
       case ViewState.FOCUS_MODE:
         Content = <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={() => {}} />;
         break;
       case ViewState.CALENDAR:
-        Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={() => {}} isDarkMode={isDarkMode} />;
+        // Fixed Routing: Render Calendar directly
+        Content = <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={() => {}} isDarkMode={isDarkMode} />;
         break;
       case ViewState.JOURNAL:
         Content = <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
@@ -587,7 +593,7 @@ const App: React.FC = () => {
 
   const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
 
-  return renderView(); // Simplify render structure to avoid duplicate providers
+  return renderView();
 };
 
 export default App;

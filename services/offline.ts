@@ -1,6 +1,6 @@
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
+import * as Crypto from 'expo-crypto';
 
 export const QUEUE_KEY = 'offline_queue';
 export const CACHE_KEYS = {
@@ -12,12 +12,9 @@ export const CACHE_KEYS = {
     QUESTS: 'cache_quests'
 };
 
-// --- ID GENERATOR (UUID v4 like) ---
+// --- ID GENERATOR (Secure UUID) ---
 export const generateId = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+    return Crypto.randomUUID();
 };
 
 // --- CACHE MANAGERS ---
@@ -35,6 +32,17 @@ export const loadFromCache = async (key: string) => {
         return data ? JSON.parse(data) : null;
     } catch (e) {
         return null;
+    }
+};
+
+// --- CLEAR CACHE ON LOGOUT ---
+export const clearCache = async () => {
+    try {
+        const keys = [QUEUE_KEY, ...Object.values(CACHE_KEYS)];
+        await AsyncStorage.multiRemove(keys);
+        console.log("Local cache cleared.");
+    } catch (e) {
+        console.error("Error clearing cache", e);
     }
 };
 
