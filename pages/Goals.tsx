@@ -1,8 +1,7 @@
-
 import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, ChevronDown, ChevronUp, X, Calendar, Minus, Flag, GitBranch } from 'lucide-react-native';
+import { Plus, Check, ChevronDown, ChevronUp, X, Calendar, Minus, Flag, GitBranch, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -16,7 +15,7 @@ interface GoalsProps {
   deleteSubObjective: (subId: string, goalId: string) => void;
   userId: string;
   refreshGoals: () => void;
-  openMenu?: () => void;
+  openMenu: () => void;
   isDarkMode?: boolean;
   noPadding?: boolean;
 }
@@ -104,7 +103,12 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : 20 }]}>
       <View style={styles.header}>
-          <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+               <TouchableOpacity onPress={openMenu} style={{marginRight: 15}}>
+                    <Menu size={24} color={colors.text} />
+               </TouchableOpacity>
+               <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
+          </View>
           <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
                 <Plus size={20} color="#FFF" strokeWidth={3} />
           </TouchableOpacity>

@@ -3,18 +3,15 @@ import { View, StatusBar, Platform, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomNav from './components/BottomNav';
+import Sidebar from './components/Sidebar';
 import LevelUpModal from './components/LevelUpModal';
 import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal, Quest, Subtask, SubObjective } from './types';
 import Dashboard from './pages/Dashboard';
-import Growth from './pages/Growth';
-import CyberKnight from './pages/CyberKnight';
 import Focus from './pages/Focus';
 import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
 import Goals from './pages/Goals';
-import Journal from './pages/Journal';
-import ReflectionPage from './pages/Reflection';
 import CalendarPage from './pages/CalendarPage';
 import Planning from './pages/Planning';
 import Introspection from './pages/Introspection';
@@ -44,6 +41,7 @@ Notifications.setNotificationHandler({
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.AUTH);
   const [profileVisible, setProfileVisible] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
   
   // States
   const [checkingOnboarding, setCheckingOnboarding] = useState(true); 
@@ -325,6 +323,7 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
     setProfileVisible(false);
+    setIsSidebarVisible(false);
     await clearCache(); // SECURE CLEANUP
     await supabase.auth.signOut();
   };
@@ -505,48 +504,47 @@ const App: React.FC = () => {
     if (!session || !user || !player) return <Auth onLogin={() => fetchData(session?.user?.id)} />;
 
     const commonProps = { isDarkMode };
+    const openMenuHandler = () => setIsSidebarVisible(true);
     
     // Contenu rendu dans un Wrapper Animé pour la transition
     let Content = null;
 
     switch (currentView) {
       case ViewState.TODAY:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
         break;
       case ViewState.PLANNING:
-        Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={()=>{}} isDarkMode={isDarkMode} />;
+        Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
         break;
       case ViewState.INTROSPECTION:
-        Content = <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
+        Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       case ViewState.EVOLUTION:
-        Content = <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} openMenu={() => {}} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
+        Content = <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
         break;
       case ViewState.TASKS: 
-          Content = <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={() => fetchData(user.id)} openMenu={() => {}} {...commonProps} />;
+          Content = <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
           break;
       case ViewState.HABITS: 
-          Content = <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={(h) => {}} deleteHabit={deleteHabit} refreshHabits={() => fetchData(user.id)} openMenu={() => {}} {...commonProps} />;
+          Content = <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={(h) => {}} deleteHabit={deleteHabit} refreshHabits={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
           break;
       case ViewState.GOALS:
-          // Fixed Routing: Render Goals directly
-          Content = <Goals goals={goals} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={() => {}} isDarkMode={isDarkMode} />;
+          Content = <Goals goals={goals} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
           break;
       case ViewState.FOCUS_MODE:
-        Content = <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={() => {}} />;
+        Content = <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={openMenuHandler} />;
         break;
       case ViewState.CALENDAR:
-        // Fixed Routing: Render Calendar directly
-        Content = <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={() => {}} isDarkMode={isDarkMode} />;
+        Content = <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
         break;
       case ViewState.JOURNAL:
-        Content = <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
+        Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       case ViewState.REFLECTION:
-        Content = <Introspection userId={user.id} openMenu={() => {}} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
+        Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       default:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
     }
 
     return (
@@ -573,16 +571,25 @@ const App: React.FC = () => {
                         )}
 
                         {currentView !== ViewState.ONBOARDING && user && player && (
-                            <Profile 
-                                visible={profileVisible} 
-                                onClose={() => setProfileVisible(false)} 
-                                user={user} player={player} logout={handleLogout} 
-                                onThemeChange={setIsDarkMode}
-                            />
-                        )}
-
-                        {currentView !== ViewState.ONBOARDING && session && user && (
-                            <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
+                            <>
+                                <Sidebar 
+                                    visible={isSidebarVisible} 
+                                    onClose={() => setIsSidebarVisible(false)} 
+                                    user={user} 
+                                    setView={setCurrentView} 
+                                    currentView={currentView} 
+                                    onLogout={handleLogout}
+                                />
+                                <Profile 
+                                    visible={profileVisible} 
+                                    onClose={() => setProfileVisible(false)} 
+                                    user={user} player={player} logout={handleLogout} 
+                                    onThemeChange={setIsDarkMode}
+                                />
+                                {session && (
+                                    <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
+                                )}
+                            </>
                         )}
                     </View>
                 </View>

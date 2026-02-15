@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Dimensions } from 'react-native';
-import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Calendar as CalendarIcon, MapPin, Clock, AlignLeft, LogIn } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Calendar as CalendarIcon, MapPin, Clock, AlignLeft, LogIn, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Task, Habit, CalendarEvent } from '../types';
 import * as Google from 'expo-auth-session/providers/google';
@@ -11,11 +11,11 @@ import { supabase } from '../services/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// --- CONFIGURATION GOOGLE ---
+// --- CONFIGURATION GOOGLE - Secured via Environment Variables ---
 const GOOGLE_CONFIG = {
-    webClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
-    androidClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
-    iosClientId: '913448608067-b0lmrcus4s7aisr0atbjettkf0qtaltl.apps.googleusercontent.com',
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
 };
 
 interface CalendarPageProps {
@@ -23,7 +23,7 @@ interface CalendarPageProps {
     habits: Habit[];
     toggleTask: (id: string) => void;
     toggleHabit: (id: string) => void;
-    openMenu?: () => void;
+    openMenu: () => void;
     isDarkMode?: boolean;
     noPadding?: boolean;
 }
@@ -356,6 +356,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top, backgroundColor: colors.bg }]}>
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
+                    <TouchableOpacity onPress={openMenu} style={{marginRight: 10}}>
+                         <Menu size={24} color={colors.text} />
+                    </TouchableOpacity>
                     <Text style={[styles.headerTitle, { color: colors.text }]}>
                         {viewMode === 'MONTH' 
                             ? currentMonthCursor.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()
@@ -481,7 +484,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 const styles = StyleSheet.create({
     container: { flex: 1 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10 },
-    headerLeft: { flex: 1 },
+    headerLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: '800' },
     headerControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     googleBtn: { padding: 8, borderRadius: 8 },

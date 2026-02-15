@@ -1,8 +1,7 @@
-
 import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, ViewState } from '../types';
-import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw } from 'lucide-react-native';
+import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
@@ -24,9 +23,10 @@ interface DashboardProps {
   setView: (view: ViewState) => void;
   isDarkMode?: boolean;
   syncStatus?: 'SYNCED' | 'SYNCING' | 'OFFLINE_PENDING';
+  openMenu: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED' }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
   const insets = useSafeAreaInsets();
   
   const colors = {
@@ -123,6 +123,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
       
       {/* HEADER - Safe Area Padding + Standard Flex Row */}
       <View style={[styles.headerContainer, { paddingTop: insets.top + 10, paddingBottom: 10, backgroundColor: colors.bg }]}>
+          <TouchableOpacity onPress={openMenu} style={{marginRight: 12}}>
+              <Menu size={24} color={colors.text} />
+          </TouchableOpacity>
           <View style={styles.headerLeft}>
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
                   <Text style={[styles.greetingSub, {color: colors.textSub}]}>
@@ -135,7 +138,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, togg
           
           <TouchableOpacity 
               onPress={() => {
-                  console.log("Profile clicked");
                   Haptics.selectionAsync();
                   openProfile();
               }} 

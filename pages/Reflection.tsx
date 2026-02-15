@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Reflection } from '../types';
@@ -9,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ReflectionProps {
   userId: string;
-  openMenu?: () => void;
+  openMenu: () => void;
   isDarkMode?: boolean;
   noPadding?: boolean;
   deleteReflection?: (id: string) => void;
@@ -232,6 +231,9 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
       {/* Header Styled Apple */}
       <View style={styles.header}>
         <View style={styles.headerTitleContainer}>
+             <TouchableOpacity onPress={openMenu} style={{marginRight: 10}}>
+                <Menu size={24} color={colors.text} />
+            </TouchableOpacity>
             <Text style={[styles.headerTitle, {color: colors.text}]}>Réflexion</Text>
         </View>
 
@@ -277,7 +279,8 @@ const styles = StyleSheet.create({
   },
   headerTitleContainer: {
       flex: 1,
-      justifyContent: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
   },
   headerTitle: {
       fontSize: 22,

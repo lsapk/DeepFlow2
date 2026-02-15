@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions, LayoutAnimation } from 'react-native';
 import { PlayerProfile, UserProfile, Task, Habit, Goal } from '../types';
-import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit, Activity, Zap, RefreshCw, BarChart2, PieChart, Clock, Target, CloudOff } from 'lucide-react-native';
+import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit, Activity, Zap, RefreshCw, BarChart2, PieChart, Clock, Target, CloudOff, Menu } from 'lucide-react-native';
 import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playMenuClick, playSuccess } from '../services/sound';
@@ -30,7 +29,7 @@ interface GrowthProps {
   noPadding?: boolean;
 }
 
-const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false }) => {
+const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false, openMenu }) => {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   
@@ -413,6 +412,9 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         {/* HEADER */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 10}}>
+                <TouchableOpacity onPress={openMenu}>
+                     <Menu size={24} color={colors.text} />
+                </TouchableOpacity>
                 <BrainCircuit size={28} color={colors.accent} />
                 <Text style={[styles.headerTitle, {color: colors.text}]}>Analyses</Text>
             </View>

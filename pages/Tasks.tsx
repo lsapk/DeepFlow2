@@ -1,8 +1,7 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard, FlatList, ActivityIndicator, InteractionManager } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
-import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle, Sparkles } from 'lucide-react-native';
+import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle, Sparkles, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { generateSubtasks } from '../services/ai';
 import * as Haptics from 'expo-haptics';
@@ -21,7 +20,7 @@ interface TasksProps {
   deleteSubtask: (subtaskId: string, taskId: string) => void;
   userId: string;
   refreshTasks: () => void;
-  openMenu?: () => void; 
+  openMenu: () => void; 
   isDarkMode?: boolean;
 }
 
@@ -199,6 +198,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
+          <TouchableOpacity onPress={openMenu} style={{marginRight: 15}}>
+              <Menu size={24} color={colors.text} />
+          </TouchableOpacity>
           <View>
             <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
             <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>
@@ -390,7 +392,7 @@ const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColo
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
   largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
   subtitle: { fontSize: 15, fontWeight: '500', marginTop: 4 },
   

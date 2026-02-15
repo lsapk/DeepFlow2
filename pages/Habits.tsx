@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, Dimensions } from 'react-native';
 import { Habit, Goal } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Grid, List, Zap, Layers, CalendarDays } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Grid, List, Zap, Layers, CalendarDays, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 
@@ -14,7 +14,7 @@ interface HabitsProps {
   archiveHabit: (habit: Habit) => void;
   deleteHabit: (id: string) => void;
   refreshHabits: () => void;
-  openMenu?: () => void;
+  openMenu: () => void;
   isDarkMode?: boolean;
 }
 
@@ -245,7 +245,12 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* HEADER iOS Style */}
       <View style={styles.header}>
-         <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
+         <View style={{flexDirection: 'row', alignItems: 'center'}}>
+             <TouchableOpacity onPress={openMenu} style={{marginRight: 15}}>
+                  <Menu size={24} color={colors.text} />
+             </TouchableOpacity>
+             <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
+         </View>
          <View style={styles.headerRight}>
              {/* Toggle Today/All */}
              <TouchableOpacity style={[styles.iconButton, {backgroundColor: colors.cardBg}]} onPress={() => setFilterMode(filterMode === 'TODAY' ? 'ALL' : 'TODAY')}>

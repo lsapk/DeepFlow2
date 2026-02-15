@@ -1,19 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, FlatList, ActivityIndicator } from 'react-native';
-import { PlayerProfile, UserProfile, Quest, Achievement, ShopItem } from '../types';
-import { Shield, Zap, Target, Star, Coins, RefreshCw, CheckCircle2, Trophy, Flame, Swords, Crown, Lock, ShoppingBag, Infinity as InfinityIcon } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { PlayerProfile, UserProfile, Quest, ShopItem } from '../types';
+import { Shield, Zap, Target, Star, Coins, RefreshCw, CheckCircle2, Trophy, Swords, Crown, ShoppingBag, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getXpForNextLevel, getRankName, ACHIEVEMENTS_LIST } from '../services/gamification';
 import { supabase } from '../services/supabase';
 import AvatarGenerator from '../components/AvatarGenerator';
 import { generateQuests } from '../services/ai';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
-// --- DATA MOCKS FOR SHOP (To be moved to DB if needed) ---
+// --- DATA MOCKS FOR SHOP ---
 const SHOP_ITEMS: ShopItem[] = [
     { id: 'boost_xp_24h', title: 'Boost XP x2', description: 'Double XP pendant 24h.', price: 150, category: 'boost', rarity: 'rare', icon: 'Zap', color: '#FACC15' },
     { id: 'shield_3d', title: 'Méga Bouclier', description: 'Protège vos streaks 3 jours.', price: 300, category: 'protection', rarity: 'epic', icon: 'Shield', color: '#60A5FA' },
@@ -36,7 +34,6 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
   const [activeTab, setActiveTab] = useState<'ARENA' | 'SHOP' | 'ACHIEVEMENTS' | 'STATS'>('ARENA');
   
   const [activeQuests, setActiveQuests] = useState<Quest[]>(initialQuests || []);
-  const [activePowerups, setActivePowerups] = useState<any[]>([]); // Mock active powerups
   const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
 
@@ -51,10 +48,6 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
       if (achievements) {
           setUnlockedAchievements(new Set(achievements.map(a => a.achievement_id)));
       }
-      
-      // Fetch active powerups (mocked if table empty or non-existent in this context, assuming logic exists)
-      const { data: powerups } = await supabase.from('active_powerups').select('*').eq('user_id', user.id);
-      if (powerups) setActivePowerups(powerups);
   };
 
   const xpRequired = getXpForNextLevel(player.level);
@@ -107,7 +100,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
                   current_progress: 0, 
                   completed: false, 
                   quest_type: 'daily',
-                  category: 'rpg' // FIX: Obligatoire selon le schéma DB
+                  category: 'rpg'
               }));
               
               const { data, error } = await supabase.from('quests').insert(questsToInsert).select();
@@ -133,10 +126,7 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
           return;
       }
       Alert.alert("Achat réussi", `Vous avez obtenu : ${item.title}`);
-      // Deduction logic would go here
   };
-
-  // --- RENDERERS ---
 
   const renderArena = () => (
       <View>
@@ -232,159 +222,137 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
           {ACHIEVEMENTS_LIST.map((ach) => {
               const unlocked = unlockedAchievements.has(ach.achievement_id);
               return (
-                  <View key={ach.id} style={[styles.achCard, {backgroundColor: colors.cardBg, borderColor: unlocked ? '#FACC15' : colors.border, opacity: unlocked ? 1 : 0.6}]}>
-                      <View style={[styles.achIcon, {backgroundColor: unlocked ? 'rgba(250, 204, 21, 0.2)' : '#333'}]}>
-                          {unlocked ? <Trophy size={24} color="#FACC15" /> : <Lock size={24} color={colors.textSub} />}
+                  <View key={ach.id} style={[styles.achievementCard, {backgroundColor: colors.cardBg, borderColor: unlocked ? colors.gold : colors.border, opacity: unlocked ? 1 : 0.6}]}>
+                      <View style={[styles.achIcon, {backgroundColor: unlocked ? 'rgba(250, 204, 21, 0.2)' : 'rgba(255,255,255,0.05)'}]}>
+                          <Trophy size={24} color={unlocked ? colors.gold : colors.textSub} />
                       </View>
                       <View style={{flex: 1}}>
                           <Text style={[styles.achTitle, {color: colors.text}]}>{ach.title}</Text>
-                          <Text style={styles.achDesc}>{ach.description}</Text>
-                          <View style={styles.achProgressBg}>
-                              <View style={[styles.achProgressFill, {width: unlocked ? '100%' : '30%', backgroundColor: unlocked ? '#FACC15' : '#555'}]} />
-                          </View>
+                          <Text style={[styles.achDesc, {color: colors.textSub}]}>{ach.description}</Text>
                       </View>
+                      {unlocked && <CheckCircle2 size={20} color={colors.gold} />}
                   </View>
-              )
+              );
           })}
       </View>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: noPadding ? 0 : insets.top, backgroundColor: colors.bg }]}>
-      
-      {/* IMMERSIVE HEADER */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <View style={styles.headerTop}>
-              <View style={styles.rankContainer}>
-                  <Text style={[styles.screenTitle, {color: colors.text}]}>Cyber Arena</Text>
-                  <View style={styles.rankBadge}>
-                      <Crown size={12} color="#FACC15" fill="#FACC15" />
-                      <Text style={styles.rankText}>{rankName}</Text>
-                  </View>
-              </View>
-              <View style={styles.wallet}>
-                  <Coins size={16} color="#FACC15" fill="#FACC15" />
-                  <Text style={styles.walletText}>{player.credits}</Text>
-              </View>
-          </View>
+    <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top}]}>
+        <View style={styles.header}>
+             <TouchableOpacity onPress={openMenu} style={{marginRight: 10}}>
+                <Menu size={24} color={colors.text} />
+            </TouchableOpacity>
+            <View style={{flex: 1, flexDirection: 'row', justifyContent: 'center'}}>
+                 <View style={styles.rankBadge}>
+                      <Crown size={14} color="#FFF" fill="#FFF" />
+                      <Text style={styles.rankTextHeader}>{rankName}</Text>
+                 </View>
+            </View>
+            <TouchableOpacity onPress={openProfile}>
+                 <View style={styles.headerAvatar}>
+                     <Text style={{color: '#FFF', fontWeight: 'bold'}}>{user.display_name?.charAt(0) || 'U'}</Text>
+                 </View>
+            </TouchableOpacity>
+        </View>
 
-          <View style={styles.profileStats}>
-              <View style={styles.avatarWrapper}>
-                  <AvatarGenerator config={player.avatar_customization} size={80} showGlow={true} />
-                  <View style={styles.levelCircle}><Text style={styles.levelNum}>{player.level}</Text></View>
-              </View>
-              <View style={{flex: 1, justifyContent: 'center'}}>
-                  <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6}}>
-                      <Text style={[styles.statLabel, {color: colors.text}]}>Progression XP</Text>
-                      <Text style={[styles.statLabel, {color: colors.accent}]}>{xpInCurrentLevel} / {xpNeededForLevel}</Text>
-                  </View>
-                  <View style={styles.xpTrack}>
-                      <LinearGradient colors={['#C4B5FD', '#8B5CF6']} start={{x:0, y:0}} end={{x:1, y:0}} style={[styles.xpFill, {width: `${progressPercent}%`}]} />
-                  </View>
-                  <View style={styles.infinityRow}>
-                      <InfinityIcon size={14} color={colors.textSub} />
-                      <Text style={{color: colors.textSub, fontSize: 10, marginLeft: 4}}>Potentiel Infini</Text>
-                  </View>
-              </View>
-          </View>
-      </View>
+        <View style={styles.avatarSection}>
+            <AvatarGenerator config={player.avatar_customization} size={140} showGlow={true} />
+            <Text style={[styles.levelTitle, {color: colors.text}]}>Niveau {player.level}</Text>
+            
+            <View style={styles.xpBarContainer}>
+                <View style={[styles.xpBarFill, {width: `${progressPercent}%`, backgroundColor: colors.accent}]} />
+            </View>
+            <Text style={styles.xpText}>{Math.floor(xpInCurrentLevel)} / {xpNeededForLevel} XP</Text>
+        </View>
 
-      {/* TABS */}
-      <View style={styles.tabsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal: 20, gap: 10}}>
-              {['ARENA', 'SHOP', 'ACHIEVEMENTS', 'STATS'].map((tab: any) => (
-                  <TouchableOpacity 
-                      key={tab} 
-                      onPress={() => setActiveTab(tab)} 
-                      style={[styles.tab, activeTab === tab && {backgroundColor: colors.text, borderColor: colors.text}, {borderColor: colors.border}]}
-                  >
-                      <Text style={[styles.tabText, {color: activeTab === tab ? (isDarkMode ? '#000' : '#FFF') : colors.textSub}]}>{tab}</Text>
-                  </TouchableOpacity>
-              ))}
-          </ScrollView>
-      </View>
+        <View style={styles.tabs}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 12, paddingHorizontal: 20}}>
+                {[
+                    {id: 'ARENA', label: 'Arène', icon: Swords},
+                    {id: 'SHOP', label: 'Marché', icon: ShoppingBag},
+                    {id: 'ACHIEVEMENTS', label: 'Succès', icon: Trophy},
+                    {id: 'STATS', label: 'Stats', icon: Target}
+                ].map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <TouchableOpacity 
+                            key={tab.id} 
+                            style={[styles.tabItem, isActive && {backgroundColor: colors.tabActive, borderColor: colors.text}]}
+                            onPress={() => setActiveTab(tab.id as any)}
+                        >
+                            <Icon size={16} color={isActive ? colors.text : colors.textSub} />
+                            <Text style={[styles.tabText, {color: isActive ? colors.text : colors.textSub}]}>{tab.label}</Text>
+                        </TouchableOpacity>
+                    )
+                })}
+            </ScrollView>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {activeTab === 'ARENA' && renderArena()}
-          {activeTab === 'SHOP' && renderShop()}
-          {activeTab === 'ACHIEVEMENTS' && renderAchievements()}
-          {activeTab === 'STATS' && (
-              <View style={{padding: 40, alignItems: 'center'}}>
-                  <Text style={{color: colors.textSub}}>Statistiques détaillées bientôt.</Text>
-              </View>
-          )}
-      </ScrollView>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {activeTab === 'ARENA' && renderArena()}
+            {activeTab === 'SHOP' && renderShop()}
+            {activeTab === 'ACHIEVEMENTS' && renderAchievements()}
+            {activeTab === 'STATS' && (
+                <View style={styles.emptyState}>
+                     <Text style={{color: colors.textSub}}>Statistiques de combat bientôt disponibles.</Text>
+                </View>
+            )}
+            <View style={{height: 100}} />
+        </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { padding: 20, paddingBottom: 24, backgroundColor: '#111', borderBottomWidth: 1 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  screenTitle: { fontSize: 28, fontWeight: '800', letterSpacing: 0.5 },
-  rankContainer: { justifyContent: 'center' },
-  rankBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, backgroundColor: 'rgba(250, 204, 21, 0.15)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  rankText: { color: '#FACC15', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  wallet: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
-  walletText: { color: '#FACC15', fontWeight: '700', fontSize: 16 },
-  
-  profileStats: { flexDirection: 'row', gap: 20 },
-  avatarWrapper: { width: 80, height: 80, alignItems: 'center', justifyContent: 'center' },
-  levelCircle: { position: 'absolute', bottom: -5, right: -5, width: 28, height: 28, borderRadius: 14, backgroundColor: '#C4B5FD', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
-  levelNum: { fontSize: 12, fontWeight: '800', color: '#000' },
-  statLabel: { fontSize: 12, fontWeight: '600' },
-  xpTrack: { height: 8, backgroundColor: '#333', borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
-  xpFill: { height: '100%' },
-  infinityRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-
-  tabsContainer: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#222', backgroundColor: '#000' },
-  tab: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, marginRight: 8 },
-  tabText: { fontSize: 12, fontWeight: '700' },
-
-  scrollContent: { padding: 20, paddingBottom: 100 },
-
-  // ARENA
-  questsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 1 },
-  generateBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  generateText: { fontSize: 11, fontWeight: '600' },
-  questCard: { flexDirection: 'row', padding: 16, borderRadius: 16, borderWidth: 1, alignItems: 'center', marginBottom: 12 },
-  questContent: { flex: 1, paddingRight: 16 },
-  questHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 },
-  tag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  tagText: { fontSize: 9, fontWeight: '800' },
-  starsRow: { flexDirection: 'row', gap: 2 },
-  questTitle: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
-  rewardsRow: { flexDirection: 'row' },
-  rewardText: { fontSize: 11, fontWeight: '700' },
-  questActionCol: { justifyContent: 'center', alignItems: 'center' },
-  claimBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center' },
-  claimText: { color: '#FFF', fontSize: 11, fontWeight: '900' },
-  emptyState: { padding: 40, alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderWidth: 1, borderRadius: 16, gap: 10 },
-  emptyText: { fontSize: 14, fontWeight: '600' },
-
-  powerupSection: { marginTop: 24 },
-  powerupCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, borderWidth: 1, minWidth: 140 },
-  powerupTitle: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-  powerupTime: { color: '#AAA', fontSize: 11 },
-
-  // SHOP
-  shopGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  shopCard: { width: (width - 52) / 2, padding: 16, borderRadius: 16, borderWidth: 1, alignItems: 'center' },
-  itemIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  shopItemTitle: { fontWeight: '700', fontSize: 14, marginBottom: 4, textAlign: 'center' },
-  shopItemDesc: { color: '#888', fontSize: 11, textAlign: 'center', marginBottom: 12, height: 32 },
-  priceTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#222', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  priceText: { color: '#FACC15', fontWeight: '700', fontSize: 12 },
-
-  // ACHIEVEMENTS
-  achCard: { flexDirection: 'row', padding: 16, borderRadius: 16, borderWidth: 1, alignItems: 'center', gap: 16 },
-  achIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  achTitle: { fontWeight: '700', fontSize: 15, marginBottom: 2 },
-  achDesc: { color: '#888', fontSize: 12, marginBottom: 8 },
-  achProgressBg: { height: 4, backgroundColor: '#333', borderRadius: 2, width: '100%' },
-  achProgressFill: { height: '100%', borderRadius: 2 },
+    container: { flex: 1 },
+    header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    rankBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FACC15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6 },
+    rankTextHeader: { color: '#000', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' },
+    headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
+    avatarSection: { alignItems: 'center', marginBottom: 20 },
+    levelTitle: { fontSize: 24, fontWeight: '800', marginVertical: 10, fontStyle: 'italic' },
+    xpBarContainer: { width: width * 0.6, height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
+    xpBarFill: { height: '100%' },
+    xpText: { fontSize: 12, color: '#8E8E93', fontWeight: '600' },
+    tabs: { marginBottom: 20 },
+    tabItem: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: 'transparent' },
+    tabText: { fontSize: 13, fontWeight: '700' },
+    scrollContent: { paddingHorizontal: 20 },
+    questsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    sectionTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+    generateBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1 },
+    generateText: { fontSize: 11, fontWeight: '600' },
+    emptyState: { alignItems: 'center', padding: 30, borderWidth: 1, borderRadius: 20, borderStyle: 'dashed' },
+    emptyText: { marginTop: 10, fontSize: 14 },
+    questCard: { flexDirection: 'row', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1 },
+    questContent: { flex: 1, marginRight: 12 },
+    questHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    tag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    tagText: { fontSize: 10, fontWeight: '700' },
+    starsRow: { flexDirection: 'row', gap: 2 },
+    questTitle: { fontSize: 16, fontWeight: '700', marginBottom: 6 },
+    rewardsRow: { flexDirection: 'row' },
+    rewardText: { fontSize: 12, fontWeight: '600' },
+    questActionCol: { justifyContent: 'center' },
+    claimBtn: { backgroundColor: '#4ADE80', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+    claimText: { color: '#000', fontWeight: '800', fontSize: 12 },
+    powerupSection: { marginTop: 20 },
+    powerupCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, gap: 10, minWidth: 140 },
+    powerupTitle: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+    powerupTime: { color: '#94A3B8', fontSize: 11 },
+    shopGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    shopCard: { width: (width - 52) / 2, borderRadius: 16, padding: 16, borderWidth: 1 },
+    itemIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+    shopItemTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+    shopItemDesc: { fontSize: 11, color: '#8E8E93', marginBottom: 12, height: 28 },
+    priceTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    priceText: { color: '#FACC15', fontWeight: '700' },
+    achievementCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, borderWidth: 1, gap: 12 },
+    achIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    achTitle: { fontWeight: '700', fontSize: 15 },
+    achDesc: { fontSize: 12 }
 });
 
 export default CyberKnight;
