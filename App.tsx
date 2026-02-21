@@ -341,10 +341,10 @@ const App: React.FC = () => {
   };
 
   // --- CRUD ACTIONS (Same as before) ---
-  const createTask = async (title: string, priority: any, goalId?: string, dueDate?: string) => {
+  const createTask = async (title: string, priority: any, goalId?: string, dueDate?: string, description?: string) => {
       if (!user) return;
       const newTask: Task = {
-          id: generateId(), user_id: user.id, title, description: null, priority, linked_goal_id: goalId, due_date: dueDate || null, completed: false, created_at: new Date().toISOString(), sort_order: 0, subtasks: []
+          id: generateId(), user_id: user.id, title, description: description || null, priority, linked_goal_id: goalId, due_date: dueDate || null, completed: false, created_at: new Date().toISOString(), sort_order: 0, subtasks: []
       };
       
       const updatedTasks = [newTask, ...tasks];

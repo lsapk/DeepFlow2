@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, KeyboardAvoidingView, Platform, Keyboard, FlatList, ActivityIndicator, InteractionManager } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, Platform, FlatList, ActivityIndicator, InteractionManager, ScrollView } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
-import { Plus, Check, Trash2, X, Calendar, ArrowUpCircle, Sparkles, Menu } from 'lucide-react-native';
+import { Plus, Check, Trash2, X, Calendar, Sparkles, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { generateSubtasks } from '../services/ai';
 import * as Haptics from 'expo-haptics';
@@ -13,7 +13,7 @@ interface TasksProps {
   tasks: Task[];
   goals: Goal[];
   toggleTask: (id: string) => void;
-  addTask: (title: string, priority: Task['priority'], goalId?: string, dueDate?: string) => void;
+  addTask: (title: string, priority: Task['priority'], goalId?: string, dueDate?: string, description?: string) => void;
   deleteTask: (id: string) => void;
   createSubtask: (taskId: string, title: string) => void;
   toggleSubtask: (subtaskId: string, taskId: string) => void;
@@ -29,11 +29,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   
   const [isReady, setIsReady] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
-  const [quickTitle, setQuickTitle] = useState('');
-  const [quickPriority, setQuickPriority] = useState<Task['priority']>('medium');
-
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formPriority, setFormPriority] = useState<Task['priority']>('medium');
@@ -62,25 +60,19 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
     return () => task.cancel();
   }, []);
 
-  const handleQuickAdd = () => {
-    if (quickTitle.trim()) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        let dueDate = undefined;
-        let title = quickTitle;
-        if (title.toLowerCase().includes('demain')) {
-            const d = new Date();
-            d.setDate(d.getDate() + 1);
-            dueDate = d.toISOString();
-            title = title.replace(/demain/i, '').trim();
-        }
-        addTask(title, quickPriority, undefined, dueDate);
-        setQuickTitle('');
-        setQuickPriority('medium');
-        Keyboard.dismiss();
-    }
+  const openCreateModal = () => {
+      setIsCreating(true);
+      setSelectedTask(null);
+      setFormTitle('');
+      setFormDesc('');
+      setFormPriority('medium');
+      setFormGoalId(null);
+      setFormDate('');
+      setEditModalVisible(true);
   };
 
   const openEditModal = useCallback((task: Task) => {
+      setIsCreating(false);
       setSelectedTask(task);
       setFormTitle(task.title);
       setFormDesc(task.description || '');
@@ -104,16 +96,28 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       );
   };
 
-  const handleUpdateTask = async () => {
-      if (!selectedTask) return;
-      await supabase.from('tasks').update({ 
-          title: formTitle,
-          description: formDesc,
-          linked_goal_id: formGoalId,
-          priority: formPriority,
-          due_date: formDate ? new Date(formDate).toISOString() : null
-      }).eq('id', selectedTask.id);
-      refreshTasks();
+  const handleSaveTask = async () => {
+      if (!formTitle.trim()) return;
+
+      if (isCreating) {
+          addTask(
+              formTitle,
+              formPriority,
+              formGoalId || undefined,
+              formDate ? new Date(formDate).toISOString() : undefined,
+              formDesc
+          );
+      } else {
+          if (!selectedTask) return;
+          await supabase.from('tasks').update({
+              title: formTitle,
+              description: formDesc,
+              linked_goal_id: formGoalId,
+              priority: formPriority,
+              due_date: formDate ? new Date(formDate).toISOString() : null
+          }).eq('id', selectedTask.id);
+          refreshTasks();
+      }
       setEditModalVisible(false);
   };
 
@@ -198,10 +202,13 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-          <View>
+          <View style={{flex: 1}}>
             <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
             <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>
           </View>
+          <TouchableOpacity style={[styles.addButton, {backgroundColor: colors.accent}]} onPress={openCreateModal}>
+             <Plus size={24} color="#FFF" strokeWidth={3} />
+          </TouchableOpacity>
       </View>
 
       {!isReady ? (
@@ -224,55 +231,27 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
           />
       )}
 
-      {/* QUICK ADD CONTAINER WITH DYNAMIC PADDING */}
-      <KeyboardAvoidingView 
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-          style={[
-              styles.quickAddWrapper, 
-              { 
-                  backgroundColor: colors.cardBg, 
-                  borderTopColor: colors.border,
-                  // Position dynamique : Barre de nav (70px) + Marge (10px) + Safe Area (insets.bottom)
-                  bottom: 70 + insets.bottom + 10 
-              }
-          ]}
-      >
-          <View style={styles.quickAddInner}>
-              <TouchableOpacity onPress={() => setQuickPriority(p => p === 'low' ? 'medium' : p === 'medium' ? 'high' : 'low')} style={[styles.quickPriorityBtn, { borderColor: getPriorityColor(quickPriority) }]}>
-                  <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(quickPriority) }]} />
-              </TouchableOpacity>
-              <TextInput 
-                  style={[styles.quickInput, { color: colors.text }]} 
-                  placeholder="Ajouter une tâche..." 
-                  placeholderTextColor={colors.textSub}
-                  value={quickTitle}
-                  onChangeText={setQuickTitle}
-                  onSubmitEditing={handleQuickAdd}
-              />
-              <TouchableOpacity onPress={handleQuickAdd} disabled={!quickTitle} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <ArrowUpCircle size={32} color={quickTitle ? colors.accent : colors.textSub} fill={colors.cardBg} />
-              </TouchableOpacity>
-          </View>
-      </KeyboardAvoidingView>
-
-      {/* MODAL (Unchanged) */}
-      <Modal visible={editModalVisible} transparent={true} animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
-          <BlurView intensity={20} tint="dark" style={styles.modalOverlay}>
+      {/* MODAL */}
+      <Modal visible={editModalVisible} transparent={true} animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
+          <View style={styles.modalOverlay}>
               <View style={[styles.modalContent, {backgroundColor: colors.cardBg}]}>
                   <View style={styles.modalHeader}>
-                      <Text style={[styles.modalTitle, {color: colors.text}]}>Modifier</Text>
+                      <Text style={[styles.modalTitle, {color: colors.text}]}>{isCreating ? 'Nouvelle Tâche' : 'Modifier'}</Text>
                       <TouchableOpacity onPress={() => setEditModalVisible(false)}>
                           <Text style={{color: colors.accent, fontSize: 17, fontWeight: '600'}}>Fermer</Text>
                       </TouchableOpacity>
                   </View>
-                  <View>
+                  <ScrollView showsVerticalScrollIndicator={false}>
                     <Text style={styles.label}>TITRE</Text>
-                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={formTitle} onChangeText={setFormTitle} />
-                    <TouchableOpacity style={[styles.magicBtn, {backgroundColor: isDarkMode ? '#333' : '#EEE'}]} onPress={handleMagicSplit} disabled={isSplitting}>
-                        {isSplitting ? <ActivityIndicator color={colors.accent} size="small" /> : <Sparkles size={20} color="#FACC15" fill="#FACC15" />}
-                        <Text style={[styles.magicBtnText, {color: colors.text}]}>{isSplitting ? 'IA au travail...' : 'Magic Split (IA)'}</Text>
-                    </TouchableOpacity>
+                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text}]} value={formTitle} onChangeText={setFormTitle} placeholder="Faire les courses..." placeholderTextColor={colors.textSub} />
+
+                    {!isCreating && (
+                        <TouchableOpacity style={[styles.magicBtn, {backgroundColor: isDarkMode ? '#333' : '#EEE'}]} onPress={handleMagicSplit} disabled={isSplitting}>
+                            {isSplitting ? <ActivityIndicator color={colors.accent} size="small" /> : <Sparkles size={20} color="#FACC15" fill="#FACC15" />}
+                            <Text style={[styles.magicBtnText, {color: colors.text}]}>{isSplitting ? 'IA au travail...' : 'Magic Split (IA)'}</Text>
+                        </TouchableOpacity>
+                    )}
+
                     <Text style={styles.label}>PRIORITÉ</Text>
                     <View style={styles.priorityRow}>
                          {(['low', 'medium', 'high'] as const).map(p => (
@@ -281,18 +260,28 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                              </TouchableOpacity>
                          ))}
                     </View>
+
                     <Text style={styles.label}>DESCRIPTION</Text>
-                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 80, paddingTop: 10}]} value={formDesc} onChangeText={setFormDesc} multiline />
+                    <TextInput style={[styles.modalInput, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text, minHeight: 80, paddingTop: 14}]} value={formDesc} onChangeText={setFormDesc} multiline placeholder="Détails de la tâche..." placeholderTextColor={colors.textSub} />
+
                     <Text style={styles.label}>DATE</Text>
                     <View style={[styles.inputWithIcon, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7'}]}>
                         <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
                         <TextInput style={[styles.transparentInput, {color: colors.text}]} value={formDate} onChangeText={setFormDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSub} />
                     </View>
-                    <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={handleUpdateTask}><Text style={styles.saveBtnText}>Enregistrer</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteActionBtn} onPress={() => confirmDeleteTask(selectedTask!.id)}><Text style={styles.deleteText}>Supprimer</Text></TouchableOpacity>
-                  </View>
+
+                    <TouchableOpacity style={[styles.saveBtn, {backgroundColor: colors.accent}]} onPress={handleSaveTask}>
+                        <Text style={styles.saveBtnText}>{isCreating ? 'Créer la tâche' : 'Enregistrer'}</Text>
+                    </TouchableOpacity>
+
+                    {!isCreating && selectedTask && (
+                        <TouchableOpacity style={styles.deleteActionBtn} onPress={() => confirmDeleteTask(selectedTask.id)}>
+                            <Text style={styles.deleteText}>Supprimer la tâche</Text>
+                        </TouchableOpacity>
+                    )}
+                  </ScrollView>
               </View>
-          </BlurView>
+          </View>
       </Modal>
     </View>
   );
@@ -389,9 +378,10 @@ const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColo
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
   largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
   subtitle: { fontSize: 15, fontWeight: '500', marginTop: 4 },
+  addButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
   
   scrollContent: { paddingHorizontal: 20 },
   

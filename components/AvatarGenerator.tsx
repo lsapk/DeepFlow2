@@ -14,6 +14,7 @@ interface AvatarGeneratorProps {
 const AvatarGenerator: React.FC<AvatarGeneratorProps> = ({ config, size = 120, showGlow = true }) => {
     // Valeurs par défaut sécurisées si la config est vide ou mal formée
     const safeConfig = config || {};
+    const avatarClass = safeConfig.class || 'cyber_knight';
     const helmet = safeConfig.helmet || 'standard';
     const armor = safeConfig.armor || 'standard';
     // Mapping DB (glow_color) vs App (color)
@@ -51,8 +52,12 @@ const AvatarGenerator: React.FC<AvatarGeneratorProps> = ({ config, size = 120, s
         opacity: 0.6
     }));
 
-    // Couleurs du corps selon l'armure
-    const bodyColor = armor === 'stealth' ? '#333' : armor === 'heavy' ? '#555' : '#E0E7FF';
+    // Couleurs du corps selon l'armure et la classe
+    let bodyColor = '#E0E7FF';
+    if (armor === 'stealth') bodyColor = '#1F2937';
+    else if (armor === 'heavy') bodyColor = '#4B5563';
+    else if (avatarClass === 'neon_hacker') bodyColor = '#111827';
+    else if (avatarClass === 'cosmic_sage') bodyColor = '#312E81';
 
     return (
         <View style={[styles.container, { width: size, height: size }]}>
