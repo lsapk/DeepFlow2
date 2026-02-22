@@ -419,7 +419,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
     >
         <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? 20 : insets.top }]}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Profil</Text>
+                <View />
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                     <Text style={styles.closeText}>Fermer</Text>
                 </TouchableOpacity>
