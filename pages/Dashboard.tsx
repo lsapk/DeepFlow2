@@ -8,6 +8,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
+import { computeProductivityScore } from '../services/productivity';
 
 const { width } = Dimensions.get('window');
 
@@ -83,26 +84,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goal
   const completedGoalsCount = goals.filter(g => g.completed).length;
   const totalGoals = goals.length;
 
-  // 3. Calcul Score Global (cohérent et basé sur l'ensemble des données)
   const productivityScore = useMemo(() => {
-      const habitsDoneToday = todaysHabits.filter(h => h.last_completed_at && isSameDay(new Date(h.last_completed_at), today)).length;
-      const habitsTodayRate = todaysHabits.length > 0 ? (habitsDoneToday / todaysHabits.length) * 100 : 50;
-
-      const averageHabitStreak = habits.length > 0
-          ? habits.reduce((acc, h) => acc + (h.streak || 0), 0) / habits.length
-          : 0;
-      const streakScore = Math.min(100, (averageHabitStreak / 30) * 100);
-      const habitScore = (habitsTodayRate * 0.6) + (streakScore * 0.4);
-
-      const taskScore = totalTasks > 0 ? (completedTasksCount / totalTasks) * 100 : 50;
-      const goalScore = totalGoals > 0 ? (completedGoalsCount / totalGoals) * 100 : 50;
-
-      const totalFocusMinutes = focusSessions.reduce((acc, session) => acc + (session.duration || 0), 0);
-      const focusScore = Math.min(100, (totalFocusMinutes / 600) * 100); // 10h cumulées = 100
-
-      const score = (taskScore * 0.3) + (goalScore * 0.25) + (habitScore * 0.25) + (focusScore * 0.2);
-      return Math.round(score);
-  }, [todaysHabits, today, habits, totalTasks, completedTasksCount, totalGoals, completedGoalsCount, focusSessions]);
+      return computeProductivityScore({
+          tasks,
+          habits,
+          goals,
+          focusSessions,
+          referenceDate: today,
+      });
+  }, [tasks, habits, goals, focusSessions, today]);
 
   // Autres stats
   const averageStreak = habits.length > 0 ? habits.reduce((acc, h) => acc + h.streak, 0) / habits.length : 0;
@@ -190,7 +180,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goal
                 />
                 <View style={styles.heroContent}>
                     <View>
-                        <Text style={[styles.heroLabel, { color: isDarkMode ? '#BFDBFE' : '#6366F1' }]}>SCORE DU JOUR</Text>
+                        <Text style={[styles.heroLabel, { color: isDarkMode ? '#BFDBFE' : '#6366F1' }]}>SCORE DE PRODUCTIVITÉ</Text>
                         <Text style={[styles.heroValue, { color: isDarkMode ? '#FFF' : '#111' }]}>{productivityScore}</Text>
                         <Text style={[styles.heroSub, { color: isDarkMode ? '#9CA3AF' : '#6B7280' }]}>Performance globale</Text>
                     </View>

@@ -10,8 +10,12 @@ import Markdown from 'react-native-markdown-display';
 import Svg, { Polygon, Line, Circle, Text as SvgText, Rect, Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { computeProductivityScore } from '../services/productivity';
 
 const { width } = Dimensions.get('window');
+
+const LIFE_WHEEL_STORAGE_KEY = 'life_wheel_data_v1';
 
 interface GrowthProps {
   player: PlayerProfile;
@@ -119,7 +123,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       const taskRate = Math.round((completedTasks.length / totalTasks) * 100);
       const activeHabits = habits.filter(h => !h.is_archived);
       const avgStreak = activeHabits.length > 0 ? Math.round(activeHabits.reduce((acc, h) => acc + h.streak, 0) / activeHabits.length) : 0;
-      const productivityScore = Math.min(100, Math.round((taskRate * 0.4) + (Math.min(avgStreak, 30) * 1.5) + (player.level * 1.5)));
+      const productivityScore = computeProductivityScore({
+          tasks,
+          habits,
+          goals,
+          focusSessions: focusHistory,
+      });
 
       // 2. Activity Chart (Weekly)
       const weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
@@ -146,9 +155,9 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       completedTasks.forEach(t => addToMap(t.created_at));
 
       return { productivityScore, taskRate, avgStreak, weeklyActivity: normalizedWeekly, completedTasksCount: completedTasks.length, consistencyMap };
-  }, [tasks, habits, player.level, focusHistory, habitCompletions, journalHistory, reflectionHistory]);
+  }, [tasks, habits, goals, focusHistory, habitCompletions, journalHistory, reflectionHistory]);
 
-  const refreshWheelAnalysis = async () => {
+  const refreshWheelAnalysis = async (persistResult = true) => {
       setIsAnalyzingWheel(true);
       playMenuClick();
       
@@ -164,12 +173,35 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       const scores = await generateLifeWheelAnalysis(deepContext);
       if (scores) {
           setLifeWheelData(scores);
+          if (persistResult) {
+              await AsyncStorage.setItem(LIFE_WHEEL_STORAGE_KEY, JSON.stringify(scores));
+          }
           playSuccess();
       } else {
           Alert.alert("Hors Connexion", "Impossible d'analyser les données sans internet.");
       }
       setIsAnalyzingWheel(false);
   };
+
+  useEffect(() => {
+      const bootstrapLifeWheel = async () => {
+          try {
+              const stored = await AsyncStorage.getItem(LIFE_WHEEL_STORAGE_KEY);
+              if (stored) {
+                  const parsed = JSON.parse(stored);
+                  if (Array.isArray(parsed) && parsed.length === 6) {
+                      setLifeWheelData(parsed);
+                      return;
+                  }
+              }
+              await refreshWheelAnalysis(true);
+          } catch (error) {
+              console.log('Failed to initialize life wheel', error);
+          }
+      };
+
+      bootstrapLifeWheel();
+  }, []);
 
   const sendMessage = async () => {
       if (!chatInput.trim()) return;
@@ -482,7 +514,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                     <View style={[styles.card, {backgroundColor: colors.card}]}>
                         <View style={styles.cardHeader}>
                             <Text style={[styles.cardTitle, {color: colors.text}]}>Roue de la Vie (IA)</Text>
-                            <TouchableOpacity onPress={refreshWheelAnalysis} disabled={isAnalyzingWheel}>
+                            <TouchableOpacity onPress={() => refreshWheelAnalysis(true)} disabled={isAnalyzingWheel}>
                                 {isAnalyzingWheel ? <ActivityIndicator size="small" color={colors.accent} /> : <RefreshCw size={18} color={colors.subText} />}
                             </TouchableOpacity>
                         </View>
