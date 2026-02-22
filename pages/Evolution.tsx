@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import Growth from './Growth';
 import CyberKnight from './CyberKnight';
-import { PlayerProfile, UserProfile, Task, Habit, Goal, Quest } from '../types';
+import { PlayerProfile, UserProfile, Task, Habit, Goal, Quest, FocusSession } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface EvolutionProps {
@@ -12,6 +12,7 @@ interface EvolutionProps {
     habits: Habit[];
     goals: Goal[];
     quests: Quest[];
+    focusSessions: FocusSession[];
     openMenu: () => void;
     openProfile: () => void;
     onAddTask: (title: string, priority: string) => void;
@@ -62,6 +63,7 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         tasks={props.tasks}
                         habits={props.habits}
                         goals={props.goals}
+                        focusSessions={props.focusSessions}
                         openMenu={props.openMenu}
                         openProfile={props.openProfile}
                         onAddTask={props.onAddTask}
