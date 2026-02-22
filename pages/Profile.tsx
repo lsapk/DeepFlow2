@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Alert, ActivityIndicator, LayoutAnimation, TextInput, Platform, BackHandler, Linking, Modal } from 'react-native';
-import { UserProfile, PlayerProfile, UserSettings, AiPermissions } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target } from 'lucide-react-native';
+import { UserProfile, PlayerProfile, UserSettings, AiPermissions, AvatarConfig, AvatarClass, AvatarHelmet, AvatarArmor, AvatarColor } from '../types';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target, Palette } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
+import AvatarGenerator from '../components/AvatarGenerator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
 
@@ -85,6 +86,11 @@ L'équipe DeepFlow.
     `
 };
 
+const AVATAR_CLASSES: AvatarClass[] = ['cyber_knight', 'neon_hacker', 'quantum_warrior', 'shadow_ninja', 'cosmic_sage'];
+const AVATAR_HELMETS: AvatarHelmet[] = ['standard', 'visor', 'crown', 'halo'];
+const AVATAR_ARMORS: AvatarArmor[] = ['standard', 'heavy', 'stealth', 'energy'];
+const AVATAR_COLORS: AvatarColor[] = ['#C4B5FD', '#34D399', '#F472B6', '#60A5FA', '#FACC15', '#F87171', '#A78BFA'];
+
 const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
@@ -103,6 +109,15 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user.display_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
+
+  // Avatar Edit State
+  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(player.avatar_customization || {
+      class: 'cyber_knight',
+      helmet: 'standard',
+      armor: 'standard',
+      color: '#C4B5FD'
+  });
 
   // Legal Modal State
   const [legalModalVisible, setLegalModalVisible] = useState(false);
@@ -166,6 +181,20 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
           };
           await supabase.from('user_settings').upsert(defaultSettings);
           setSettings(defaultSettings);
+      }
+      setLoading(false);
+  };
+
+  const saveAvatar = async () => {
+      setLoading(true);
+      const { error } = await supabase.from('player_profiles').update({
+          avatar_customization: avatarConfig
+      }).eq('user_id', user.id);
+
+      if (error) Alert.alert("Erreur", "Impossible de sauvegarder l'avatar.");
+      else {
+          player.avatar_customization = avatarConfig;
+          setIsEditingAvatar(false);
       }
       setLoading(false);
   };
@@ -243,7 +272,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       <View style={styles.tabContent}>
           <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                  <Image source={{ uri: user.photo_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
+                  <AvatarGenerator config={player.avatar_customization} size={120} />
                   <View style={styles.levelBadge}>
                       <Text style={styles.levelBadgeText}>{player.level}</Text>
                   </View>
@@ -274,10 +303,16 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
               <View style={styles.xpBarBg}><View style={[styles.xpBarFill, { width: `${(player.experience_points % 1000) / 10}%` }]} /></View>
           </View>
           {!isEditing && (
-              <TouchableOpacity style={styles.editProfileBtn} onPress={() => setIsEditing(true)}>
-                  <Edit2 size={16} color="#FFF" style={{marginRight: 8}} />
-                  <Text style={styles.editProfileText}>Modifier le profil</Text>
-              </TouchableOpacity>
+              <View style={{gap: 12}}>
+                  <TouchableOpacity style={styles.editProfileBtn} onPress={() => setIsEditing(true)}>
+                      <Edit2 size={16} color="#FFF" style={{marginRight: 8}} />
+                      <Text style={styles.editProfileText}>Modifier le profil</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.editProfileBtn, {backgroundColor: '#2D1B0E', borderColor: '#451a03', borderWidth: 1}]} onPress={() => setIsEditingAvatar(true)}>
+                      <Palette size={16} color="#FACC15" style={{marginRight: 8}} />
+                      <Text style={[styles.editProfileText, {color: '#FACC15'}]}>Personnaliser l'Avatar</Text>
+                  </TouchableOpacity>
+              </View>
           )}
       </View>
   );
@@ -399,6 +434,63 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                 </ScrollView>
             )}
         </View>
+
+        {/* AVATAR EDIT MODAL */}
+        <Modal visible={isEditingAvatar} transparent animationType="slide">
+            <View style={styles.modalOverlay}>
+                <View style={[styles.modalContent, {height: '80%', backgroundColor: '#1C1C1E'}]}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Personnalisation</Text>
+                        <TouchableOpacity onPress={() => setIsEditingAvatar(false)}>
+                            <X size={24} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        <View style={{alignItems: 'center', marginVertical: 20}}>
+                            <AvatarGenerator config={avatarConfig} size={150} />
+                        </View>
+
+                        <Text style={styles.inputLabel}>CLASSE</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
+                            {AVATAR_CLASSES.map(c => (
+                                <TouchableOpacity key={c} style={[styles.choiceBtn, avatarConfig.class === c && styles.choiceBtnActive]} onPress={() => setAvatarConfig({...avatarConfig, class: c})}>
+                                    <Text style={[styles.choiceText, avatarConfig.class === c && styles.choiceTextActive]}>{c.replace('_', ' ')}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.inputLabel}>CASQUE</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
+                            {AVATAR_HELMETS.map(h => (
+                                <TouchableOpacity key={h} style={[styles.choiceBtn, avatarConfig.helmet === h && styles.choiceBtnActive]} onPress={() => setAvatarConfig({...avatarConfig, helmet: h})}>
+                                    <Text style={[styles.choiceText, avatarConfig.helmet === h && styles.choiceTextActive]}>{h}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.inputLabel}>ARMURE</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
+                            {AVATAR_ARMORS.map(a => (
+                                <TouchableOpacity key={a} style={[styles.choiceBtn, avatarConfig.armor === a && styles.choiceBtnActive]} onPress={() => setAvatarConfig({...avatarConfig, armor: a})}>
+                                    <Text style={[styles.choiceText, avatarConfig.armor === a && styles.choiceTextActive]}>{a}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.inputLabel}>COULEUR D'ÉNERGIE</Text>
+                        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 30}}>
+                            {AVATAR_COLORS.map(c => (
+                                <TouchableOpacity key={c} style={[styles.colorCircle, {backgroundColor: c}, avatarConfig.color === c && {borderWidth: 3, borderColor: '#FFF'}]} onPress={() => setAvatarConfig({...avatarConfig, color: c})} />
+                            ))}
+                        </View>
+
+                        <TouchableOpacity style={styles.saveMainBtn} onPress={saveAvatar} disabled={loading}>
+                            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveMainBtnText}>Enregistrer</Text>}
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
 
         {/* LEGAL MODAL */}
         <Modal visible={legalModalVisible} transparent animationType="slide" onRequestClose={() => setLegalModalVisible(false)}>
@@ -528,6 +620,15 @@ const styles = StyleSheet.create({
   statCard: { width: '48%', backgroundColor: '#1C1C1E', padding: 16, borderRadius: 16, alignItems: 'center' },
   statCardValue: { color: '#FFF', fontSize: 24, fontWeight: '700', marginBottom: 4 },
   statCardLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
+
+  inputLabel: { fontSize: 12, color: '#888', fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  choiceBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#333', marginRight: 10, borderWidth: 1, borderColor: 'transparent' },
+  choiceBtnActive: { backgroundColor: '#007AFF', borderColor: '#FFF' },
+  choiceText: { color: '#888', fontWeight: '600', textTransform: 'capitalize' },
+  choiceTextActive: { color: '#FFF' },
+  colorCircle: { width: 40, height: 40, borderRadius: 20 },
+  saveMainBtn: { backgroundColor: '#007AFF', padding: 16, borderRadius: 14, alignItems: 'center', marginBottom: 40 },
+  saveMainBtnText: { color: '#FFF', fontWeight: '700', fontSize: 17 },
 });
 
 export default Profile;
