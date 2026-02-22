@@ -1,8 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 import { supabase } from './supabase';
 
-// Logique pour s'assurer que la clé est bien chargée
-const getApiKey = () => process.env.API_KEY;
+// Expo n'expose côté client que les variables préfixées par EXPO_PUBLIC_.
+// On garde des fallbacks pour compatibilité (web / anciennes configs).
+const getApiKey = () => (
+    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.API_KEY
+);
 
 async function logAiUsage(type: 'chat' | 'analysis') {
     try {
@@ -42,7 +47,7 @@ export const generateActionableCoaching = async (
 ): Promise<{ text: string, action?: any }> => {
   const apiKey = getApiKey();
   if (!apiKey) {
-      console.warn("API Key manquante dans process.env.API_KEY");
+      console.warn("API Key manquante. Utilisez EXPO_PUBLIC_GEMINI_API_KEY dans votre .env.");
       return { text: "⚠️ IA non configurée (Clé manquante dans le fichier .env)." };
   }
 

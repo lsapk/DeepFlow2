@@ -1,27 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Calendar as CalendarIcon, MapPin, Clock, AlignLeft, LogIn, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Task, Habit, CalendarEvent } from '../types';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 import { playMenuClick } from '../services/sound';
 import Animated, { FadeIn, LayoutAnimationConfig } from 'react-native-reanimated';
 import { supabase } from '../services/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// --- CONFIGURATION GOOGLE - Secured via Environment Variables ---
-// Fallback to 'dummy' IDs to prevent app crash if keys are missing in .env
+// --- CONFIGURATION GOOGLE ---
+// Expo n'expose côté client que les variables EXPO_PUBLIC_*
 const GOOGLE_CONFIG = {
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy_web_client_id',
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy_android_client_id',
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy_ios_client_id',
+    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '',
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
 };
 
-const hasValidGoogleConfig = 
-    GOOGLE_CONFIG.androidClientId !== 'dummy_android_client_id' && 
-    GOOGLE_CONFIG.iosClientId !== 'dummy_ios_client_id';
+const appOwnership = Constants.appOwnership;
+const isExpoGo = appOwnership === 'expo';
+
+const hasGoogleClientIdForCurrentPlatform = () => {
+    if (isExpoGo) return !!GOOGLE_CONFIG.expoClientId;
+    if (Platform.OS === 'ios') return !!GOOGLE_CONFIG.iosClientId;
+    if (Platform.OS === 'android') return !!GOOGLE_CONFIG.androidClientId;
+    if (Platform.OS === 'web') return !!GOOGLE_CONFIG.webClientId;
+    return false;
+};
 
 interface CalendarPageProps {
     tasks: Task[];
@@ -69,9 +78,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
     // Google Auth Request - Safely initialized with dummy IDs if real ones missing
     const [request, response, promptAsync] = Google.useAuthRequest({
-        iosClientId: GOOGLE_CONFIG.iosClientId,
-        androidClientId: GOOGLE_CONFIG.androidClientId,
-        webClientId: GOOGLE_CONFIG.webClientId,
+        clientId: GOOGLE_CONFIG.expoClientId || GOOGLE_CONFIG.webClientId || undefined,
+        iosClientId: GOOGLE_CONFIG.iosClientId || undefined,
+        androidClientId: GOOGLE_CONFIG.androidClientId || undefined,
+        webClientId: GOOGLE_CONFIG.webClientId || undefined,
         scopes: ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events'],
     });
 
@@ -129,7 +139,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 headers: { Authorization: `Bearer ${token}` }
             });
             
-            if (!res.ok) throw new Error("Google API Error");
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Google API Error ${res.status}: ${errText}`);
+            }
 
             const data = await res.json();
             
@@ -156,15 +169,31 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         }
     };
 
-    const handleGoogleConnect = () => {
-        if (!hasValidGoogleConfig) {
-            Alert.alert("Configuration Manquante", "Les clés API Google (Client IDs) ne sont pas configurées dans le fichier .env.");
+    const handleGoogleConnect = async () => {
+        if (!hasGoogleClientIdForCurrentPlatform()) {
+            const expected = isExpoGo
+                ? 'EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID'
+                : Platform.OS === 'ios'
+                    ? 'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID'
+                    : Platform.OS === 'android'
+                        ? 'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID'
+                        : 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID';
+
+            Alert.alert(
+                'Configuration Manquante',
+                `Client ID Google manquant pour cette plateforme. Ajoute ${expected} dans le .env puis redémarre Expo avec le cache vidé.`
+            );
             return;
         }
+
         if (googleToken) {
             fetchGoogleCalendarEvents(googleToken);
-        } else {
-            promptAsync();
+            return;
+        }
+
+        const result = await promptAsync();
+        if (result?.type !== 'success' && result?.type !== 'dismiss') {
+            Alert.alert('Connexion Google', 'Connexion annulée ou refusée.');
         }
     };
 
@@ -375,8 +404,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 
                 <View style={styles.headerControls}>
                     {!googleToken && (
-                        <TouchableOpacity onPress={handleGoogleConnect} style={[styles.googleBtn, { backgroundColor: hasValidGoogleConfig ? 'rgba(234, 67, 53, 0.1)' : '#333' }]} disabled={isLoadingGoogle}>
-                            {isLoadingGoogle ? <ActivityIndicator size="small" color={colors.googleRed} /> : <CalendarIcon size={20} color={hasValidGoogleConfig ? colors.googleRed : '#555'} />}
+                        <TouchableOpacity onPress={handleGoogleConnect} style={[styles.googleBtn, { backgroundColor: hasGoogleClientIdForCurrentPlatform() ? 'rgba(234, 67, 53, 0.1)' : '#333' }]} disabled={isLoadingGoogle || !request}>
+                            {isLoadingGoogle ? <ActivityIndicator size="small" color={colors.googleRed} /> : <CalendarIcon size={20} color={hasGoogleClientIdForCurrentPlatform() ? colors.googleRed : '#555'} />}
                         </TouchableOpacity>
                     )}
                     <View style={[styles.viewToggle, { backgroundColor: colors.toggleBg }]}>
