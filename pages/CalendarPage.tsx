@@ -15,11 +15,14 @@ WebBrowser.maybeCompleteAuthSession();
 
 // --- CONFIGURATION GOOGLE ---
 // Expo n'expose côté client que les variables EXPO_PUBLIC_*
+const sanitizeEnvValue = (value?: string) =>
+    (value || '').replace(/\\n/g, '').trim();
+
 const GOOGLE_CONFIG = {
-    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '',
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
+    expoClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID),
+    webClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),
+    androidClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID),
+    iosClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
 };
 
 const appOwnership = Constants.appOwnership;
