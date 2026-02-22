@@ -48,7 +48,8 @@ const App: React.FC = () => {
   const [levelUpVisible, setLevelUpVisible] = useState(false);
   const previousLevelRef = useRef<number>(1);
   
-  const [session, setSession] = useState<any>(null);
+  // undefined = session en cours de chargement, null = non connecté.
+  const [session, setSession] = useState<any | null | undefined>(undefined);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
   
@@ -445,6 +446,12 @@ const App: React.FC = () => {
     );
 
     if (currentView === ViewState.ONBOARDING) return <Onboarding onFinish={finishOnboarding} />;
+    if (session === undefined) return (
+        <View style={{ flex: 1, backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }}>
+            <SkeletonDashboard />
+        </View>
+    );
+
     if (!session || !user || !player) return <Auth onLogin={() => fetchData(session?.user?.id)} />;
 
     const commonProps = { isDarkMode };
@@ -513,7 +520,7 @@ const App: React.FC = () => {
                     <LevelUpModal visible={levelUpVisible} newLevel={player.level} onClose={() => setLevelUpVisible(false)} />
                 )}
 
-                {currentView !== ViewState.ONBOARDING && user && player && (
+                {user && player && (
                     <>
                         <Sidebar 
                             visible={isSidebarVisible} 
