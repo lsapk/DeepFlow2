@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions, LayoutAnimation } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, Goal } from '../types';
+import { PlayerProfile, UserProfile, Task, Habit, Goal, FocusSession } from '../types';
 import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit, Activity, Zap, RefreshCw, BarChart2, PieChart, Clock, Target, CloudOff, Menu } from 'lucide-react-native';
 import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ interface GrowthProps {
   tasks: Task[]; 
   habits?: Habit[];
   goals?: Goal[];
+  focusSessions?: FocusSession[];
   openMenu: () => void;
   openProfile: () => void;
   onAddTask: (title: string, priority: string) => void;
@@ -33,7 +34,7 @@ interface GrowthProps {
   noPadding?: boolean;
 }
 
-const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false, openMenu }) => {
+const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], focusSessions = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false, openMenu }) => {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   
@@ -90,7 +91,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
               const isoDate = thirtyDaysAgo.toISOString();
 
               const [focusRes, journalRes, reflectionRes, habitRes] = await Promise.all([
-                  supabase.from('focus_sessions').select('*').eq('user_id', user.id).gte('created_at', isoDate).order('created_at', { ascending: false }),
+                  supabase.from('focus_sessions').select('*').eq('user_id', user.id).gte('completed_at', isoDate).order('completed_at', { ascending: false }),
                   supabase.from('journal_entries').select('created_at, mood, title, content').eq('user_id', user.id).gte('created_at', isoDate),
                   supabase.from('daily_reflections').select('created_at, answer, question').eq('user_id', user.id).gte('created_at', isoDate),
                   supabase.from('habit_completions').select('*').eq('user_id', user.id).gte('completed_date', isoDate.split('T')[0])
@@ -127,13 +128,13 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           tasks,
           habits,
           goals,
-          focusSessions: focusHistory,
+          focusSessions,
       });
 
       // 2. Activity Chart (Weekly)
       const weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
       focusHistory.forEach(session => {
-          const d = new Date(session.created_at);
+          const d = new Date(session.completed_at || session.created_at);
           const day = d.getDay(); // 0 is Sunday
           const adjustedDay = day === 0 ? 6 : day - 1; 
           weeklyActivity[adjustedDay] += (session.duration || 0);
@@ -148,14 +149,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           const k = dateStr.split('T')[0];
           consistencyMap[k] = (consistencyMap[k] || 0) + 1;
       };
-      focusHistory.forEach(s => addToMap(s.created_at));
+      focusHistory.forEach(s => addToMap(s.completed_at || s.created_at));
       habitCompletions.forEach(h => addToMap(h.completed_date));
       journalHistory.forEach(j => addToMap(j.created_at));
       reflectionHistory.forEach(r => addToMap(r.created_at));
       completedTasks.forEach(t => addToMap(t.created_at));
 
       return { productivityScore, taskRate, avgStreak, weeklyActivity: normalizedWeekly, completedTasksCount: completedTasks.length, consistencyMap };
-  }, [tasks, habits, goals, focusHistory, habitCompletions, journalHistory, reflectionHistory]);
+  }, [tasks, habits, goals, focusSessions, focusHistory, habitCompletions, journalHistory, reflectionHistory]);
 
   const refreshWheelAnalysis = async (persistResult = true) => {
       setIsAnalyzingWheel(true);
@@ -365,7 +366,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           else buckets[3]++;
       };
 
-      focusHistory.forEach(s => processTime(s.created_at));
+      focusHistory.forEach(s => processTime(s.completed_at || s.created_at));
       journalHistory.forEach(j => processTime(j.created_at));
       reflectionHistory.forEach(r => processTime(r.created_at));
       tasks.filter(t => t.completed).forEach(t => processTime(t.created_at));

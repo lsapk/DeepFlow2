@@ -15,18 +15,21 @@ WebBrowser.maybeCompleteAuthSession();
 
 // --- CONFIGURATION GOOGLE ---
 // Expo n'expose côté client que les variables EXPO_PUBLIC_*
+const sanitizeEnvValue = (value?: string) =>
+    (value || '').replace(/\\n/g, '').trim();
+
 const GOOGLE_CONFIG = {
-    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '',
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
+    expoClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID),
+    webClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),
+    androidClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID),
+    iosClientId: sanitizeEnvValue(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
 };
 
 const appOwnership = Constants.appOwnership;
 const isExpoGo = appOwnership === 'expo';
 
 const hasGoogleClientIdForCurrentPlatform = () => {
-    if (isExpoGo) return !!GOOGLE_CONFIG.expoClientId;
+    if (isExpoGo) return !!(GOOGLE_CONFIG.expoClientId || GOOGLE_CONFIG.webClientId);
     if (Platform.OS === 'ios') return !!GOOGLE_CONFIG.iosClientId;
     if (Platform.OS === 'android') return !!GOOGLE_CONFIG.androidClientId;
     if (Platform.OS === 'web') return !!GOOGLE_CONFIG.webClientId;
@@ -315,7 +318,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     const handleGoogleConnect = async () => {
         if (!hasGoogleClientIdForCurrentPlatform()) {
             const expected = isExpoGo
-                ? 'EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID'
+                ? 'EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID (ou EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID en secours)'
                 : Platform.OS === 'ios'
                     ? 'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID'
                     : Platform.OS === 'android'

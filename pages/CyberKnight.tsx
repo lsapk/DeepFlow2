@@ -104,13 +104,22 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
   const handleClaimQuest = async (quest: Quest) => {
     if (quest.completed) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setActiveQuests((prev) => prev.map(q => q.id === quest.id ? { ...q, completed: true } : q));
+
+    const nextXp = player.experience_points + quest.reward_xp;
+    let nextLevel = player.level;
+    while (nextXp >= getXpForNextLevel(nextLevel)) {
+      nextLevel += 1;
+    }
+
+    // Cohérence avec le reste de l'app: une quête validée disparaît des quêtes actives.
+    setActiveQuests((prev) => prev.filter((q) => q.id !== quest.id));
 
     try {
       await Promise.all([
         supabase.from('quests').update({ completed: true, completed_at: new Date().toISOString() }).eq('id', quest.id),
         supabase.from('player_profiles').update({
-          experience_points: player.experience_points + quest.reward_xp,
+          experience_points: nextXp,
+          level: nextLevel,
           credits: player.credits + quest.reward_credits,
           total_quests_completed: (player.total_quests_completed || 0) + 1,
         }).eq('user_id', user.id),
@@ -123,9 +132,18 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
   const handleGenerateQuests = async () => {
     setGenerating(true);
     try {
+      if (activeQuests.length >= 12) {
+        Alert.alert('Limite atteinte', 'Complète quelques quêtes avant d’en générer de nouvelles.');
+        return;
+      }
+
       const generated = await generateQuests(player.level, 'Utilisateur mobile actif');
       if (!generated.length) return;
-      const questsToInsert = generated.map((q: any) => ({
+
+      const knownTitles = new Set(activeQuests.map((q) => q.title.trim().toLowerCase()));
+      const questsToInsert = generated
+        .filter((q: any) => q?.title && !knownTitles.has(String(q.title).trim().toLowerCase()))
+        .map((q: any) => ({
         user_id: user.id,
         title: q.title,
         description: q.description,
@@ -137,6 +155,12 @@ const CyberKnight: React.FC<CyberKnightProps> = ({ player, user, quests: initial
         quest_type: q.quest_type || 'daily',
         category: q.category || 'rpg',
       }));
+
+      if (!questsToInsert.length) {
+        Alert.alert('Info', 'Les nouvelles quêtes proposées existent déjà.');
+        return;
+      }
+
       const { data } = await supabase.from('quests').insert(questsToInsert).select();
       if (data) setActiveQuests((prev) => [...prev, ...data as any]);
     } catch {

@@ -68,6 +68,16 @@ const App: React.FC = () => {
   
   const realtimeChannel = useRef<RealtimeChannel | null>(null);
   const appState = useRef(AppState.currentState);
+  const realtimeRefreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleRealtimeRefresh = (userId: string) => {
+      if (realtimeRefreshDebounceRef.current) {
+          clearTimeout(realtimeRefreshDebounceRef.current);
+      }
+      realtimeRefreshDebounceRef.current = setTimeout(() => {
+          fetchData(userId);
+      }, 250);
+  };
 
   // --- SYSTEM & OFFLINE INIT ---
   useEffect(() => {
@@ -97,6 +107,9 @@ const App: React.FC = () => {
 
       return () => {
           subscription.remove();
+          if (realtimeRefreshDebounceRef.current) {
+              clearTimeout(realtimeRefreshDebounceRef.current);
+          }
       };
   }, []);
 
@@ -226,10 +239,10 @@ const App: React.FC = () => {
   const setupRealtimeSubscription = (userId: string) => {
       if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
       const channel = supabase.channel('db_changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'quests', filter: `user_id=eq.${userId}` }, () => fetchData(userId))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` }, () => fetchData(userId)) // Listen for focus
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'quests', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId)) // Listen for focus
           .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, (payload) => {
                   if (payload.eventType === 'UPDATE') {
                       const newP = payload.new as PlayerProfile;
@@ -244,8 +257,8 @@ const App: React.FC = () => {
                   }
           })
           .subscribe((status) => {
-              if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                  console.log("Realtime disconnected");
+              if (status === 'CHANNEL_ERROR') {
+                  console.warn("Realtime channel error");
               }
           });
       realtimeChannel.current = channel;
@@ -470,7 +483,7 @@ const App: React.FC = () => {
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       case ViewState.EVOLUTION:
-        Content = <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
+        Content = <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} focusSessions={focusSessions} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
         break;
       case ViewState.TASKS: 
           Content = <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
