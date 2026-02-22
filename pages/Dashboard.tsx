@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Platform } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, ViewState, FocusSession } from '../types';
+import { PlayerProfile, UserProfile, Task, Habit, Goal, ViewState, FocusSession } from '../types';
 import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -16,7 +16,8 @@ interface DashboardProps {
   player: PlayerProfile;
   tasks: Task[];
   habits: Habit[];
-  todayFocusSessions: FocusSession[]; // Nouvelle prop pour le score focus
+  goals: Goal[];
+  focusSessions: FocusSession[];
   toggleHabit: (id: string) => void;
   toggleTask: (id: string) => void;
   openFocus: () => void;
@@ -27,7 +28,7 @@ interface DashboardProps {
   openMenu: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, todayFocusSessions = [], toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goals, focusSessions = [], toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
   const insets = useSafeAreaInsets();
   
   const colors = {
@@ -75,33 +76,33 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, toda
       return aDone ? 1 : -1;
   });
 
-  // 2. Tasks
-  const activeTasks = tasks.filter(t => !t.completed).slice(0, 4); 
-  const completedTasksCount = tasks.filter(t => t.completed).length; // Idéalement filtrer par date de complétion si dispo
+  // 2. Tasks & Goals
+  const activeTasks = tasks.filter(t => !t.completed).slice(0, 4);
+  const completedTasksCount = tasks.filter(t => t.completed).length;
   const totalTasks = tasks.length;
+  const completedGoalsCount = goals.filter(g => g.completed).length;
+  const totalGoals = goals.length;
 
-  // 3. Calcul Score Cohérent
+  // 3. Calcul Score Global (cohérent et basé sur l'ensemble des données)
   const productivityScore = useMemo(() => {
-      // Score Habitudes (30%)
-      const habitsDone = todaysHabits.filter(h => h.last_completed_at && isSameDay(new Date(h.last_completed_at), today)).length;
-      const habitsTotal = todaysHabits.length;
-      const habitScore = habitsTotal > 0 ? (habitsDone / habitsTotal) * 100 : 0; // Si 0 habitudes, ne penalise pas mais ne donne pas de points
+      const habitsDoneToday = todaysHabits.filter(h => h.last_completed_at && isSameDay(new Date(h.last_completed_at), today)).length;
+      const habitsTodayRate = todaysHabits.length > 0 ? (habitsDoneToday / todaysHabits.length) * 100 : 50;
 
-      // Score Tâches (40%) - Basé sur le taux de complétion global actuel
-      const taskScore = totalTasks > 0 ? (completedTasksCount / totalTasks) * 100 : 0;
+      const averageHabitStreak = habits.length > 0
+          ? habits.reduce((acc, h) => acc + (h.streak || 0), 0) / habits.length
+          : 0;
+      const streakScore = Math.min(100, (averageHabitStreak / 30) * 100);
+      const habitScore = (habitsTodayRate * 0.6) + (streakScore * 0.4);
 
-      // Score Focus (30%) - Basé sur minutes (Objectif arbitraire 60 min)
-      const focusMinutes = todayFocusSessions.reduce((acc, session) => acc + session.duration, 0);
-      const focusScore = Math.min(100, (focusMinutes / 60) * 100);
+      const taskScore = totalTasks > 0 ? (completedTasksCount / totalTasks) * 100 : 50;
+      const goalScore = totalGoals > 0 ? (completedGoalsCount / totalGoals) * 100 : 50;
 
-      // Moyenne Pondérée
-      let score = (taskScore * 0.4) + (habitScore * 0.3) + (focusScore * 0.3);
-      
-      // Bonus si aucune habitude prévue
-      if (habitsTotal === 0) score = (taskScore * 0.5) + (focusScore * 0.5);
+      const totalFocusMinutes = focusSessions.reduce((acc, session) => acc + (session.duration || 0), 0);
+      const focusScore = Math.min(100, (totalFocusMinutes / 600) * 100); // 10h cumulées = 100
 
-      return Math.round(score) || 0;
-  }, [todaysHabits, completedTasksCount, totalTasks, todayFocusSessions]);
+      const score = (taskScore * 0.3) + (goalScore * 0.25) + (habitScore * 0.25) + (focusScore * 0.2);
+      return Math.round(score);
+  }, [todaysHabits, today, habits, totalTasks, completedTasksCount, totalGoals, completedGoalsCount, focusSessions]);
 
   // Autres stats
   const averageStreak = habits.length > 0 ? habits.reduce((acc, h) => acc + h.streak, 0) / habits.length : 0;

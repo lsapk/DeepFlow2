@@ -230,19 +230,6 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   };
 
   const scheduleNotifications = async (seconds: number) => {
-      const endDate = new Date(Date.now() + seconds * 1000);
-      const endHours = endDate.getHours().toString().padStart(2, '0');
-      const endMinutes = endDate.getMinutes().toString().padStart(2, '0');
-
-      await Notifications.scheduleNotificationAsync({
-          content: {
-              title: "Focus en cours 🧠",
-              body: `Session lancée. Fin prévue à ${endHours}:${endMinutes}.`,
-              sound: false,
-          },
-          trigger: null,
-      });
-
       await Notifications.scheduleNotificationAsync({
           content: {
               title: "Session Terminée ! 🎉",
@@ -251,7 +238,8 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               vibrate: [0, 250, 250, 250],
           },
           trigger: {
-              seconds: seconds,
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds,
           },
       });
   };
@@ -278,6 +266,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           startTime: now
       };
       await AsyncStorage.setItem('active_focus_session', JSON.stringify(sessionData));
+      await cancelNotifications();
       await scheduleNotifications(d * 60);
 
       setDurationMinutes(d);
@@ -299,6 +288,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       setIsActive(false);
       setEndTimeTimestamp(null);
       await AsyncStorage.removeItem('active_focus_session');
+      await cancelNotifications();
       playSuccess();
 
       const { data: { user } } = await supabase.auth.getUser();

@@ -57,7 +57,7 @@ const App: React.FC = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [quests, setQuests] = useState<Quest[]>([]);
-  const [todayFocus, setTodayFocus] = useState<FocusSession[]>([]); // New state for live score
+  const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SYNCING' | 'OFFLINE_PENDING'>('SYNCED');
@@ -285,14 +285,12 @@ const App: React.FC = () => {
       const { data: settingsData } = await supabase.from('user_settings').select('theme').eq('id', userId).single();
       if (settingsData && settingsData.theme) setIsDarkMode(settingsData.theme === 'dark');
 
-      const todayStr = new Date().toISOString().split('T')[0];
-
       const [tasksRes, habitsRes, goalsRes, questsRes, focusRes] = await Promise.all([
           supabase.from('tasks').select('*, subtasks(*)').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
           supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId),
           supabase.from('quests').select('*').eq('user_id', userId).eq('completed', false),
-          supabase.from('focus_sessions').select('*').eq('user_id', userId).gte('completed_at', todayStr) // Today only
+          supabase.from('focus_sessions').select('*').eq('user_id', userId)
       ]);
 
       if (tasksRes.data) {
@@ -312,7 +310,7 @@ const App: React.FC = () => {
           saveToCache(CACHE_KEYS.QUESTS, questsRes.data);
       }
       if (focusRes.data) {
-          setTodayFocus(focusRes.data);
+          setFocusSessions(focusRes.data);
       }
 
       const savedSession = await AsyncStorage.getItem('active_focus_session');
@@ -456,7 +454,7 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case ViewState.TODAY:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} todayFocusSessions={todayFocus} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
         break;
       case ViewState.PLANNING:
         Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
@@ -489,7 +487,7 @@ const App: React.FC = () => {
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       default:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} todayFocusSessions={todayFocus} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
     }
 
     const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
@@ -530,6 +528,10 @@ const App: React.FC = () => {
                             onClose={() => setProfileVisible(false)} 
                             user={user} player={player} logout={handleLogout} 
                             onThemeChange={setIsDarkMode}
+                            onPlayerUpdate={(updatedPlayer) => {
+                                setPlayer(updatedPlayer);
+                                saveToCache(CACHE_KEYS.PLAYER, updatedPlayer);
+                            }}
                         />
                         {session && (
                             <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
