@@ -470,7 +470,7 @@ const App: React.FC = () => {
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       case ViewState.EVOLUTION:
-        Content = <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
+        Content = <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} focusSessions={focusSessions} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
         break;
       case ViewState.TASKS: 
           Content = <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
