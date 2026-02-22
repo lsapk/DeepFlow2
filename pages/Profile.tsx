@@ -15,6 +15,7 @@ interface ProfileProps {
   visible: boolean;
   onClose: () => void;
   onThemeChange?: (isDark: boolean) => void;
+  onPlayerUpdate?: (player: PlayerProfile) => void;
 }
 
 const DEFAULT_AI_PERMISSIONS: AiPermissions = {
@@ -91,7 +92,7 @@ const AVATAR_HELMETS: AvatarHelmet[] = ['standard', 'visor', 'crown', 'halo'];
 const AVATAR_ARMORS: AvatarArmor[] = ['standard', 'heavy', 'stealth', 'energy'];
 const AVATAR_COLORS: AvatarColor[] = ['#C4B5FD', '#34D399', '#F472B6', '#60A5FA', '#FACC15', '#F87171', '#A78BFA'];
 
-const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange }) => {
+const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange, onPlayerUpdate }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
@@ -156,6 +157,18 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       }
   }, [visible]);
 
+
+  useEffect(() => {
+      if (visible) {
+          setAvatarConfig(player.avatar_customization || {
+              class: 'cyber_knight',
+              helmet: 'standard',
+              armor: 'standard',
+              color: '#C4B5FD'
+          });
+      }
+  }, [player.avatar_customization, visible]);
+
   const fetchSettings = async () => {
       setLoading(true);
       const { data } = await supabase.from('user_settings').select('*').eq('id', user.id).single();
@@ -187,13 +200,17 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
 
   const saveAvatar = async () => {
       setLoading(true);
-      const { error } = await supabase.from('player_profiles').update({
-          avatar_customization: avatarConfig
-      }).eq('user_id', user.id);
+      const { data, error } = await supabase
+          .from('player_profiles')
+          .update({ avatar_customization: avatarConfig })
+          .eq('user_id', user.id)
+          .select('*')
+          .single();
 
-      if (error) Alert.alert("Erreur", "Impossible de sauvegarder l'avatar.");
-      else {
-          player.avatar_customization = avatarConfig;
+      if (error) {
+          Alert.alert("Erreur", "Impossible de sauvegarder l'avatar.");
+      } else if (data) {
+          onPlayerUpdate?.(data as PlayerProfile);
           setIsEditingAvatar(false);
       }
       setLoading(false);
