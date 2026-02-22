@@ -197,7 +197,7 @@ export interface CalendarEvent {
     start_time?: string; 
     end_time?: string;   
     is_all_day: boolean;
-    type: 'task' | 'habit' | 'google';
+    type: 'task' | 'habit' | 'google' | 'custom';
     status: 'pending' | 'completed';
     color?: string;
     description?: string;

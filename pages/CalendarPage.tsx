@@ -1,27 +1,53 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform, Dimensions, Modal, TextInput, Switch } from 'react-native';
 import { Plus, ChevronLeft, ChevronRight, CheckCircle2, Circle, Calendar as CalendarIcon, MapPin, Clock, AlignLeft, LogIn, Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Task, Habit, CalendarEvent } from '../types';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 import { playMenuClick } from '../services/sound';
 import Animated, { FadeIn, LayoutAnimationConfig } from 'react-native-reanimated';
 import { supabase } from '../services/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// --- CONFIGURATION GOOGLE - Secured via Environment Variables ---
-// Fallback to 'dummy' IDs to prevent app crash if keys are missing in .env
+// --- CONFIGURATION GOOGLE ---
+// Expo n'expose côté client que les variables EXPO_PUBLIC_*
 const GOOGLE_CONFIG = {
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy_web_client_id',
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy_android_client_id',
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy_ios_client_id',
+    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '',
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
 };
 
-const hasValidGoogleConfig = 
-    GOOGLE_CONFIG.androidClientId !== 'dummy_android_client_id' && 
-    GOOGLE_CONFIG.iosClientId !== 'dummy_ios_client_id';
+const appOwnership = Constants.appOwnership;
+const isExpoGo = appOwnership === 'expo';
+
+const hasGoogleClientIdForCurrentPlatform = () => {
+    if (isExpoGo) return !!GOOGLE_CONFIG.expoClientId;
+    if (Platform.OS === 'ios') return !!GOOGLE_CONFIG.iosClientId;
+    if (Platform.OS === 'android') return !!GOOGLE_CONFIG.androidClientId;
+    if (Platform.OS === 'web') return !!GOOGLE_CONFIG.webClientId;
+    return false;
+};
+
+
+interface LocalCalendarEvent {
+    id: string;
+    user_id: string;
+    title: string;
+    description?: string | null;
+    location?: string | null;
+    start_time: string;
+    end_time: string;
+    is_all_day: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+const LOCAL_EVENTS_KEY = 'deepflow_custom_calendar_events';
 
 interface CalendarPageProps {
     tasks: Task[];
@@ -66,12 +92,17 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
     
     const [habitHistory, setHabitHistory] = useState<any[]>([]);
+    const [customEvents, setCustomEvents] = useState<LocalCalendarEvent[]>([]);
+    const [showEventModal, setShowEventModal] = useState(false);
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
+    const [eventForm, setEventForm] = useState({ title: '', description: '', location: '', start: '09:00', end: '10:00', isAllDay: false });
 
     // Google Auth Request - Safely initialized with dummy IDs if real ones missing
     const [request, response, promptAsync] = Google.useAuthRequest({
-        iosClientId: GOOGLE_CONFIG.iosClientId,
-        androidClientId: GOOGLE_CONFIG.androidClientId,
-        webClientId: GOOGLE_CONFIG.webClientId,
+        clientId: GOOGLE_CONFIG.expoClientId || GOOGLE_CONFIG.webClientId || undefined,
+        iosClientId: GOOGLE_CONFIG.iosClientId || undefined,
+        androidClientId: GOOGLE_CONFIG.androidClientId || undefined,
+        webClientId: GOOGLE_CONFIG.webClientId || undefined,
         scopes: ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events'],
     });
 
@@ -91,6 +122,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
     useEffect(() => {
         fetchHabitHistory();
     }, [habits, selectedDate.getMonth()]);
+
+    useEffect(() => {
+        loadCustomEvents();
+    }, []);
+
 
     const fetchHabitHistory = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -117,7 +153,124 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
     useEffect(() => {
         mergeAllEvents();
-    }, [selectedDate, tasks, habits, googleEvents, habitHistory]);
+    }, [selectedDate, tasks, habits, googleEvents, habitHistory, customEvents]);
+
+
+    const loadCustomEvents = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        try {
+            const raw = await AsyncStorage.getItem(`${LOCAL_EVENTS_KEY}_${user.id}`);
+            const local: LocalCalendarEvent[] = raw ? JSON.parse(raw) : [];
+            setCustomEvents(local);
+
+            // Sync best-effort from Supabase if table exists
+            const { data } = await supabase.from('calendar_events').select('*').eq('user_id', user.id);
+            if (data && Array.isArray(data) && data.length > 0) {
+                const merged = [...local];
+                data.forEach((r: any) => {
+                    if (!merged.some(e => e.id === r.id)) {
+                        merged.push({
+                            id: r.id,
+                            user_id: r.user_id,
+                            title: r.title,
+                            description: r.description,
+                            location: r.location,
+                            start_time: r.start_time,
+                            end_time: r.end_time,
+                            is_all_day: !!r.is_all_day,
+                            created_at: r.created_at || new Date().toISOString(),
+                            updated_at: r.updated_at || new Date().toISOString(),
+                        });
+                    }
+                });
+                setCustomEvents(merged);
+                await AsyncStorage.setItem(`${LOCAL_EVENTS_KEY}_${user.id}`, JSON.stringify(merged));
+            }
+        } catch (e) {
+            console.log('Custom events fallback local only');
+        }
+    };
+
+    const persistCustomEvents = async (events: LocalCalendarEvent[]) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await AsyncStorage.setItem(`${LOCAL_EVENTS_KEY}_${user.id}`, JSON.stringify(events));
+    };
+
+    const openCreateEvent = () => {
+        setEditingEventId(null);
+        setEventForm({ title: '', description: '', location: '', start: '09:00', end: '10:00', isAllDay: false });
+        setShowEventModal(true);
+    };
+
+    const openEditEvent = (event: LocalCalendarEvent) => {
+        const startD = new Date(event.start_time);
+        const endD = new Date(event.end_time);
+        setEditingEventId(event.id);
+        setEventForm({
+            title: event.title,
+            description: event.description || '',
+            location: event.location || '',
+            start: `${String(startD.getHours()).padStart(2, '0')}:${String(startD.getMinutes()).padStart(2, '0')}`,
+            end: `${String(endD.getHours()).padStart(2, '0')}:${String(endD.getMinutes()).padStart(2, '0')}`,
+            isAllDay: event.is_all_day,
+        });
+        setShowEventModal(true);
+    };
+
+    const saveCustomEvent = async () => {
+        if (!eventForm.title.trim()) {
+            Alert.alert('Titre requis', "Ajoutez un titre à l'événement.");
+            return;
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        const startIso = eventForm.isAllDay ? `${dateStr}T00:00:00.000Z` : new Date(`${dateStr}T${eventForm.start}:00`).toISOString();
+        const endIso = eventForm.isAllDay ? `${dateStr}T23:59:00.000Z` : new Date(`${dateStr}T${eventForm.end}:00`).toISOString();
+
+        const payload: LocalCalendarEvent = {
+            id: editingEventId || `local_${Date.now()}`,
+            user_id: user.id,
+            title: eventForm.title.trim(),
+            description: eventForm.description.trim() || null,
+            location: eventForm.location.trim() || null,
+            start_time: startIso,
+            end_time: endIso,
+            is_all_day: eventForm.isAllDay,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        const next = editingEventId
+            ? customEvents.map(ev => ev.id === editingEventId ? payload : ev)
+            : [...customEvents, payload];
+
+        setCustomEvents(next);
+        await persistCustomEvents(next);
+
+        try {
+            await supabase.from('calendar_events').upsert(payload);
+        } catch {
+            // local-first
+        }
+
+        setShowEventModal(false);
+    };
+
+    const deleteCustomEvent = async (id: string) => {
+        const next = customEvents.filter(ev => ev.id !== id);
+        setCustomEvents(next);
+        await persistCustomEvents(next);
+        try {
+            await supabase.from('calendar_events').delete().eq('id', id);
+        } catch {
+            // local-first
+        }
+    };
 
     const fetchGoogleCalendarEvents = async (token: string) => {
         setIsLoadingGoogle(true);
@@ -129,7 +282,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 headers: { Authorization: `Bearer ${token}` }
             });
             
-            if (!res.ok) throw new Error("Google API Error");
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Google API Error ${res.status}: ${errText}`);
+            }
 
             const data = await res.json();
             
@@ -156,15 +312,31 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         }
     };
 
-    const handleGoogleConnect = () => {
-        if (!hasValidGoogleConfig) {
-            Alert.alert("Configuration Manquante", "Les clés API Google (Client IDs) ne sont pas configurées dans le fichier .env.");
+    const handleGoogleConnect = async () => {
+        if (!hasGoogleClientIdForCurrentPlatform()) {
+            const expected = isExpoGo
+                ? 'EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID'
+                : Platform.OS === 'ios'
+                    ? 'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID'
+                    : Platform.OS === 'android'
+                        ? 'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID'
+                        : 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID';
+
+            Alert.alert(
+                'Configuration Manquante',
+                `Client ID Google manquant pour cette plateforme. Ajoute ${expected} dans le .env puis redémarre Expo avec le cache vidé.`
+            );
             return;
         }
+
         if (googleToken) {
             fetchGoogleCalendarEvents(googleToken);
-        } else {
-            promptAsync();
+            return;
+        }
+
+        const result = await promptAsync();
+        if (result?.type !== 'success' && result?.type !== 'dismiss') {
+            Alert.alert('Connexion Google', 'Connexion annulée ou refusée.');
         }
     };
 
@@ -181,7 +353,26 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
             }
         });
 
-        // 2. Tasks
+        // 2. Local custom events
+        customEvents.forEach(ev => {
+            if (isSameDay(new Date(ev.start_time), selectedDate)) {
+                events.push({
+                    id: ev.id,
+                    title: ev.title,
+                    description: ev.description || undefined,
+                    location: ev.location || undefined,
+                    start_time: ev.start_time,
+                    end_time: ev.end_time,
+                    is_all_day: ev.is_all_day,
+                    type: 'custom',
+                    status: 'pending',
+                    color: '#A78BFA',
+                    meta: ev
+                });
+            }
+        });
+
+        // 3. Tasks
         tasks.forEach(task => {
             if (task.due_date && isSameDay(new Date(task.due_date), selectedDate)) {
                 events.push({
@@ -196,7 +387,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
             }
         });
 
-        // 3. Habits
+        // 4. Habits
         habits.forEach(habit => {
             const isForToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(dayOfWeek);
             
@@ -251,6 +442,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
 
         const hasGoogle = googleEvents.some(ev => isSameDay(new Date(ev.start_time!), date));
         if (hasGoogle) return { has: true, color: colors.googleRed };
+
+        const hasCustom = customEvents.some(ev => isSameDay(new Date(ev.start_time), date));
+        if (hasCustom) return { has: true, color: '#A78BFA' };
 
         const hasTask = tasks.some(t => t.due_date && isSameDay(new Date(t.due_date), date));
         if (hasTask) return { has: true, color: colors.accent };
@@ -374,9 +568,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                 </View>
                 
                 <View style={styles.headerControls}>
+                    <TouchableOpacity onPress={openCreateEvent} style={[styles.googleBtn, { backgroundColor: 'rgba(0, 122, 255, 0.12)' }]}><Plus size={20} color={colors.accent} /></TouchableOpacity>
                     {!googleToken && (
-                        <TouchableOpacity onPress={handleGoogleConnect} style={[styles.googleBtn, { backgroundColor: hasValidGoogleConfig ? 'rgba(234, 67, 53, 0.1)' : '#333' }]} disabled={isLoadingGoogle}>
-                            {isLoadingGoogle ? <ActivityIndicator size="small" color={colors.googleRed} /> : <CalendarIcon size={20} color={hasValidGoogleConfig ? colors.googleRed : '#555'} />}
+                        <TouchableOpacity onPress={handleGoogleConnect} style={[styles.googleBtn, { backgroundColor: hasGoogleClientIdForCurrentPlatform() ? 'rgba(234, 67, 53, 0.1)' : '#333' }]} disabled={isLoadingGoogle || !request}>
+                            {isLoadingGoogle ? <ActivityIndicator size="small" color={colors.googleRed} /> : <CalendarIcon size={20} color={hasGoogleClientIdForCurrentPlatform() ? colors.googleRed : '#555'} />}
                         </TouchableOpacity>
                     )}
                     <View style={[styles.viewToggle, { backgroundColor: colors.toggleBg }]}>
@@ -428,8 +623,8 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                     {mergedEvents.length === 0 ? (
                         <View style={styles.emptyState}>
                             <Text style={[styles.emptyText, { color: colors.textSub }]}>Rien de prévu pour ce jour.</Text>
-                            <TouchableOpacity style={styles.addEventHint}>
-                                <Text style={{color: colors.accent}}>+ Ajouter un objectif</Text>
+                            <TouchableOpacity style={styles.addEventHint} onPress={openCreateEvent}>
+                                <Text style={{color: colors.accent}}>+ Ajouter un événement</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -442,6 +637,18 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                                         if (event.type === 'task') toggleTask(event.id);
                                         if (event.type === 'habit' && isSameDay(selectedDate, new Date())) toggleHabit(event.id);
                                         if (event.type === 'google') Alert.alert("Google Calendar", event.title);
+                                        if (event.type === 'custom') {
+                                            const ev = event.meta as LocalCalendarEvent;
+                                            Alert.alert(
+                                                event.title,
+                                                'Modifier ou supprimer cet événement ?',
+                                                [
+                                                    { text: 'Annuler', style: 'cancel' },
+                                                    { text: 'Modifier', onPress: () => openEditEvent(ev) },
+                                                    { text: 'Supprimer', style: 'destructive', onPress: () => deleteCustomEvent(ev.id) }
+                                                ]
+                                            );
+                                        }
                                     }}
                                 >
                                     <View style={[styles.timeColumn, { borderRightColor: colors.border }]}>
@@ -470,6 +677,12 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                                             </View>
                                         )}
                                         
+                                        {event.type === 'custom' && (
+                                            <View style={[styles.googleBadge, { backgroundColor: 'rgba(167,139,250,0.2)' }]}>
+                                                <Text style={[styles.googleBadgeText, { color: '#A78BFA' }]}>Local</Text>
+                                            </View>
+                                        )}
+
                                         {event.type === 'google' && (
                                             <View style={styles.googleBadge}>
                                                 <Text style={styles.googleBadgeText}>G-Cal</Text>
@@ -483,6 +696,31 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
                     <View style={{height: 100}} />
                 </ScrollView>
             </View>
+
+            <Modal visible={showEventModal} transparent animationType="slide" onRequestClose={() => setShowEventModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+                        <Text style={[styles.modalTitle, { color: colors.text }]}>{editingEventId ? 'Modifier événement' : 'Nouvel événement'}</Text>
+                        <TextInput placeholder="Titre" placeholderTextColor={colors.textSub} value={eventForm.title} onChangeText={(v) => setEventForm(prev => ({ ...prev, title: v }))} style={[styles.input, { color: colors.text, borderColor: colors.border }]} />
+                        <TextInput placeholder="Description" placeholderTextColor={colors.textSub} value={eventForm.description} onChangeText={(v) => setEventForm(prev => ({ ...prev, description: v }))} style={[styles.input, { color: colors.text, borderColor: colors.border }]} />
+                        <TextInput placeholder="Lieu" placeholderTextColor={colors.textSub} value={eventForm.location} onChangeText={(v) => setEventForm(prev => ({ ...prev, location: v }))} style={[styles.input, { color: colors.text, borderColor: colors.border }]} />
+                        <View style={styles.rowBetween}>
+                            <Text style={{ color: colors.text }}>Journée entière</Text>
+                            <Switch value={eventForm.isAllDay} onValueChange={(v) => setEventForm(prev => ({ ...prev, isAllDay: v }))} />
+                        </View>
+                        {!eventForm.isAllDay && (
+                            <View style={styles.rowBetween}>
+                                <TextInput placeholder="Début HH:MM" placeholderTextColor={colors.textSub} value={eventForm.start} onChangeText={(v) => setEventForm(prev => ({ ...prev, start: v }))} style={[styles.inputHalf, { color: colors.text, borderColor: colors.border }]} />
+                                <TextInput placeholder="Fin HH:MM" placeholderTextColor={colors.textSub} value={eventForm.end} onChangeText={(v) => setEventForm(prev => ({ ...prev, end: v }))} style={[styles.inputHalf, { color: colors.text, borderColor: colors.border }]} />
+                            </View>
+                        )}
+                        <View style={styles.rowBetween}>
+                            <TouchableOpacity style={[styles.modalBtn, { backgroundColor: isDarkMode ? '#333' : '#DDD' }]} onPress={() => setShowEventModal(false)}><Text style={{ color: colors.text }}>Annuler</Text></TouchableOpacity>
+                            <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.accent }]} onPress={saveCustomEvent}><Text style={{ color: '#FFF', fontWeight: '700' }}>Enregistrer</Text></TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -530,6 +768,13 @@ const styles = StyleSheet.create({
     metaText: { fontSize: 11 },
     googleBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(234, 67, 53, 0.2)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
     googleBadgeText: { color: '#EA4335', fontSize: 8, fontWeight: '700' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    modalCard: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, padding: 16, gap: 10 },
+    modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 6 },
+    input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+    inputHalf: { width: '48%', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+    rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+    modalBtn: { flex: 1, borderRadius: 10, alignItems: 'center', paddingVertical: 12 },
 });
 
 export default CalendarPage;

@@ -7,6 +7,7 @@ import { supabase } from '../services/supabase';
 import AvatarGenerator from '../components/AvatarGenerator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
+import Markdown from 'react-native-markdown-display';
 
 interface ProfileProps {
   user: UserProfile;
@@ -30,62 +31,184 @@ const DEFAULT_AI_PERMISSIONS: AiPermissions = {
 const APP_VERSION = "1.0.2 (Build 2024.1)";
 
 const LEGAL_CONTENT = {
-    FAQ: `
-**Q: Mes données sont-elles privées ?**
-R: Oui. Vos données sont stockées de manière sécurisée. L'IA n'analyse que ce que vous autorisez explicitement dans les réglages.
+    FAQ: `# FAQ DeepFlow (50 questions)
 
-**Q: Comment fonctionne le système de niveau ?**
-R: Vous gagnez de l'XP en complétant des tâches, des habitudes et des sessions de focus.
+**Q1. Comment réinitialiser mon mot de passe ?**\nR: Utilisez l'écran de connexion, option mot de passe oublié, puis suivez le lien reçu par email.
+**Q2. Mes données sont-elles privées ?**\nR: Oui, elles sont stockées via Supabase avec RLS et accès limité à votre compte.
+**Q3. Puis-je exporter mes données ?**\nR: Oui, contactez le support ou utilisez la future option d’export en JSON/CSV.
+**Q4. Puis-je supprimer mon compte ?**\nR: Oui, depuis Zone de danger, suppression définitive et irréversible.
+**Q5. Pourquoi mon niveau n’augmente pas ?**\nR: Le niveau dépend de l’XP totale. Vérifiez que vos actions sont bien synchronisées.
+**Q6. Comment gagner des crédits ?**\nR: Complétez des quêtes, tâches et habitudes pour gagner des crédits.
+**Q7. À quoi servent les crédits IA ?**\nR: Ils permettent d’utiliser certaines fonctionnalités d’assistance IA.
+**Q8. L’IA lit-elle tout mon journal ?**\nR: Uniquement selon vos permissions IA dans les réglages.
+**Q9. Comment désactiver l’IA ?**\nR: Dans Réglages > Permissions IA, désactivez chaque module.
+**Q10. Pourquoi je vois un mode hors ligne ?**\nR: L’app est offline-first. Les actions sont mises en file puis synchronisées.
+**Q11. Comment forcer la synchronisation ?**\nR: Mettez l’app au premier plan avec internet actif ; la sync repart automatiquement.
+**Q12. Que faire si une tâche disparaît ?**\nR: Vérifiez filtres, date, puis relancez l’app. Contactez support si besoin.
+**Q13. Puis-je partager un objectif ?**\nR: Pas encore publiquement, cette option est en préparation.
+**Q14. Comment fonctionne la streak d’habitudes ?**\nR: Elle augmente à chaque jour/occurrence validée selon la fréquence.
+**Q15. Pourquoi ma streak a baissé ?**\nR: Une journée manquée ou une timezone incorrecte peut casser la chaîne.
+**Q16. Comment changer la langue ?**\nR: Réglages > Langue. Certaines sections restent en français pour le moment.
+**Q17. Puis-je utiliser l’app sans compte ?**\nR: Non, un compte est nécessaire pour la synchronisation multi-appareils.
+**Q18. Comment marche le focus mode ?**\nR: Lancez une session, terminez-la pour enregistrer durée et progression.
+**Q19. Puis-je lier des tâches à des objectifs ?**\nR: Oui lors de la création/édition des tâches.
+**Q20. Comment fonctionnent les quêtes ?**\nR: Des objectifs gamifiés donnant XP et crédits.
+**Q21. Les quêtes expirent-elles ?**\nR: Certaines oui, selon leur type et date d’expiration.
+**Q22. Comment débloquer des cosmétiques avatar ?**\nR: Via boutique, succès ou récompenses de coffres.
+**Q23. Le thème clair existe-t-il ?**\nR: Oui, activable depuis Réglages > Apparence.
+**Q24. Puis-je changer d’avatar à tout moment ?**\nR: Oui, depuis Profil > Personnaliser l’avatar.
+**Q25. Pourquoi le bouton Enregistrer n’apparaissait pas ?**\nR: Correctif appliqué : bouton désormais fixe en bas du modal.
+**Q26. Google Calendar est-il obligatoire ?**\nR: Non, vous pouvez créer des événements locaux sans Google.
+**Q27. Comment connecter Google Calendar ?**\nR: Ajoutez les Client IDs, relancez Expo, puis connectez depuis Calendrier.
+**Q28. Pourquoi Google refuse la connexion ?**\nR: Client ID, SHA, bundle id ou compte testeur OAuth incorrect.
+**Q29. Puis-je ajouter des événements manuellement ?**\nR: Oui, via le bouton + dans Calendrier.
+**Q30. Puis-je modifier/supprimer un événement local ?**\nR: Oui, appui long sur l’événement local dans l’agenda.
+**Q31. Les événements locaux sont synchronisés ?**\nR: Oui en local immédiat et tentative de sync Supabase si disponible.
+**Q32. Comment contacter le support ?**\nR: Par email depuis Réglages > Contacter le support.
+**Q33. Quel est le délai de réponse support ?**\nR: Généralement 24 à 72h ouvrées.
+**Q34. L’app est-elle conforme RGPD ?**\nR: Oui, avec droits d’accès/suppression/rectification.
+**Q35. Comment voir mes statistiques ?**\nR: Onglet Stats dans le profil et modules d’évolution.
+**Q36. Puis-je restaurer un compte supprimé ?**\nR: Non, suppression définitive selon la politique en vigueur.
+**Q37. Les notifications sont personnalisables ?**\nR: Oui, vous pouvez activer/désactiver selon vos préférences.
+**Q38. Pourquoi je n’ai pas de notifications ?**\nR: Vérifiez permissions système et réglage notifications activé.
+**Q39. Comment changer mon pseudo ?**\nR: Profil > Modifier, puis sauvegarder.
+**Q40. Mon email peut-il être changé ?**\nR: Cela dépend du provider d’authentification et des règles Supabase.
+**Q41. Comment signaler un bug ?**\nR: Envoyez version app, appareil, capture et étapes de reproduction.
+**Q42. L’app consomme beaucoup de batterie ?**\nR: Le mode focus et sync sont optimisés, mais dépend de votre usage.
+**Q43. Mes données sont-elles chiffrées ?**\nR: Transport chiffré (TLS) et stockage sécurisé côté backend.
+**Q44. Y a-t-il des achats intégrés ?**\nR: Des mécaniques de crédits existent, selon votre environnement de test.
+**Q45. Puis-je utiliser plusieurs appareils ?**\nR: Oui avec le même compte, les données se synchronisent.
+**Q46. Comment vider le cache Expo ?**\nR: Lancez la commande npx expo start -c puis relance complète de l’app.
+**Q47. Pourquoi certaines vues sont vides ?**\nR: Aucune donnée disponible ou filtrage actif.
+**Q48. Puis-je désactiver les sons ?**\nR: Oui dans Réglages > Son.
+**Q49. Qu’est-ce que les power-ups ?**\nR: Bonus temporaires (XP, protection streak, etc.) appliqués au profil.
+**Q50. Comment débloquer des succès ?**\nR: En atteignant des paliers quêtes/focus/habitudes/niveau/tâches.
+**Q51. Puis-je proposer une fonctionnalité ?**\nR: Oui, envoyez vos idées via support, section feedback.`,
+    PRIVACY: `# Politique de Confidentialité
 
-**Q: Puis-je utiliser l'application hors ligne ?**
-R: Oui, DeepFlow fonctionne en "Offline First". Vos données se synchroniseront dès que vous retrouverez une connexion.
+## 1) Responsable du traitement
+DeepFlow traite vos données pour fournir l'application, la synchronisation, la gamification et l'assistance IA.
 
-**Q: L'application est-elle gratuite ?**
-R: Les fonctionnalités de base sont gratuites. Certaines fonctionnalités IA avancées peuvent nécessiter des crédits.
-    `,
-    PRIVACY: `
-**Politique de Confidentialité**
+## 2) Données collectées
+- Données de compte (email, identifiant, pseudo).
+- Données d'usage (tâches, habitudes, objectifs, sessions focus, quêtes, succès, calendrier local).
+- Données techniques minimales (logs applicatifs, erreurs).
 
-1. **Collecte des données**
-Nous collectons uniquement les données nécessaires au fonctionnement de l'application (email, tâches, habitudes).
+## 3) Finalités
+- Fournir les fonctionnalités principales.
+- Synchroniser vos données multi-appareils.
+- Personnaliser recommandations IA selon vos permissions.
+- Assurer sécurité, prévention fraude et qualité de service.
 
-2. **Utilisation de l'IA**
-Les données envoyées à l'IA (Google Gemini) sont anonymisées autant que possible et ne sont utilisées que pour vous fournir des conseils personnalisés. Vous pouvez révoquer ces accès à tout moment.
+## 4) Bases légales
+- Exécution du service demandé.
+- Consentement pour certains traitements (IA, communications).
+- Intérêt légitime (stabilité, sécurité, analytics techniques minimaux).
 
-3. **Sécurité**
-Vos données sont chiffrées et stockées via Supabase (PostgreSQL) avec des règles de sécurité strictes (RLS).
+## 5) IA et consentement
+Les modules IA respectent les permissions activées dans l'application. Vous pouvez retirer ce consentement à tout moment sans bloquer les fonctions cœur.
 
-4. **Vos droits (RGPD)**
-Vous avez le droit d'accès, de rectification et de suppression de vos données. Utilisez le bouton "Supprimer mon compte" dans la zone de danger pour effacer toutes vos traces.
-    `,
-    TERMS: `
-**Conditions Générales d'Utilisation (CGU)**
+## 6) Durées de conservation
+Les données sont conservées tant que votre compte est actif, puis supprimées selon les délais techniques et obligations légales minimales.
 
-L'utilisation de DeepFlow implique l'acceptation pleine et entière des présentes conditions.
+## 7) Sous-traitants
+- Supabase (base de données/auth/sync).
+- Google (OAuth Calendar/IA selon usage).
 
-1. **Usage personnel**
-L'application est destinée à un usage personnel pour la productivité et le développement personnel.
+## 8) Sécurité
+- Chiffrement TLS en transit.
+- Règles RLS côté base.
+- Principe du moindre privilège.
 
-2. **Responsabilité**
-DeepFlow fournit des conseils via une IA. Ces conseils ne remplacent en aucun cas un avis médical ou psychologique professionnel.
+## 9) Vos droits
+Accès, rectification, effacement, opposition, limitation, portabilité, retrait du consentement.
 
-3. **Propriété intellectuelle**
-Le design, le code et les éléments graphiques "Cyber Knight" sont la propriété exclusive de DeepFlow.
-    `,
-    LEGAL: `
-**Mentions Légales**
+## 10) Exercice des droits
+Contact : **deepflow.ia@gmail.com** avec objet “RGPD - DeepFlow”.
 
-**Éditeur :**
-DeepFlow Inc. (Développement Personnel)
-Contact : deepflow.ia@gmail.com
+## 11) Mineurs
+Le service n'est pas destiné aux enfants sans supervision parentale selon les lois locales.
 
-**Hébergement :**
-Supabase Inc. / Google Cloud Platform
+## 12) Cookies / traceurs
+Sur mobile natif, pas de cookies web classiques ; sur web, des traceurs techniques peuvent être utilisés pour session et sécurité.
 
-**Directeur de la publication :**
-L'équipe DeepFlow.
-    `
+## 13) Mises à jour
+Cette politique peut évoluer. La date de mise à jour est affichée dans l'application.`,
+    TERMS: `# Conditions Générales d'Utilisation (CGU)
+
+## 1) Objet
+DeepFlow est une application de productivité et gamification personnelle.
+
+## 2) Acceptation
+L'utilisation du service implique l'acceptation pleine et entière des présentes CGU.
+
+## 3) Compte utilisateur
+Vous êtes responsable de la confidentialité de vos identifiants et de l'activité de votre compte.
+
+## 4) Usage autorisé
+Usage personnel, licite, sans tentative d'abus, rétro-ingénierie, fraude ou détournement.
+
+## 5) IA et recommandations
+Les suggestions IA sont informatives et ne remplacent pas un avis professionnel (médical, psychologique, juridique, etc.).
+
+## 6) Disponibilité
+Le service vise une haute disponibilité sans garantie d'absence totale d'interruption.
+
+## 7) Données et sauvegarde
+DeepFlow applique une stratégie offline-first, mais l'utilisateur reste responsable de vérifier ses données critiques.
+
+## 8) Propriété intellectuelle
+Le code, design, contenus, marque et univers visuel appartiennent à DeepFlow ou ses ayants droit.
+
+## 9) Contenus utilisateur
+Vous conservez vos contenus, accordez une licence technique nécessaire à l'hébergement/synchronisation.
+
+## 10) Comportements interdits
+Spam, usurpation, exploitation abusive des API, contournement sécurité, atteinte aux droits de tiers.
+
+## 11) Limitation de responsabilité
+Responsabilité limitée aux dommages directs prouvés, dans les limites autorisées par la loi.
+
+## 12) Suspension / résiliation
+Compte suspendu ou résilié en cas de violation grave des CGU.
+
+## 13) Modifications
+Les CGU peuvent évoluer ; l'usage continu vaut acceptation de la version en vigueur.
+
+## 14) Droit applicable
+Droit applicable selon juridiction indiquée dans les mentions légales et la législation de protection des consommateurs.`,
+    LEGAL: `# Mentions Légales
+
+## Éditeur
+**DeepFlow**
+Contact : **deepflow.ia@gmail.com**
+
+## Hébergement
+- Supabase Inc.
+- Google Cloud Platform
+
+## Directeur de publication
+L'équipe produit DeepFlow.
+
+## Support
+Assistance fonctionnelle et technique par email.
+
+## Propriété intellectuelle
+L'ensemble des éléments (marques, interfaces, textes, illustrations, code) est protégé. Toute reproduction non autorisée est interdite.
+
+## Responsabilité
+DeepFlow met en œuvre les moyens raisonnables pour assurer exactitude et disponibilité, sans garantie absolue.
+
+## Signalement
+Pour tout abus, contenu illicite, faille de sécurité : **deepflow.ia@gmail.com**
+
+## Crédits
+Icônes et bibliothèques open source utilisées selon leurs licences respectives.
+
+## Version légale
+Dernière mise à jour : 2026-02-22.`
 };
+
 
 const AVATAR_CLASSES: AvatarClass[] = ['cyber_knight', 'neon_hacker', 'quantum_warrior', 'shadow_ninja', 'cosmic_sage'];
 const AVATAR_HELMETS: AvatarHelmet[] = ['standard', 'visor', 'crown', 'halo'];
@@ -462,7 +585,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                             <X size={24} color="#FFF" />
                         </TouchableOpacity>
                     </View>
-                    <ScrollView showsVerticalScrollIndicator={false}>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 120}}>
                         <View style={{alignItems: 'center', marginVertical: 20}}>
                             <AvatarGenerator config={avatarConfig} size={150} />
                         </View>
@@ -501,10 +624,13 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                             ))}
                         </View>
 
+                    </ScrollView>
+
+                    <View style={styles.stickySaveBar}>
                         <TouchableOpacity style={styles.saveMainBtn} onPress={saveAvatar} disabled={loading}>
                             {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveMainBtnText}>Enregistrer</Text>}
                         </TouchableOpacity>
-                    </ScrollView>
+                    </View>
                 </View>
             </View>
         </Modal>
@@ -520,7 +646,9 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                         </TouchableOpacity>
                     </View>
                     <ScrollView contentContainerStyle={{padding: 20}}>
-                        <Text style={styles.legalText}>{legalBody}</Text>
+                        <Markdown style={{ body: styles.legalText, heading1: { color: '#FFF', fontSize: 24, marginBottom: 16 }, heading2: { color: '#FFF', fontSize: 19, marginTop: 14 }, strong: { color: '#FFF' }, list_item: { color: '#DDD' } }}>
+                            {legalBody}
+                        </Markdown>
                     </ScrollView>
                 </View>
             </View>
@@ -644,7 +772,8 @@ const styles = StyleSheet.create({
   choiceText: { color: '#888', fontWeight: '600', textTransform: 'capitalize' },
   choiceTextActive: { color: '#FFF' },
   colorCircle: { width: 40, height: 40, borderRadius: 20 },
-  saveMainBtn: { backgroundColor: '#007AFF', padding: 16, borderRadius: 14, alignItems: 'center', marginBottom: 40 },
+  stickySaveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, backgroundColor: 'rgba(17,17,17,0.98)', borderTopWidth: 1, borderTopColor: '#2A2A2A' },
+  saveMainBtn: { backgroundColor: '#007AFF', padding: 16, borderRadius: 14, alignItems: 'center' },
   saveMainBtnText: { color: '#FFF', fontWeight: '700', fontSize: 17 },
 });
 
