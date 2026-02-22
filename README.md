@@ -38,6 +38,9 @@ EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=...
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=...
 # Obligatoire si vous testez dans Expo Go
 EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID=...
+
+# Important: une seule ligne par variable (sans "\\n" littéral)
+# Exemple incorrect: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=...apps.googleusercontent.com\\n
 ```
 
 Puis redémarre Expo en vidant le cache :
@@ -60,3 +63,9 @@ npx expo start -c
 6. Relance l'app puis ouvre l'écran **Calendrier** et appuie sur l'icône Google.
 
 > Note : sur Android/iOS, un client ID invalide (ou mauvais package/bundle/SHA) provoque une connexion refusée même si la clé est présente dans `.env`.
+
+### Dépannage rapide Google Calendar
+
+- Vérifie que chaque variable OAuth est sur **une seule ligne** dans `.env`.
+- Si tu copies/colles des valeurs et vois `\\n` à la fin, supprime-le.
+- Relance Expo avec cache vidé: `npx expo start -c`.
