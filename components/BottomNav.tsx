@@ -53,7 +53,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
     { view: ViewState.PLANNING, icon: CalendarRange, label: 'Plan' },
     { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true },
     { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal' },
-    { view: isAdmin ? ViewState.ADMIN : ViewState.EVOLUTION, icon: isAdmin ? Shield : TrendingUp, label: isAdmin ? 'Admin' : 'Évo' },
+    { view: ViewState.EVOLUTION, icon: TrendingUp, label: 'Évo' },
+    ...(isAdmin ? [{ view: ViewState.ADMIN, icon: Shield, label: 'Admin' }] : []),
   ];
 
   const handlePress = (view: ViewState) => {
@@ -126,8 +127,8 @@ const styles = StyleSheet.create({
   },
   barContainer: {
       width: '100%',
-      maxWidth: 400,
-      paddingHorizontal: 16,
+      maxWidth: 450,
+      paddingHorizontal: 10,
       alignItems: 'center',
       justifyContent: 'flex-end',
   },

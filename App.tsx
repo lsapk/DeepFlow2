@@ -63,6 +63,8 @@ const App: React.FC = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [quests, setQuests] = useState<Quest[]>([]);
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
+  const [journalEntries, setJournalEntries] = useState<any[]>([]);
+  const [reflections, setReflections] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SYNCING' | 'OFFLINE_PENDING'>('SYNCED');
@@ -304,12 +306,14 @@ const App: React.FC = () => {
       const { data: settingsData } = await supabase.from('user_settings').select('theme').eq('id', userId).single();
       if (settingsData && settingsData.theme) setIsDarkMode(settingsData.theme === 'dark');
 
-      const [tasksRes, habitsRes, goalsRes, questsRes, focusRes] = await Promise.all([
+      const [tasksRes, habitsRes, goalsRes, questsRes, focusRes, journalRes, reflectionRes] = await Promise.all([
           supabase.from('tasks').select('*, subtasks(*)').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
           supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId),
           supabase.from('quests').select('*').eq('user_id', userId).eq('completed', false),
-          supabase.from('focus_sessions').select('*').eq('user_id', userId)
+          supabase.from('focus_sessions').select('*').eq('user_id', userId),
+          supabase.from('journal_entries').select('created_at').eq('user_id', userId),
+          supabase.from('daily_reflections').select('created_at').eq('user_id', userId)
       ]);
 
       if (tasksRes.data) {
@@ -330,6 +334,12 @@ const App: React.FC = () => {
       }
       if (focusRes.data) {
           setFocusSessions(focusRes.data);
+      }
+      if (journalRes.data) {
+          setJournalEntries(journalRes.data);
+      }
+      if (reflectionRes.data) {
+          setReflections(reflectionRes.data);
       }
 
       const savedSession = await AsyncStorage.getItem('active_focus_session');
@@ -500,7 +510,7 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case ViewState.TODAY:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} journalEntries={journalEntries} reflections={reflections} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
         break;
       case ViewState.PLANNING:
         Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;

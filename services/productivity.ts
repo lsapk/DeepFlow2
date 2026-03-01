@@ -4,7 +4,9 @@ interface ComputeProductivityScoreParams {
   tasks: Task[];
   habits: Habit[];
   goals: Goal[];
-  focusSessions: Array<Pick<FocusSession, 'duration'>>;
+  focusSessions: Array<Pick<FocusSession, 'duration' | 'completed_at'>>;
+  journalEntries?: Array<{ created_at: string }>;
+  reflections?: Array<{ created_at: string }>;
   referenceDate?: Date;
 }
 
@@ -13,6 +15,8 @@ export const computeProductivityScore = ({
   habits,
   goals,
   focusSessions,
+  journalEntries = [],
+  reflections = [],
   referenceDate = new Date(),
 }: ComputeProductivityScoreParams): number => {
   const isSameDay = (d1: Date, d2: Date) => (
@@ -21,34 +25,46 @@ export const computeProductivityScore = ({
     d1.getFullYear() === d2.getFullYear()
   );
 
-  const dayOfWeek = referenceDate.getDay();
-  const activeHabits = habits.filter((h) => !h.is_archived);
+  const sixtyDaysAgo = new Date(referenceDate);
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-  const todaysHabits = activeHabits.filter((h) => {
-    if (!h.days_of_week || h.days_of_week.length === 0) return true;
-    return h.days_of_week.includes(dayOfWeek);
-  });
+  // 1. REGULARITY (Last 60 days)
+  const activityDays = new Set<string>();
+  const addActivity = (dateStr?: string | null) => {
+    if (!dateStr) return;
+    const d = new Date(dateStr);
+    if (d >= sixtyDaysAgo && d <= referenceDate) {
+      activityDays.add(d.toISOString().split('T')[0]);
+    }
+  };
 
-  const habitsDoneToday = todaysHabits.filter(
-    (h) => h.last_completed_at && isSameDay(new Date(h.last_completed_at), referenceDate)
-  ).length;
-  const habitsTodayRate = todaysHabits.length > 0 ? (habitsDoneToday / todaysHabits.length) * 100 : 50;
+  focusSessions.forEach(s => addActivity(s.completed_at));
+  journalEntries.forEach(j => addActivity(j.created_at));
+  reflections.forEach(r => addActivity(r.created_at));
+  tasks.forEach(t => { if (t.completed) addActivity(t.created_at); });
 
-  const averageHabitStreak = activeHabits.length > 0
-    ? activeHabits.reduce((acc, h) => acc + (h.streak || 0), 0) / activeHabits.length
-    : 0;
-  const streakScore = Math.min(100, (averageHabitStreak / 30) * 100);
-  const habitScore = (habitsTodayRate * 0.6) + (streakScore * 0.4);
+  const regularityScore = (activityDays.size / 60) * 100;
 
-  const completedTasksCount = tasks.filter((t) => t.completed).length;
-  const completedGoalsCount = goals.filter((g) => g.completed).length;
+  // 2. CONTENT RICHNESS & DIVERSITY
+  const hasJournal = journalEntries.length > 0 ? 20 : 0;
+  const hasReflections = reflections.length > 0 ? 20 : 0;
+  const hasFocus = focusSessions.length > 0 ? 20 : 0;
+  const hasTasks = tasks.length > 0 ? 20 : 0;
+  const hasHabits = habits.length > 0 ? 20 : 0;
+  const contentDiversityScore = hasJournal + hasReflections + hasFocus + hasTasks + hasHabits;
 
-  const taskScore = tasks.length > 0 ? (completedTasksCount / tasks.length) * 100 : 50;
-  const goalScore = goals.length > 0 ? (completedGoalsCount / goals.length) * 100 : 50;
+  // 3. PERFORMANCE (Tasks & Goals)
+  const taskRate = tasks.length > 0 ? (tasks.filter(t => t.completed).length / tasks.length) * 100 : 50;
+  const goalRate = goals.length > 0 ? (goals.filter(g => g.completed).length / goals.length) * 100 : 50;
+  const performanceScore = (taskRate * 0.6) + (goalRate * 0.4);
 
-  const totalFocusMinutes = focusSessions.reduce((acc, session) => acc + (session.duration || 0), 0);
-  const focusScore = Math.min(100, (totalFocusMinutes / 600) * 100);
+  // 4. HABITS & STREAKS
+  const activeHabits = habits.filter(h => !h.is_archived);
+  const avgStreak = activeHabits.length > 0 ? activeHabits.reduce((acc, h) => acc + h.streak, 0) / activeHabits.length : 0;
+  const habitScore = Math.min(100, (avgStreak / 21) * 100); // 21 days for a habit
 
-  const score = (taskScore * 0.3) + (goalScore * 0.25) + (habitScore * 0.25) + (focusScore * 0.2);
-  return Math.round(score);
+  // FINAL WEIGHTED SCORE
+  const score = (regularityScore * 0.35) + (contentDiversityScore * 0.25) + (performanceScore * 0.20) + (habitScore * 0.20);
+
+  return Math.round(Math.min(100, score));
 };

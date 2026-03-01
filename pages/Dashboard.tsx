@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Platform } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, Goal, ViewState, FocusSession, Announcement } from '../types';
-import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu, Megaphone, X as CloseIcon } from 'lucide-react-native';
+import { PlayerProfile, UserProfile, Task, Habit, Goal, ViewState, FocusSession, Announcement, JournalEntry, Reflection } from '../types';
+import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu, Megaphone, X as CloseIcon, Info, AlertTriangle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn, LinearTransition, Layout } from 'react-native-reanimated';
@@ -21,6 +21,8 @@ interface DashboardProps {
   habits: Habit[];
   goals: Goal[];
   focusSessions: FocusSession[];
+  journalEntries?: JournalEntry[];
+  reflections?: Reflection[];
   toggleHabit: (id: string) => void;
   toggleTask: (id: string) => void;
   openFocus: () => void;
@@ -31,7 +33,7 @@ interface DashboardProps {
   openMenu: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goals, focusSessions = [], toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goals, focusSessions = [], journalEntries = [], reflections = [], toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
   const insets = useSafeAreaInsets();
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
   const [closedAnnouncements, setClosedAnnouncements] = React.useState<string[]>([]);
@@ -121,9 +123,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goal
           habits,
           goals,
           focusSessions,
+          journalEntries,
+          reflections,
           referenceDate: today,
       });
-  }, [tasks, habits, goals, focusSessions, today]);
+  }, [tasks, habits, goals, focusSessions, journalEntries, reflections, today]);
 
   // Autres stats
   const averageStreak = habits.length > 0 ? habits.reduce((acc, h) => acc + h.streak, 0) / habits.length : 0;
@@ -199,10 +203,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goal
                 key={a.id}
                 entering={FadeIn}
                 layout={Layout.springify()}
-                style={[styles.announcementBanner, { backgroundColor: colors.accent }]}
+                style={[styles.announcementBanner, { backgroundColor: a.announcement_type === 'alert' ? '#FF3B30' : (a.announcement_type === 'update' ? '#34C759' : '#007AFF') }]}
             >
-                <Megaphone size={18} color="#FFF" style={{ marginRight: 10 }} />
-                <Text style={styles.announcementText}>{a.message}</Text>
+                {a.announcement_type === 'alert' ? <AlertTriangle size={18} color="#FFF" style={{ marginRight: 10 }} /> : (a.announcement_type === 'update' ? <Plus size={18} color="#FFF" style={{ marginRight: 10 }} /> : <Info size={18} color="#FFF" style={{ marginRight: 10 }} />)}
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.announcementText, { fontWeight: '800' }]}>{a.title}</Text>
+                    <Text style={[styles.announcementText, { fontSize: 12, opacity: 0.9 }]}>{a.content}</Text>
+                </View>
                 <TouchableOpacity onPress={() => handleCloseAnnouncement(a.id)} style={styles.announcementClose}>
                     <CloseIcon size={16} color="#FFF" />
                 </TouchableOpacity>

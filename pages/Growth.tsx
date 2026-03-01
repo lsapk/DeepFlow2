@@ -133,6 +133,8 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           habits,
           goals,
           focusSessions,
+          journalEntries: journalHistory,
+          reflections: reflectionHistory,
       });
 
       const weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
