@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import Growth from './Growth';
-import CyberKnight from './CyberKnight';
+import PenguinArena from './PenguinArena';
 import { PlayerProfile, UserProfile, Task, Habit, Goal, Quest, FocusSession } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,7 +23,7 @@ interface EvolutionProps {
 }
 
 const Evolution: React.FC<EvolutionProps> = (props) => {
-    const [view, setView] = useState<'GROWTH' | 'CYBER_KNIGHT'>('GROWTH');
+    const [view, setView] = useState<'GROWTH' | 'PENGUIN_ARENA'>('GROWTH');
     const { isDarkMode } = props;
     const insets = useSafeAreaInsets();
 
@@ -46,11 +46,11 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'GROWTH' ? '700' : '500' }]}>Analyses</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                        style={[styles.segmentBtn, view === 'CYBER_KNIGHT' && { backgroundColor: colors.segmentActive }]} 
-                        onPress={() => setView('CYBER_KNIGHT')}
+                        style={[styles.segmentBtn, view === 'PENGUIN_ARENA' && { backgroundColor: colors.segmentActive }]}
+                        onPress={() => setView('PENGUIN_ARENA')}
                         activeOpacity={1}
                     >
-                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'CYBER_KNIGHT' ? '700' : '500' }]}>Avatar</Text>
+                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'PENGUIN_ARENA' ? '700' : '500' }]}>Pingouin</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -74,10 +74,8 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         noPadding={true}
                     />
                 ) : (
-                    <CyberKnight 
-                        player={props.player}
+                    <PenguinArena
                         user={props.user}
-                        quests={props.quests}
                         openMenu={props.openMenu}
                         openProfile={props.openProfile}
                         isDarkMode={props.isDarkMode}
