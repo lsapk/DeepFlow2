@@ -5,6 +5,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';
 import { addXp, REWARDS } from '../services/gamification';
+import { awardFood } from '../services/penguin';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
@@ -144,6 +145,12 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', user.id).single();
               if (player) {
                   await addXp(user.id, xpAmount, player);
+              }
+
+              if (session.duration >= 60) {
+                await awardFood(user.id, 'salmon', 1, 'Deep Work Focus (Background)');
+              } else {
+                await awardFood(user.id, 'shrimp', 1, 'Focus Session (Background)');
               }
           } catch (e) {
               addToQueue({ type: 'INSERT', table: 'focus_sessions', payload: sessionPayload });
@@ -314,6 +321,12 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
               if (player) {
                   await addXp(user.id, xpAmount, player);
                   Alert.alert("Focus Terminé", `Bravo ! +${xpAmount} XP`);
+              }
+
+              if (durationMinutes >= 60) {
+                await awardFood(user.id, 'salmon', 1, 'Deep Work Focus');
+              } else {
+                await awardFood(user.id, 'shrimp', 1, 'Focus Session');
               }
           } catch (e) {
               addToQueue({ type: 'INSERT', table: 'focus_sessions', payload: sessionPayload });

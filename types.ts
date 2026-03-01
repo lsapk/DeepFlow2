@@ -152,6 +152,74 @@ export interface Achievement {
     target_value: number;
 }
 
+// Penguin System Types
+export type PenguinStage = 'egg' | 'chick' | 'explorer' | 'emperor';
+export type PenguinClimate = 'active' | 'resting';
+export type FoodType = 'shrimp' | 'salmon' | 'golden_fish';
+
+export interface PenguinProfile {
+  id: string;
+  user_id: string;
+  stage: PenguinStage;
+  shrimp_total: number;
+  salmon_total: number;
+  golden_fish_total: number;
+  shrimp_today: number;
+  shrimp_daily_limit: number;
+  last_shrimp_reset: string;
+  iceberg_size: number;
+  climate_state: PenguinClimate;
+  equipped_accessories: string[];
+  has_radio: boolean;
+  has_library: boolean;
+  has_lounge_chair: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PenguinAccessory {
+  id: string;
+  user_id: string;
+  accessory_id: string;
+  accessory_name: string;
+  accessory_type: string;
+  unlocked_at: string;
+}
+
+export interface PenguinExpedition {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  expedition_type: 'daily' | 'weekly';
+  target_value: number;
+  current_progress: number;
+  reward_type: FoodType;
+  reward_amount: number;
+  started_at: string;
+  expires_at?: string;
+  completed: boolean;
+  completed_at?: string;
+}
+
+export interface PenguinFoodLog {
+  id: string;
+  user_id: string;
+  food_type: FoodType;
+  source: string;
+  earned_at: string;
+}
+
+export interface PenguinPearl {
+  id: string;
+  user_id: string;
+  pearl_type: 'efficiency' | 'resilience' | 'growth';
+  message: string;
+  data: any;
+  created_at: string;
+  is_read: boolean;
+}
+
 export interface ShopItem {
     id: string;
     title: string;
@@ -218,6 +286,7 @@ export enum ViewState {
   GOALS = 'GOALS',    
   GROWTH = 'GROWTH',
   CYBER_KNIGHT = 'CYBER_KNIGHT',
+  PENGUIN_ARENA = 'PENGUIN_ARENA',
   JOURNAL = 'JOURNAL',
   REFLECTION = 'REFLECTION',
   CALENDAR = 'CALENDAR'

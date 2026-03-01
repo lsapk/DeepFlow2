@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import * as NavigationBar from 'expo-navigation-bar';
 import { saveToCache, loadFromCache, addToQueue, processQueue, getQueueSize, CACHE_KEYS, generateId, clearCache } from './services/offline';
+import { awardFood } from './services/penguin';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 // Configuration Notifications
@@ -392,6 +393,12 @@ const App: React.FC = () => {
       const updatedGoals = [...goals, newGoal];
       setGoals(updatedGoals);
       saveToCache(CACHE_KEYS.GOALS, updatedGoals);
+
+      // Penguin Evolution Trigger: Egg -> Chick when first goal is created
+      if (goals.length === 0) {
+        import('./services/penguin').then(m => m.evolvePenguin(user.id, 'chick'));
+      }
+
       const { subobjectives, ...goalDbPayload } = newGoal;
       try { const { error } = await supabase.from('goals').insert(goalDbPayload); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'goals', payload: goalDbPayload }); }
   };
@@ -399,10 +406,16 @@ const App: React.FC = () => {
   const toggleTask = async (id: string) => {
       const task = tasks.find(t => t.id === id);
       if (!task) return;
-      const updatedTasks = tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+      const isCompleting = !task.completed;
+      const updatedTasks = tasks.map(t => t.id === id ? { ...t, completed: isCompleting } : t);
       setTasks(updatedTasks);
       saveToCache(CACHE_KEYS.TASKS, updatedTasks);
-      try { const { error } = await supabase.from('tasks').update({ completed: !task.completed }).eq('id', id); if (error) throw error; } catch (e) { queueAction({ type: 'UPDATE', table: 'tasks', payload: { id, completed: !task.completed } }); }
+
+      if (isCompleting && user) {
+        awardFood(user.id, 'shrimp', 1, `Task: ${task.title}`);
+      }
+
+      try { const { error } = await supabase.from('tasks').update({ completed: isCompleting }).eq('id', id); if (error) throw error; } catch (e) { queueAction({ type: 'UPDATE', table: 'tasks', payload: { id, completed: isCompleting } }); }
   };
 
   const toggleHabit = async (id: string) => {
@@ -416,6 +429,14 @@ const App: React.FC = () => {
       const updatedHabits = habits.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: now.toISOString() } : h);
       setHabits(updatedHabits);
       saveToCache(CACHE_KEYS.HABITS, updatedHabits);
+
+      if (user) {
+        awardFood(user.id, 'shrimp', 1, `Habit: ${habit.title}`);
+        if (newStreak % 7 === 0) {
+          awardFood(user.id, 'golden_fish', 1, `7-Day Streak: ${habit.title}`);
+        }
+      }
+
       try {
           await supabase.from('habits').update({ streak: newStreak, last_completed_at: now.toISOString() }).eq('id', id);
           await supabase.from('habit_completions').insert({ user_id: user?.id, habit_id: id, completed_date: todayStr });
