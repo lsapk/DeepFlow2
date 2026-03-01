@@ -1,14 +1,16 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Platform } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, Goal, ViewState, FocusSession } from '../types';
-import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu } from 'lucide-react-native';
+import { PlayerProfile, UserProfile, Task, Habit, Goal, ViewState, FocusSession, Announcement } from '../types';
+import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu, Megaphone, X as CloseIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, LinearTransition, Layout } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { computeProductivityScore } from '../services/productivity';
+import { getActiveAnnouncements } from '../services/admin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +33,35 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goals, focusSessions = [], toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
   const insets = useSafeAreaInsets();
+  const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
+  const [closedAnnouncements, setClosedAnnouncements] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    fetchAnnouncements();
+    loadClosedAnnouncements();
+  }, []);
+
+  const fetchAnnouncements = async () => {
+    try {
+        const data = await getActiveAnnouncements();
+        setAnnouncements(data);
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
+  const loadClosedAnnouncements = async () => {
+    const closed = await AsyncStorage.getItem('closed_announcements');
+    if (closed) setClosedAnnouncements(JSON.parse(closed));
+  };
+
+  const handleCloseAnnouncement = async (id: string) => {
+    const newClosed = [...closedAnnouncements, id];
+    setClosedAnnouncements(newClosed);
+    await AsyncStorage.setItem('closed_announcements', JSON.stringify(newClosed));
+  };
+
+  const visibleAnnouncements = announcements.filter(a => !closedAnnouncements.includes(a.id));
   
   const colors = {
       bg: isDarkMode ? '#000000' : '#F2F2F7',
@@ -163,6 +194,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goal
         showsVerticalScrollIndicator={false}
       >
         
+        {visibleAnnouncements.map((a) => (
+            <Animated.View
+                key={a.id}
+                entering={FadeIn}
+                layout={Layout.springify()}
+                style={[styles.announcementBanner, { backgroundColor: colors.accent }]}
+            >
+                <Megaphone size={18} color="#FFF" style={{ marginRight: 10 }} />
+                <Text style={styles.announcementText}>{a.message}</Text>
+                <TouchableOpacity onPress={() => handleCloseAnnouncement(a.id)} style={styles.announcementClose}>
+                    <CloseIcon size={16} color="#FFF" />
+                </TouchableOpacity>
+            </Animated.View>
+        ))}
+
         {/* HERO SECTION: BENTO GRID */}
         <View style={styles.bentoGrid}>
             
@@ -366,6 +412,23 @@ const styles = StyleSheet.create({
     paddingBottom: 130, 
     paddingHorizontal: 20,
     paddingTop: 10,
+  },
+  announcementBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  announcementText: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  announcementClose: {
+    padding: 4,
+    marginLeft: 8,
   },
   
   // BENTO GRID

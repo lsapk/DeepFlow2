@@ -8,6 +8,32 @@ export interface UserProfile {
   photo_url: string | null;
   bio: string | null;
   created_at: string;
+  is_banned?: boolean;
+  ban_reason?: string | null;
+}
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role: 'admin' | 'user';
+  created_at: string;
+}
+
+export interface Announcement {
+  id: string;
+  message: string;
+  created_at: string;
+  is_active: boolean;
+}
+
+export interface PlatformStats {
+  totalUsers: number;
+  activeThisWeek: number;
+  totalBanned: number;
+  totalTasks: number;
+  totalHabits: number;
+  totalGoals: number;
+  totalFocusHours: number;
 }
 
 export interface AiPermissions {
@@ -289,5 +315,6 @@ export enum ViewState {
   PENGUIN_ARENA = 'PENGUIN_ARENA',
   JOURNAL = 'JOURNAL',
   REFLECTION = 'REFLECTION',
-  CALENDAR = 'CALENDAR'
+  CALENDAR = 'CALENDAR',
+  ADMIN = 'ADMIN'
 }

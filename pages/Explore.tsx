@@ -43,7 +43,7 @@ const Explore: React.FC<ExploreProps> = ({ player }) => {
         <View style={styles.spacer} />
         
         {/* Gamification Section - REAL DATA */}
-        <Text style={styles.sectionLabel}>Cyber Knight QG</Text>
+        <Text style={styles.sectionLabel}>QG des Pingouins</Text>
 
         <TouchableOpacity style={styles.cardItem}>
             <View style={styles.cardHeader}>

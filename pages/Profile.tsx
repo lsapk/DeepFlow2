@@ -54,9 +54,9 @@ const LEGAL_CONTENT = {
 **Q19. Puis-je lier des tâches à des objectifs ?**\nR: Oui lors de la création/édition des tâches.
 **Q20. Comment fonctionnent les quêtes ?**\nR: Des objectifs gamifiés donnant XP et crédits.
 **Q21. Les quêtes expirent-elles ?**\nR: Certaines oui, selon leur type et date d’expiration.
-**Q22. Comment débloquer des cosmétiques avatar ?**\nR: Via boutique, succès ou récompenses de coffres.
+**Q22. Comment débloquer des cosmétiques pour mon pingouin ?**\nR: Via la boutique, les succès ou les récompenses d'expéditions.
 **Q23. Le thème clair existe-t-il ?**\nR: Oui, activable depuis Réglages > Apparence.
-**Q24. Puis-je changer d’avatar à tout moment ?**\nR: Oui, depuis Profil > Personnaliser l’avatar.
+**Q24. Puis-je changer d’avatar à tout moment ?**\nR: L'avatar de votre pingouin évolue avec votre progression.
 **Q25. Pourquoi le bouton Enregistrer n’apparaissait pas ?**\nR: Correctif appliqué : bouton désormais fixe en bas du modal.
 **Q26. Google Calendar est-il obligatoire ?**\nR: Non, vous pouvez créer des événements locaux sans Google.
 **Q27. Comment connecter Google Calendar ?**\nR: Ajoutez les Client IDs, relancez Expo, puis connectez depuis Calendrier.
@@ -234,15 +234,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const [editName, setEditName] = useState(user.display_name || '');
   const [editBio, setEditBio] = useState(user.bio || '');
 
-  // Avatar Edit State
-  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
-  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(player.avatar_customization || {
-      class: 'cyber_knight',
-      helmet: 'standard',
-      armor: 'standard',
-      color: '#C4B5FD'
-  });
-
   // Legal Modal State
   const [legalModalVisible, setLegalModalVisible] = useState(false);
   const [legalTitle, setLegalTitle] = useState('');
@@ -281,16 +272,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   }, [visible]);
 
 
-  useEffect(() => {
-      if (visible) {
-          setAvatarConfig(player.avatar_customization || {
-              class: 'cyber_knight',
-              helmet: 'standard',
-              armor: 'standard',
-              color: '#C4B5FD'
-          });
-      }
-  }, [player.avatar_customization, visible]);
 
   const fetchSettings = async () => {
       setLoading(true);
@@ -321,23 +302,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       setLoading(false);
   };
 
-  const saveAvatar = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-          .from('player_profiles')
-          .update({ avatar_customization: avatarConfig })
-          .eq('user_id', user.id)
-          .select('*')
-          .single();
-
-      if (error) {
-          Alert.alert("Erreur", "Impossible de sauvegarder l'avatar.");
-      } else if (data) {
-          onPlayerUpdate?.(data as PlayerProfile);
-          setIsEditingAvatar(false);
-      }
-      setLoading(false);
-  };
 
   const fetchStats = async () => {
       const [tRes, hRes, gRes, fRes] = await Promise.all([
@@ -447,10 +411,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                   <TouchableOpacity style={styles.editProfileBtn} onPress={() => setIsEditing(true)}>
                       <Edit2 size={16} color="#FFF" style={{marginRight: 8}} />
                       <Text style={styles.editProfileText}>Modifier le profil</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.editProfileBtn, {backgroundColor: '#2D1B0E', borderColor: '#451a03', borderWidth: 1}]} onPress={() => setIsEditingAvatar(true)}>
-                      <Palette size={16} color="#FACC15" style={{marginRight: 8}} />
-                      <Text style={[styles.editProfileText, {color: '#FACC15'}]}>Personnaliser l'Avatar</Text>
                   </TouchableOpacity>
               </View>
           )}
@@ -575,65 +535,6 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
             )}
         </View>
 
-        {/* AVATAR EDIT MODAL */}
-        <Modal visible={isEditingAvatar} transparent animationType="slide">
-            <View style={styles.modalOverlay}>
-                <View style={[styles.modalContent, {height: '80%', backgroundColor: '#1C1C1E'}]}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Personnalisation</Text>
-                        <TouchableOpacity onPress={() => setIsEditingAvatar(false)}>
-                            <X size={24} color="#FFF" />
-                        </TouchableOpacity>
-                    </View>
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 120}}>
-                        <View style={{alignItems: 'center', marginVertical: 20}}>
-                            <AvatarGenerator config={avatarConfig} size={150} />
-                        </View>
-
-                        <Text style={styles.inputLabel}>CLASSE</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
-                            {AVATAR_CLASSES.map(c => (
-                                <TouchableOpacity key={c} style={[styles.choiceBtn, avatarConfig.class === c && styles.choiceBtnActive]} onPress={() => setAvatarConfig({...avatarConfig, class: c})}>
-                                    <Text style={[styles.choiceText, avatarConfig.class === c && styles.choiceTextActive]}>{c.replace('_', ' ')}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-
-                        <Text style={styles.inputLabel}>CASQUE</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
-                            {AVATAR_HELMETS.map(h => (
-                                <TouchableOpacity key={h} style={[styles.choiceBtn, avatarConfig.helmet === h && styles.choiceBtnActive]} onPress={() => setAvatarConfig({...avatarConfig, helmet: h})}>
-                                    <Text style={[styles.choiceText, avatarConfig.helmet === h && styles.choiceTextActive]}>{h}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-
-                        <Text style={styles.inputLabel}>ARMURE</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
-                            {AVATAR_ARMORS.map(a => (
-                                <TouchableOpacity key={a} style={[styles.choiceBtn, avatarConfig.armor === a && styles.choiceBtnActive]} onPress={() => setAvatarConfig({...avatarConfig, armor: a})}>
-                                    <Text style={[styles.choiceText, avatarConfig.armor === a && styles.choiceTextActive]}>{a}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-
-                        <Text style={styles.inputLabel}>COULEUR D'ÉNERGIE</Text>
-                        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 30}}>
-                            {AVATAR_COLORS.map(c => (
-                                <TouchableOpacity key={c} style={[styles.colorCircle, {backgroundColor: c}, avatarConfig.color === c && {borderWidth: 3, borderColor: '#FFF'}]} onPress={() => setAvatarConfig({...avatarConfig, color: c})} />
-                            ))}
-                        </View>
-
-                    </ScrollView>
-
-                    <View style={styles.stickySaveBar}>
-                        <TouchableOpacity style={styles.saveMainBtn} onPress={saveAvatar} disabled={loading}>
-                            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveMainBtnText}>Enregistrer</Text>}
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
-        </Modal>
 
         {/* LEGAL MODAL */}
         <Modal visible={legalModalVisible} transparent animationType="slide" onRequestClose={() => setLegalModalVisible(false)}>
