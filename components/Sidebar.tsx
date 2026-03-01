@@ -1,8 +1,11 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
-import { UserProfile, ViewState } from '../types';
+import { UserProfile, ViewState, PenguinProfile } from '../types';
 import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Calendar } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getPenguinProfile } from '../services/penguin';
+import PenguinAvatar from './PenguinAvatar';
 
 interface SidebarProps {
   visible: boolean;
@@ -10,11 +13,18 @@ interface SidebarProps {
   user: UserProfile | null;
   setView: (view: ViewState) => void;
   currentView: ViewState;
-  onLogout: () => void; // Gardé pour compatibilité props, mais non utilisé dans le rendu
+  onLogout: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, currentView }) => {
   const insets = useSafeAreaInsets();
+  const [penguin, setPenguin] = useState<PenguinProfile | null>(null);
+
+  useEffect(() => {
+    if (visible && user) {
+        getPenguinProfile(user.id).then(setPenguin);
+    }
+  }, [visible, user]);
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Tableau de bord', view: ViewState.TODAY },
@@ -33,13 +43,13 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
       onClose();
   };
 
+  const showPenguin = penguin && penguin.stage !== 'egg';
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
         <View style={styles.overlay}>
-            {/* Drawer à Gauche */}
             <View style={[styles.drawer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
                 
-                {/* Header */}
                 <View style={styles.header}>
                      {user && (
                         <View style={styles.userInfo}>
@@ -57,6 +67,19 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
                          <X size={24} color="#888" />
                      </TouchableOpacity>
                 </View>
+
+                {showPenguin && (
+                    <TouchableOpacity
+                        style={styles.penguinBanner}
+                        onPress={() => handleNavigate(ViewState.EVOLUTION)}
+                    >
+                        <PenguinAvatar stage={penguin.stage} size={40} />
+                        <View>
+                            <Text style={styles.penguinStatus}>Compagnon : {penguin.stage.toUpperCase()}</Text>
+                            <Text style={styles.penguinSub}>Voir l'évolution</Text>
+                        </View>
+                    </TouchableOpacity>
+                )}
 
                 <View style={styles.divider} />
 
@@ -81,13 +104,11 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
                     </View>
                 </ScrollView>
                 
-                {/* Footer retiré comme demandé (Logout uniquement dans le profil) */}
                 <View style={styles.footerInfo}>
-                    <Text style={styles.versionText}>DeepFlow v1.0.2</Text>
+                    <Text style={styles.versionText}>DeepFlow v1.0.3</Text>
                 </View>
             </View>
 
-            {/* Backdrop à Droite */}
             <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
         </View>
     </Modal>
@@ -97,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
 const styles = StyleSheet.create({
   overlay: {
       flex: 1,
-      flexDirection: 'row', // Assure que le drawer est à gauche
+      flexDirection: 'row',
   },
   backdrop: {
       flex: 1,
@@ -112,11 +133,6 @@ const styles = StyleSheet.create({
       borderRightColor: '#262626',
       display: 'flex',
       flexDirection: 'column',
-      shadowColor: "#000",
-      shadowOffset: { width: 2, height: 0 },
-      shadowOpacity: 0.5,
-      shadowRadius: 10,
-      elevation: 10,
   },
   header: {
       paddingHorizontal: 20,
@@ -154,6 +170,28 @@ const styles = StyleSheet.create({
   userEmail: {
       color: '#666',
       fontSize: 11,
+  },
+  penguinBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 15,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      backgroundColor: '#1c1c1e',
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: '#333',
+  },
+  penguinStatus: {
+      color: '#FFF',
+      fontSize: 13,
+      fontWeight: '700',
+  },
+  penguinSub: {
+      color: '#0EA5E9',
+      fontSize: 11,
+      fontWeight: '600',
   },
   divider: {
       height: 1,

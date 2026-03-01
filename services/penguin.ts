@@ -79,19 +79,18 @@ export const awardFood = async (userId: string, type: FoodType, amount: number, 
 
     const updates: any = {};
     if (type === 'shrimp') {
-        updates.shrimp_total = profile.shrimp_total + amount;
-        updates.shrimp_today = profile.shrimp_today + amount;
+        updates.shrimp_total = (profile.shrimp_total || 0) + amount;
+        updates.shrimp_today = (profile.shrimp_today || 0) + amount;
     } else if (type === 'salmon') {
-        updates.salmon_total = profile.salmon_total + amount;
-        // Salmon increases iceberg size
-        updates.iceberg_size = profile.iceberg_size + (amount * 2);
+        updates.salmon_total = (profile.salmon_total || 0) + amount;
+        updates.iceberg_size = (profile.iceberg_size || 1) + (amount * 2);
     } else if (type === 'golden_fish') {
-        updates.golden_fish_total = profile.golden_fish_total + amount;
+        updates.golden_fish_total = (profile.golden_fish_total || 0) + amount;
     }
 
-    // Handle Evolution
-    if (profile.stage === 'egg' && (updates.shrimp_total || profile.shrimp_total) > 0) {
-        // Normally evolves when first goal is set, but let's say some shrimp/salmon trigger it too if needed
+    // Auto-evolve to chick if egg and earns first food
+    if (profile.stage === 'egg' && amount > 0) {
+        updates.stage = 'chick';
     }
 
     const { error: updateError } = await supabase
@@ -138,10 +137,40 @@ export const markPearlAsRead = async (pearlId: string) => {
     await supabase.from('penguin_pearls').update({ is_read: true }).eq('id', pearlId);
 };
 
-export const getUnlockedAccessories = async (userId: string): Promise<PenguinAccessory[]> => {
-    const { data } = await supabase
-        .from('penguin_accessories')
-        .select('*')
-        .eq('user_id', userId);
-    return data || [];
+export const syncLegacyProgress = async (userId: string) => {
+    // Fetch historical data
+    const [tasks, focus] = await Promise.all([
+        supabase.from('tasks').select('id').eq('user_id', userId).eq('completed', true),
+        supabase.from('focus_sessions').select('duration').eq('user_id', userId)
+    ]);
+
+    const completedTasksCount = tasks.data?.length || 0;
+    const totalFocusMinutes = focus.data?.reduce((acc, s) => acc + s.duration, 0) || 0;
+
+    // Conversion logic
+    const shrimpToAward = Math.min(100, completedTasksCount); // Cap it for balance
+    const salmonToAward = Math.floor(totalFocusMinutes / 60);
+
+    const profile = await getPenguinProfile(userId);
+    if (!profile) return;
+
+    const updates: any = {
+        shrimp_total: (profile.shrimp_total || 0) + shrimpToAward,
+        salmon_total: (profile.salmon_total || 0) + salmonToAward,
+        iceberg_size: (profile.iceberg_size || 1) + (salmonToAward * 2)
+    };
+
+    if (profile.stage === 'egg' && (shrimpToAward > 0 || salmonToAward > 0)) {
+        updates.stage = 'chick';
+    }
+
+    // Check for further evolution
+    if (updates.shrimp_total > 50 || updates.salmon_total > 10) {
+        updates.stage = 'explorer';
+    }
+    if (updates.shrimp_total > 200 && updates.salmon_total > 50) {
+        updates.stage = 'emperor';
+    }
+
+    await supabase.from('penguin_profiles').update(updates).eq('user_id', userId);
 };

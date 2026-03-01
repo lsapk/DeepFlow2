@@ -1,10 +1,12 @@
+
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, StatusBar } from 'react-native';
-import Animated, { FadeInDown, SlideInRight, FadeOut } from 'react-native-reanimated';
-import { ChevronRight, Target, Zap, TrendingUp, ArrowRight } from 'lucide-react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, StatusBar, TextInput, ScrollView } from 'react-native';
+import Animated, { FadeInDown, SlideInRight, FadeIn, FadeOut } from 'react-native-reanimated';
+import { Target, Zap, TrendingUp, ArrowRight, Fish, MountainSnow, Coffee, Brain } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../services/supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -15,44 +17,117 @@ interface OnboardingProps {
 const SLIDES = [
     {
         id: 1,
-        title: "Gamifiez\nVotre Vie",
-        desc: "Transformez vos tâches en quêtes. Gagnez de l'XP et montez de niveau à chaque réussite.",
-        icon: Target,
-        color: ['#4F46E5', '#9333EA']
+        title: "Éclosez\nVotre Potentiel",
+        desc: "Commencez avec un œuf. Chaque tâche complétée vous apporte des crevettes pour nourrir votre pingouin.",
+        icon: Fish,
+        color: ['#0C4A6E', '#0EA5E9']
     },
     {
         id: 2,
-        title: "Focus\nImmersif",
-        desc: "Entrez dans la zone avec un minuteur adapté à votre chronobiologie.",
-        icon: Zap,
-        color: ['#EA580C', '#FACC15']
+        title: "Focus\nGlacial",
+        desc: "Entrez dans la zone de concentration profonde. Plus vous restez focus, plus votre iceberg grandit.",
+        icon: MountainSnow,
+        color: ['#1E293B', '#334155']
     },
     {
         id: 3,
-        title: "Devenez\nLégendaire",
-        desc: "Analysez vos données, débloquez des avatars Cyber Knight et maîtrisez votre destin.",
+        title: "Devenez\nL'Empereur",
+        desc: "Faites évoluer votre compagnon du stade de poussin à celui d'Empereur en dominant vos objectifs.",
         icon: TrendingUp,
-        color: ['#059669', '#34D399']
+        color: ['#4F46E5', '#6366F1']
+    }
+];
+
+const QUESTIONS = [
+    {
+        id: 'goal',
+        question: "Quel est votre objectif principal ?",
+        options: ["Productivité brute", "Équilibre vie pro/perso", "Discipline personnelle", "Réduire la procrastination"]
+    },
+    {
+        id: 'rhythm',
+        question: "Votre moment de focus idéal ?",
+        options: ["Aube polaire (Matin)", "Zénith (Midi)", "Crépuscule (Soir)", "Oiseau de nuit"]
+    },
+    {
+        id: 'difficulty',
+        question: "Niveau de défi souhaité ?",
+        options: ["Balade sur la banquise (Facile)", "Exploration (Normal)", "Tempête de neige (Difficile)"]
     }
 ];
 
 const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
     const insets = useSafeAreaInsets();
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [showQuiz, setShowQuiz] = useState(false);
+    const [quizIndex, setQuizIndex] = useState(0);
+    const [answers, setAnswers] = useState<Record<string, string>>({});
 
     const handleNext = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         if (currentIndex < SLIDES.length - 1) {
             setCurrentIndex(currentIndex + 1);
         } else {
-            onFinish();
+            setShowQuiz(true);
         }
+    };
+
+    const handleQuizAnswer = (answer: string) => {
+        const currentQuestion = QUESTIONS[quizIndex];
+        const newAnswers = { ...answers, [currentQuestion.id]: answer };
+        setAnswers(newAnswers);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        if (quizIndex < QUESTIONS.length - 1) {
+            setQuizIndex(quizIndex + 1);
+        } else {
+            saveAndFinish(newAnswers);
+        }
+    };
+
+    const saveAndFinish = async (finalAnswers: any) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('user_profiles').update({
+                    bio: JSON.stringify({ onboarding_quiz: finalAnswers })
+                }).eq('id', user.id);
+            }
+        } catch (e) {
+            console.error("Failed to save quiz answers", e);
+        }
+        onFinish();
     };
 
     const handleSkip = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onFinish();
     };
+
+    if (showQuiz) {
+        const q = QUESTIONS[quizIndex];
+        return (
+            <View style={[styles.container, { backgroundColor: '#000' }]}>
+                <LinearGradient colors={['#0f172a', '#000']} style={StyleSheet.absoluteFill} />
+                <Animated.View entering={FadeIn} style={[styles.overlay, { paddingTop: insets.top + 60 }]}>
+                    <Text style={styles.quizStep}>QUESTION {quizIndex + 1}/{QUESTIONS.length}</Text>
+                    <Text style={styles.quizQuestion}>{q.question}</Text>
+
+                    <View style={styles.optionsContainer}>
+                        {q.options.map((opt, i) => (
+                            <TouchableOpacity
+                                key={i}
+                                style={styles.optionBtn}
+                                onPress={() => handleQuizAnswer(opt)}
+                            >
+                                <Text style={styles.optionText}>{opt}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </Animated.View>
+            </View>
+        );
+    }
 
     const currentSlide = SLIDES[currentIndex];
     const Icon = currentSlide.icon;
@@ -61,7 +136,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
             
-            {/* Background avec transition fluide simulée par key */}
             <LinearGradient
                 key={`grad-${currentIndex}`}
                 colors={currentSlide.color as any}
@@ -72,7 +146,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
             
             <View style={[styles.overlay, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }]}>
                 
-                {/* Bouton Passer */}
                 <TouchableOpacity 
                     style={styles.skipButton} 
                     onPress={handleSkip}
@@ -116,7 +189,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
 
                         <TouchableOpacity style={styles.button} onPress={handleNext} activeOpacity={0.8}>
                             {currentIndex === SLIDES.length - 1 ? (
-                                <Text style={styles.btnText}>C'EST PARTI</Text>
+                                <Text style={styles.btnText}>PERSONNALISER</Text>
                             ) : (
                                 <ArrowRight size={24} color="#000" />
                             )}
@@ -140,7 +213,7 @@ const styles = StyleSheet.create({
     },
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.4)', // Léger assombrissement pour lisibilité
+        backgroundColor: 'rgba(0,0,0,0.3)',
         justifyContent: 'space-between',
         paddingHorizontal: 30,
     },
@@ -169,10 +242,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.3)',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
     },
     contentContainer: {
         gap: 40,
@@ -181,17 +250,17 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     title: {
-        fontSize: 42,
+        fontSize: 38,
         fontWeight: '900',
         color: '#FFF',
         textTransform: 'uppercase',
         letterSpacing: 1,
-        lineHeight: 44,
+        lineHeight: 42,
     },
     desc: {
-        fontSize: 18,
+        fontSize: 17,
         color: 'rgba(255,255,255,0.9)',
-        lineHeight: 26,
+        lineHeight: 24,
         fontWeight: '500',
     },
     footer: {
@@ -222,16 +291,40 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 20,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        elevation: 5,
     },
     btnText: {
         color: '#000',
         fontWeight: '800',
-        fontSize: 16,
+        fontSize: 14,
+    },
+    // Quiz styles
+    quizStep: {
+        color: '#0EA5E9',
+        fontWeight: '800',
+        fontSize: 12,
+        letterSpacing: 2,
+        marginBottom: 10,
+    },
+    quizQuestion: {
+        color: '#FFF',
+        fontSize: 32,
+        fontWeight: '900',
+        marginBottom: 40,
+    },
+    optionsContainer: {
+        gap: 15,
+    },
+    optionBtn: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: 20,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    optionText: {
+        color: '#FFF',
+        fontSize: 18,
+        fontWeight: '600',
     }
 });
 
