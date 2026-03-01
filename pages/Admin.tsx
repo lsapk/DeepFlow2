@@ -16,7 +16,9 @@ const Admin: React.FC = () => {
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-    const [newAnnouncement, setNewAnnouncement] = useState('');
+    const [newAnnTitle, setNewAnnTitle] = useState('');
+    const [newAnnContent, setNewAnnContent] = useState('');
+    const [newAnnType, setNewAnnType] = useState('info');
     const [loading, setLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
     const [userDetails, setUserDetails] = useState<any>(null);
@@ -121,9 +123,11 @@ const Admin: React.FC = () => {
     };
 
     const handlePostAnnouncement = async () => {
-        if (!newAnnouncement.trim()) return;
-        await createAnnouncement(newAnnouncement);
-        setNewAnnouncement('');
+        if (!newAnnTitle.trim() || !newAnnContent.trim()) return;
+        await createAnnouncement(newAnnTitle, newAnnContent, newAnnType);
+        setNewAnnTitle('');
+        setNewAnnContent('');
+        setNewAnnType('info');
         loadData();
     };
 
@@ -210,13 +214,31 @@ const Admin: React.FC = () => {
                             <View style={styles.announcementInputCard}>
                                 <Text style={styles.sectionTitle}>Nouvelle Annonce</Text>
                                 <TextInput
+                                    style={[styles.announcementInput, { minHeight: 48, marginBottom: 8 }]}
+                                    placeholder="Titre de l'annonce..."
+                                    placeholderTextColor="#666"
+                                    value={newAnnTitle}
+                                    onChangeText={setNewAnnTitle}
+                                />
+                                <TextInput
                                     style={styles.announcementInput}
-                                    placeholder="Message de l'annonce..."
+                                    placeholder="Corps du message..."
                                     placeholderTextColor="#666"
                                     multiline
-                                    value={newAnnouncement}
-                                    onChangeText={setNewAnnouncement}
+                                    value={newAnnContent}
+                                    onChangeText={setNewAnnContent}
                                 />
+                                <View style={styles.typeSelector}>
+                                    {['info', 'alert', 'update'].map(t => (
+                                        <TouchableOpacity
+                                            key={t}
+                                            style={[styles.typeBtn, newAnnType === t && styles.activeTypeBtn]}
+                                            onPress={() => setNewAnnType(t)}
+                                        >
+                                            <Text style={[styles.typeBtnText, newAnnType === t && styles.activeTypeBtnText]}>{t.toUpperCase()}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
                                 <TouchableOpacity style={styles.postBtn} onPress={handlePostAnnouncement}>
                                     <Text style={styles.postBtnText}>Publier</Text>
                                 </TouchableOpacity>
@@ -224,7 +246,13 @@ const Admin: React.FC = () => {
                             <Text style={styles.sectionTitle}>Annonces Actives</Text>
                             {announcements.map(a => (
                                 <View key={a.id} style={styles.announcementItem}>
-                                    <Text style={styles.announcementText}>{a.message}</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                            <View style={[styles.typeBadge, { backgroundColor: a.announcement_type === 'alert' ? '#EF4444' : (a.announcement_type === 'update' ? '#34C759' : '#007AFF') }]} />
+                                            <Text style={styles.announcementTitleText}>{a.title}</Text>
+                                        </View>
+                                        <Text style={styles.announcementContentText}>{a.content}</Text>
+                                    </View>
                                     <TouchableOpacity onPress={() => handleDeleteAnnouncement(a.id)}>
                                         <X size={18} color="#EF4444" />
                                     </TouchableOpacity>
@@ -351,8 +379,15 @@ const styles = StyleSheet.create({
     announcementInput: { backgroundColor: '#000', borderRadius: 12, color: '#FFF', padding: 12, minHeight: 80, textAlignVertical: 'top', marginBottom: 12 },
     postBtn: { backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
     postBtnText: { color: '#FFF', fontWeight: '700' },
-    announcementItem: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1C1C1E', padding: 16, borderRadius: 16, marginBottom: 10 },
-    announcementText: { flex: 1, color: '#FFF', fontSize: 14 },
+    announcementItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: '#1C1C1E', padding: 16, borderRadius: 16, marginBottom: 10 },
+    announcementTitleText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+    announcementContentText: { color: '#8E8E93', fontSize: 13, lineHeight: 18 },
+    typeBadge: { width: 8, height: 8, borderRadius: 4 },
+    typeSelector: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+    typeBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#000', borderWidth: 1, borderColor: '#333' },
+    activeTypeBtn: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+    typeBtnText: { color: '#666', fontSize: 10, fontWeight: '700' },
+    activeTypeBtnText: { color: '#FFF' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
     modalContent: { backgroundColor: '#111', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '90%' },
     modalHeader: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#222', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

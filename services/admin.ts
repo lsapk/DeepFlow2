@@ -84,8 +84,15 @@ export const updateUserCredits = async (userId: string, amount: number) => {
     return await supabase.from('player_profiles').update({ credits: amount }).eq('user_id', userId);
 };
 
-export const createAnnouncement = async (message: string) => {
-    return await supabase.from('announcements').insert({ message, is_active: true });
+export const createAnnouncement = async (title: string, content: string, type: string = 'info') => {
+    const { data: { user } } = await supabase.auth.getUser();
+    return await supabase.from('announcements').insert({
+        title,
+        content,
+        announcement_type: type,
+        is_active: true,
+        created_by: user?.id
+    });
 };
 
 export const getActiveAnnouncements = async (): Promise<Announcement[]> => {

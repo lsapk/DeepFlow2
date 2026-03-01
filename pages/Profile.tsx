@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Alert, ActivityIndicator, LayoutAnimation, TextInput, Platform, BackHandler, Linking, Modal } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings, AiPermissions, AvatarConfig, AvatarClass, AvatarHelmet, AvatarArmor, AvatarColor } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target, Palette } from 'lucide-react-native';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target, Palette, Award, Zap as ZapIcon, LayoutGrid } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-import AvatarGenerator from '../components/AvatarGenerator';
+import PenguinAvatar from '../components/PenguinAvatar';
+import { getPenguinProfile } from '../services/penguin';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
@@ -219,6 +220,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
+  const [penguin, setPenguin] = useState<any>(null);
   const [settings, setSettings] = useState<UserSettings>({
       id: user.id,
       theme: 'dark',
@@ -268,8 +270,14 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       if (visible) {
           fetchSettings();
           fetchStats();
+          fetchPenguin();
       }
   }, [visible]);
+
+  const fetchPenguin = async () => {
+      const profile = await getPenguinProfile(user.id);
+      if (profile) setPenguin(profile);
+  };
 
 
 
@@ -376,7 +384,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       <View style={styles.tabContent}>
           <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                  <AvatarGenerator config={player.avatar_customization} size={120} />
+                  <PenguinAvatar stage={penguin?.stage || 'egg'} size={140} />
                   <View style={styles.levelBadge}>
                       <Text style={styles.levelBadgeText}>{player.level}</Text>
                   </View>
@@ -385,7 +393,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                   <View style={{width: '100%', alignItems: 'center', marginBottom: 10}}>
                       <TextInput style={[styles.editInput, {fontSize: 20, fontWeight: '700', textAlign: 'center'}]} value={editName} onChangeText={setEditName} placeholder="Nom" placeholderTextColor="#666" />
                       <TextInput style={[styles.editInput, {fontSize: 14, textAlign: 'center', marginTop: 8, minWidth: 200}]} value={editBio} onChangeText={setEditBio} placeholder="Bio..." placeholderTextColor="#666" />
-                      <View style={{flexDirection: 'row', gap: 10, marginTop: 10}}>
+                      <View style={{flexDirection: 'row', gap: 10, marginTop: 10, zIndex: 10}}>
                           <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelBtn}><X size={20} color="#FFF" /></TouchableOpacity>
                           <TouchableOpacity onPress={saveProfile} style={styles.confirmBtn}><Check size={20} color="#FFF" /></TouchableOpacity>
                       </View>
@@ -395,22 +403,38 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                     <Text style={styles.name}>{user.display_name}</Text>
                     <Text style={styles.email}>{user.email}</Text>
                     {user.bio && <Text style={styles.bio}>{user.bio}</Text>}
-                    <Text style={styles.rankText}>{player.avatar_type.toUpperCase()}</Text>
+                    <View style={styles.badgeRow}>
+                        <View style={styles.rankBadge}>
+                            <Award size={12} color="#C4B5FD" />
+                            <Text style={styles.rankText}>{penguin?.stage?.toUpperCase() || 'EGG'}</Text>
+                        </View>
+                    </View>
                   </>
               )}
           </View>
-          <View style={styles.xpCard}>
-              <View style={styles.xpRow}>
-                  <Text style={styles.xpLabel}>Progression XP</Text>
-                  <Text style={styles.xpValue}>{player.experience_points} / {player.level * 100 * player.level}</Text>
+
+          <View style={styles.infoGrid}>
+              <View style={styles.infoCard}>
+                  <Text style={styles.infoLabel}>XP TOTAL</Text>
+                  <Text style={styles.infoValue}>{player.experience_points}</Text>
+                  <View style={styles.xpBarBgMini}>
+                      <View style={[styles.xpBarFill, { width: `${Math.min(100, (player.experience_points / (player.level * 100 * player.level)) * 100)}%` }]} />
+                  </View>
               </View>
-              <View style={styles.xpBarBg}><View style={[styles.xpBarFill, { width: `${(player.experience_points % 1000) / 10}%` }]} /></View>
+              <View style={styles.infoCard}>
+                  <Text style={styles.infoLabel}>CRÉDITS</Text>
+                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+                    <Star size={16} color="#FACC15" fill="#FACC15" />
+                    <Text style={styles.infoValue}>{player.credits}</Text>
+                  </View>
+              </View>
           </View>
+
           {!isEditing && (
               <View style={{gap: 12}}>
                   <TouchableOpacity style={styles.editProfileBtn} onPress={() => setIsEditing(true)}>
-                      <Edit2 size={16} color="#FFF" style={{marginRight: 8}} />
-                      <Text style={styles.editProfileText}>Modifier le profil</Text>
+                      <Edit2 size={16} color="#8E8E93" style={{marginRight: 8}} />
+                      <Text style={[styles.editProfileText, {color: '#8E8E93'}]}>Modifier mon profil</Text>
                   </TouchableOpacity>
               </View>
           )}
@@ -615,14 +639,22 @@ const styles = StyleSheet.create({
 
   // Profile Tab
   profileHeader: { alignItems: 'center', marginBottom: 10 },
-  avatarContainer: { marginBottom: 16 },
+  avatarContainer: { marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
   avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: '#1C1C1E' },
-  levelBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#007AFF', width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
+  levelBadge: { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#007AFF', width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#000' },
   levelBadgeText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
-  name: { fontSize: 22, fontWeight: '700', color: '#FFF', marginBottom: 4 },
-  email: { fontSize: 14, color: '#888', marginBottom: 8 },
-  bio: { fontSize: 14, color: '#CCC', marginBottom: 8, textAlign: 'center', paddingHorizontal: 20, fontStyle: 'italic' },
-  rankText: { fontSize: 12, fontWeight: '700', color: '#C4B5FD', letterSpacing: 1 },
+  name: { fontSize: 24, fontWeight: '800', color: '#FFF', marginBottom: 4 },
+  email: { fontSize: 14, color: '#666', marginBottom: 12 },
+  bio: { fontSize: 15, color: '#8E8E93', marginBottom: 16, textAlign: 'center', paddingHorizontal: 30, lineHeight: 22 },
+  badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  rankBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(196, 181, 253, 0.1)', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(196, 181, 253, 0.2)' },
+  rankText: { fontSize: 11, fontWeight: '800', color: '#C4B5FD', letterSpacing: 1 },
+
+  infoGrid: { flexDirection: 'row', gap: 12, marginBottom: 10 },
+  infoCard: { flex: 1, backgroundColor: '#1C1C1E', padding: 16, borderRadius: 20, justifyContent: 'center' },
+  infoLabel: { fontSize: 10, fontWeight: '700', color: '#666', marginBottom: 6, letterSpacing: 0.5 },
+  infoValue: { fontSize: 20, fontWeight: '800', color: '#FFF' },
+  xpBarBgMini: { height: 4, backgroundColor: '#333', borderRadius: 2, marginTop: 8, overflow: 'hidden' },
   
   editInput: { backgroundColor: '#1C1C1E', color: '#FFF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
   cancelBtn: { backgroundColor: '#333', padding: 10, borderRadius: 20 },

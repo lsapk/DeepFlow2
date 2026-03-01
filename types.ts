@@ -21,9 +21,13 @@ export interface UserRole {
 
 export interface Announcement {
   id: string;
-  message: string;
+  title: string;
+  content: string;
+  announcement_type: string;
   created_at: string;
+  updated_at: string;
   is_active: boolean;
+  created_by?: string | null;
 }
 
 export interface PlatformStats {
