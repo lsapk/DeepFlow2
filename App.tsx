@@ -16,6 +16,7 @@ import CalendarPage from './pages/CalendarPage';
 import Planning from './pages/Planning';
 import Introspection from './pages/Introspection';
 import Evolution from './pages/Evolution';
+import Admin from './pages/Admin';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import SkeletonDashboard from './components/SkeletonDashboard';
@@ -26,6 +27,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import * as NavigationBar from 'expo-navigation-bar';
 import { saveToCache, loadFromCache, addToQueue, processQueue, getQueueSize, CACHE_KEYS, generateId, clearCache } from './services/offline';
 import { awardFood } from './services/penguin';
+import { isAdmin } from './services/admin';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 // Configuration Notifications
@@ -53,6 +55,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any | null | undefined>(undefined);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
+  const [userIsAdmin, setUserIsAdmin] = useState(false);
   
   // Data States
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -281,6 +284,7 @@ const App: React.FC = () => {
       if (userData) {
           setUser(userData);
           saveToCache(CACHE_KEYS.USER, userData);
+          isAdmin(userId).then(setUserIsAdmin);
       }
 
       let { data: playerData } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
@@ -505,7 +509,10 @@ const App: React.FC = () => {
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       case ViewState.EVOLUTION:
-        Content = <Evolution player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} focusSessions={focusSessions} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
+        Content = <Evolution isAdmin={userIsAdmin} player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} focusSessions={focusSessions} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
+        break;
+      case ViewState.ADMIN:
+        Content = <Admin />;
         break;
       case ViewState.TASKS: 
           Content = <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
@@ -561,6 +568,7 @@ const App: React.FC = () => {
                             visible={isSidebarVisible} 
                             onClose={() => setIsSidebarVisible(false)} 
                             user={user} 
+                            isAdmin={userIsAdmin}
                             setView={setCurrentView} 
                             currentView={currentView} 
                             onLogout={handleLogout}
@@ -576,7 +584,7 @@ const App: React.FC = () => {
                             }}
                         />
                         {session && (
-                            <BottomNav currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
+                            <BottomNav isAdmin={userIsAdmin} currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />
                         )}
                     </>
                 )}

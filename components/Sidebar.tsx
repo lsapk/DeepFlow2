@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
 import { UserProfile, ViewState, PenguinProfile } from '../types';
-import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Calendar } from 'lucide-react-native';
+import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Calendar, Shield } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getPenguinProfile } from '../services/penguin';
 import PenguinAvatar from './PenguinAvatar';
@@ -11,12 +11,13 @@ interface SidebarProps {
   visible: boolean;
   onClose: () => void;
   user: UserProfile | null;
+  isAdmin?: boolean;
   setView: (view: ViewState) => void;
   currentView: ViewState;
   onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, currentView }) => {
+const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, isAdmin = false, setView, currentView }) => {
   const insets = useSafeAreaInsets();
   const [penguin, setPenguin] = useState<PenguinProfile | null>(null);
 
@@ -37,6 +38,10 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, setView, curr
     { icon: Calendar, label: 'Calendrier', view: ViewState.CALENDAR },
     { icon: TrendingUp, label: 'Croissance & IA', view: ViewState.GROWTH },
   ];
+
+  if (isAdmin) {
+    menuItems.push({ icon: Shield, label: 'Administration', view: ViewState.ADMIN });
+  }
 
   const handleNavigate = (view: ViewState) => {
       setView(view);

@@ -6,6 +6,7 @@ import { PlayerProfile, UserProfile, Task, Habit, Goal, Quest, FocusSession } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface EvolutionProps {
+    isAdmin?: boolean;
     player: PlayerProfile;
     user: UserProfile;
     tasks: Task[];
@@ -80,6 +81,7 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         openProfile={props.openProfile}
                         isDarkMode={props.isDarkMode}
                         noPadding={true}
+                        isAdmin={props.isAdmin}
                     />
                 )}
             </View>

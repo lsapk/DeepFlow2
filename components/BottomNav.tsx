@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Platform } from 'react-native';
-import { LayoutDashboard, CalendarRange, BookOpen, TrendingUp, Zap } from 'lucide-react-native';
+import { LayoutDashboard, CalendarRange, BookOpen, TrendingUp, Zap, Shield } from 'lucide-react-native';
 import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -12,6 +12,7 @@ interface BottomNavProps {
   currentView: ViewState;
   setView: (view: ViewState) => void;
   isDarkMode?: boolean;
+  isAdmin?: boolean;
 }
 
 const TabIcon = ({ Icon, isActive, color, label }: any) => {
@@ -44,7 +45,7 @@ const TabIcon = ({ Icon, isActive, color, label }: any) => {
     );
 };
 
-const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode = true }) => {
+const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode = true, isAdmin = false }) => {
   const insets = useSafeAreaInsets();
   
   const navItems = [
@@ -52,7 +53,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
     { view: ViewState.PLANNING, icon: CalendarRange, label: 'Plan' },
     { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true },
     { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal' },
-    { view: ViewState.EVOLUTION, icon: TrendingUp, label: 'Évo' },
+    { view: isAdmin ? ViewState.ADMIN : ViewState.EVOLUTION, icon: isAdmin ? Shield : TrendingUp, label: isAdmin ? 'Admin' : 'Évo' },
   ];
 
   const handlePress = (view: ViewState) => {
