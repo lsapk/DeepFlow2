@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions
 import { PenguinProfile, PenguinExpedition, PenguinPearl, UserProfile } from '../types';
 import { Fish, Zap, Star, ShoppingBag, Gift, Compass, MessageCircle, BarChart3, Radio, Library, Sofa, RefreshCw, CheckCircle2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getPenguinProfile, getExpeditions, getPearls, markPearlAsRead } from '../services/penguin';
+import { getPenguinProfile, getExpeditions, getPearls, markPearlAsRead, syncLegacyProgress } from '../services/penguin';
 import IcebergView from '../components/IcebergView';
 import PenguinAvatar from '../components/PenguinAvatar';
 import PenguinStats from '../components/PenguinStats';
@@ -31,6 +31,7 @@ const PenguinArena: React.FC<PenguinArenaProps> = ({ user, openProfile, isDarkMo
     const [pearls, setPearls] = useState<PenguinPearl[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -54,6 +55,20 @@ const PenguinArena: React.FC<PenguinArenaProps> = ({ user, openProfile, isDarkMo
         await fetchData();
         setRefreshing(false);
     }, [fetchData]);
+
+    const handleSyncProgress = async () => {
+        setSyncing(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        try {
+            await syncLegacyProgress(user.id);
+            await fetchData();
+            Alert.alert("Synchronisation terminée", "Votre progression passée a été convertie en ressources pour votre pingouin !");
+        } catch (e) {
+            Alert.alert("Erreur", "La synchronisation a échoué.");
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     const colors = {
         bg: isDarkMode ? '#000000' : '#F2F2F7',
@@ -194,8 +209,20 @@ const PenguinArena: React.FC<PenguinArenaProps> = ({ user, openProfile, isDarkMo
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0EA5E9" />}
             >
                 <View style={styles.header}>
-                    <Text style={[styles.title, { color: colors.text }]}>Mon Pingouin</Text>
-                    <Text style={[styles.subtitle, { color: colors.textSub }]}>Vers : {profile?.stage.toUpperCase() || 'EGG'}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View>
+                            <Text style={[styles.title, { color: colors.text }]}>Mon Pingouin</Text>
+                            <Text style={[styles.subtitle, { color: colors.textSub }]}>Stade : {profile?.stage.toUpperCase() || 'EGG'}</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.syncBtn, { borderColor: colors.border }]}
+                            onPress={handleSyncProgress}
+                            disabled={syncing}
+                        >
+                            {syncing ? <ActivityIndicator size="small" color={colors.text} /> : <RefreshCw size={18} color={colors.text} />}
+                            <Text style={[styles.syncText, { color: colors.text }]}>Sync</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {profile && (
@@ -248,6 +275,8 @@ const styles = StyleSheet.create({
     header: { marginBottom: 20 },
     title: { fontSize: 24, fontWeight: '800' },
     subtitle: { fontSize: 14, marginTop: 4 },
+    syncBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1 },
+    syncText: { fontSize: 12, fontWeight: '700' },
     tabs: { flexDirection: 'row', gap: 10, marginBottom: 25 },
     tabItem: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
     tabText: { fontSize: 13, fontWeight: '700' },

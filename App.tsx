@@ -396,7 +396,8 @@ const App: React.FC = () => {
 
       // Penguin Evolution Trigger: Egg -> Chick when first goal is created
       if (goals.length === 0) {
-        import('./services/penguin').then(m => m.evolvePenguin(user.id, 'chick'));
+        const { evolvePenguin } = require('./services/penguin');
+        evolvePenguin(user.id, 'chick');
       }
 
       const { subobjectives, ...goalDbPayload } = newGoal;

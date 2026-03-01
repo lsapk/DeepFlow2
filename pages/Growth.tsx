@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions, LayoutAnimation } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, Goal, FocusSession } from '../types';
+import { PlayerProfile, UserProfile, Task, Habit, Goal, FocusSession, PenguinProfile } from '../types';
 import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit, Activity, Zap, RefreshCw, BarChart2, PieChart, Clock, Target, CloudOff, Menu } from 'lucide-react-native';
 import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { computeProductivityScore } from '../services/productivity';
+import { getPenguinProfile } from '../services/penguin';
+import PenguinAvatar from '../components/PenguinAvatar';
 
 const { width } = Dimensions.get('window');
 
@@ -72,6 +74,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
+  const [penguin, setPenguin] = useState<PenguinProfile | null>(null);
   
   // Deep Real Data
   const [lifeWheelData, setLifeWheelData] = useState<number[]>([20, 20, 20, 20, 20, 20]);
@@ -90,17 +93,19 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
               thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
               const isoDate = thirtyDaysAgo.toISOString();
 
-              const [focusRes, journalRes, reflectionRes, habitRes] = await Promise.all([
+              const [focusRes, journalRes, reflectionRes, habitRes, pengRes] = await Promise.all([
                   supabase.from('focus_sessions').select('*').eq('user_id', user.id).gte('completed_at', isoDate).order('completed_at', { ascending: false }),
                   supabase.from('journal_entries').select('created_at, mood, title, content').eq('user_id', user.id).gte('created_at', isoDate),
                   supabase.from('daily_reflections').select('created_at, answer, question').eq('user_id', user.id).gte('created_at', isoDate),
-                  supabase.from('habit_completions').select('*').eq('user_id', user.id).gte('completed_date', isoDate.split('T')[0])
+                  supabase.from('habit_completions').select('*').eq('user_id', user.id).gte('completed_date', isoDate.split('T')[0]),
+                  getPenguinProfile(user.id)
               ]);
 
               if (focusRes.data) setFocusHistory(focusRes.data);
               if (journalRes.data) setJournalHistory(journalRes.data);
               if (reflectionRes.data) setReflectionHistory(reflectionRes.data);
               if (habitRes.data) setHabitCompletions(habitRes.data);
+              if (pengRes) setPenguin(pengRes);
 
           } catch (e) {
               console.log("Error fetching deep data", e);
@@ -118,7 +123,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   // --- COMPUTED STATS (REAL) ---
   const stats = useMemo(() => {
-      // 1. Productivity Score
       const totalTasks = tasks.length || 1;
       const completedTasks = tasks.filter(t => t.completed);
       const taskRate = Math.round((completedTasks.length / totalTasks) * 100);
@@ -131,18 +135,16 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
           focusSessions,
       });
 
-      // 2. Activity Chart (Weekly)
       const weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
       focusHistory.forEach(session => {
           const d = new Date(session.completed_at || session.created_at);
-          const day = d.getDay(); // 0 is Sunday
+          const day = d.getDay();
           const adjustedDay = day === 0 ? 6 : day - 1; 
           weeklyActivity[adjustedDay] += (session.duration || 0);
       });
       const maxActivity = Math.max(...weeklyActivity, 1);
       const normalizedWeekly = weeklyActivity.map(v => (v / maxActivity) * 100);
 
-      // 3. Consistency Map (All actions)
       const consistencyMap: Record<string, number> = {};
       const addToMap = (dateStr: string) => {
           if (!dateStr) return;
@@ -247,8 +249,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       ]);
   };
 
-  // --- CUSTOM CHARTS ---
-
   const renderProductivityRing = () => {
       const size = 160;
       const strokeWidth = 12;
@@ -293,7 +293,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                   <View key={i} style={{alignItems: 'center', gap: 6}}>
                       <View style={{
                           width: barW, 
-                          height: (val / max) * h || 4, // Min height visual
+                          height: (val / max) * h || 4,
                           backgroundColor: i === 6 ? colors.primary : (isDarkMode ? '#333' : '#E5E5EA'),
                           borderRadius: 6
                       }} />
@@ -354,8 +354,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const renderChronobiology = () => {
-      // Calculate REAL chronobiology based on ALL activities
-      const buckets = [0, 0, 0, 0]; // 6h, 12h, 18h, 22h simplified
+      const buckets = [0, 0, 0, 0];
       
       const processTime = (dateStr: string) => {
           if (!dateStr) return;
@@ -407,7 +406,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   const renderConsistency = () => {
-      // 30 days grid
       const grid = Array.from({length: 30}).map((_, i) => {
           const d = new Date();
           d.setDate(d.getDate() - (29 - i));
@@ -419,7 +417,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       return (
           <View style={styles.heatmapGrid}>
               {grid.map((day, i) => {
-                  const intensity = Math.min(1, day.count / 5); // 5 actions = max intensity
+                  const intensity = Math.min(1, day.count / 5);
                   return (
                       <View 
                           key={i} 
@@ -438,6 +436,8 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   };
 
   if (loading) return <SkeletonAnalysis />;
+
+  const showPenguin = penguin && penguin.stage !== 'egg';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top }]}>
@@ -461,6 +461,18 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         {mainTab === 'DATA' ? (
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 
+                {showPenguin && (
+                    <View style={[styles.penguinInsight, { backgroundColor: colors.card }]}>
+                        <PenguinAvatar stage={penguin.stage} size={50} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.insightTitle, { color: colors.text }]}>Regard de {penguin.stage}</Text>
+                            <Text style={[styles.insightText, { color: colors.subText }]}>
+                                "Ton score de {stats.productivityScore} est impressionnant ! Continuons ainsi."
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
                 {/* SUB-TABS */}
                 <View style={styles.subTabsContainer}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 8}}>
@@ -646,7 +658,10 @@ const styles = StyleSheet.create({
   heatmapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   heatmapCell: { width: (width - 80 - (6*5)) / 6, height: 24, borderRadius: 4 },
 
-  // Chat Styles
+  penguinInsight: { flexDirection: 'row', alignItems: 'center', gap: 15, padding: 15, borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  insightTitle: { fontSize: 14, fontWeight: '700' },
+  insightText: { fontSize: 12, fontStyle: 'italic' },
+
   chatContainer: { flex: 1, paddingHorizontal: 16, paddingTop: 20 },
   bubble: { padding: 14, borderRadius: 18, marginBottom: 12, maxWidth: '88%' },
   bubbleUser: { alignSelf: 'flex-end', borderBottomRightRadius: 2 },

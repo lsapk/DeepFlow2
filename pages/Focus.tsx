@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, Scroll
 import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2, MoreHorizontal, History } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
-import { Task, FocusSession } from '../types';
+import { Task, FocusSession, PenguinProfile } from '../types';
 import { addXp, REWARDS } from '../services/gamification';
-import { awardFood } from '../services/penguin';
+import { awardFood, getPenguinProfile } from '../services/penguin';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
@@ -14,6 +14,7 @@ import { playSuccess } from '../services/sound';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { addToQueue } from '../services/offline';
+import PenguinAvatar from '../components/PenguinAvatar';
 
 const { width } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.min(width * 0.75, 300); 
@@ -35,6 +36,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   useKeepAwake();
 
   const [viewMode, setViewMode] = useState<'CONFIG' | 'RUNNING' | 'HISTORY' | 'MANUAL'>('CONFIG');
+  const [penguin, setPenguin] = useState<PenguinProfile | null>(null);
   
   // Timer State
   const [isActive, setIsActive] = useState(false);
@@ -93,7 +95,16 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   useEffect(() => {
       checkActiveSession();
       Notifications.requestPermissionsAsync();
+      loadPenguin();
   }, []);
+
+  const loadPenguin = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const prof = await getPenguinProfile(user.id);
+        setPenguin(prof);
+    }
+  };
 
   const checkActiveSession = async () => {
       try {
@@ -486,6 +497,11 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                 />
             </AnimatedSvg>
             <View style={styles.timerTextContainer}>
+                {penguin && penguin.stage !== 'egg' && (
+                    <View style={{ marginBottom: 10 }}>
+                        <PenguinAvatar stage={penguin.stage} size={60} />
+                    </View>
+                )}
                 <Text style={[styles.timeText, { color: '#FFF' }]}>{formatTime(timeLeft)}</Text>
                 <Text style={[styles.statusText, { color: '#94A3B8' }]}>{sessionTitle || 'Concentration'}</Text>
             </View>
