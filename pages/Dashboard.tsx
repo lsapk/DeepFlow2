@@ -23,6 +23,7 @@ interface DashboardProps {
   focusSessions: FocusSession[];
   journalEntries?: JournalEntry[];
   reflections?: Reflection[];
+  productivityScore?: number;
   toggleHabit: (id: string) => void;
   toggleTask: (id: string) => void;
   openFocus: () => void;
@@ -33,7 +34,7 @@ interface DashboardProps {
   openMenu: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goals, focusSessions = [], journalEntries = [], reflections = [], toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goals, focusSessions = [], journalEntries = [], reflections = [], productivityScore: initialProductivityScore, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
   const insets = useSafeAreaInsets();
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
   const [closedAnnouncements, setClosedAnnouncements] = React.useState<string[]>([]);
@@ -117,17 +118,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goal
   const completedGoalsCount = goals.filter(g => g.completed).length;
   const totalGoals = goals.length;
 
-  const productivityScore = useMemo(() => {
-      return computeProductivityScore({
-          tasks,
-          habits,
-          goals,
-          focusSessions,
-          journalEntries,
-          reflections,
-          referenceDate: today,
-      });
-  }, [tasks, habits, goals, focusSessions, journalEntries, reflections, today]);
+  const productivityScore = initialProductivityScore ?? 0;
 
   // Autres stats
   const averageStreak = habits.length > 0 ? habits.reduce((acc, h) => acc + h.streak, 0) / habits.length : 0;

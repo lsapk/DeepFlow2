@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Alert, ActivityIndicator, LayoutAnimation, TextInput, Platform, BackHandler, Linking, Modal } from 'react-native';
 import { UserProfile, PlayerProfile, UserSettings, AiPermissions, AvatarConfig, AvatarClass, AvatarHelmet, AvatarArmor, AvatarColor } from '../types';
-import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target, Palette, Award, Zap as ZapIcon, LayoutGrid } from 'lucide-react-native';
+import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target, Palette, Award, Zap as ZapIcon, LayoutGrid, Sparkles } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import PenguinAvatar from '../components/PenguinAvatar';
 import { getPenguinProfile } from '../services/penguin';
@@ -18,6 +18,8 @@ interface ProfileProps {
   onClose: () => void;
   onThemeChange?: (isDark: boolean) => void;
   onPlayerUpdate?: (player: PlayerProfile) => void;
+  isAdmin?: boolean;
+  setView?: (view: any) => void;
 }
 
 const DEFAULT_AI_PERMISSIONS: AiPermissions = {
@@ -216,7 +218,7 @@ const AVATAR_HELMETS: AvatarHelmet[] = ['standard', 'visor', 'crown', 'halo'];
 const AVATAR_ARMORS: AvatarArmor[] = ['standard', 'heavy', 'stealth', 'energy'];
 const AVATAR_COLORS: AvatarColor[] = ['#C4B5FD', '#34D399', '#F472B6', '#60A5FA', '#FACC15', '#F87171', '#A78BFA'];
 
-const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange, onPlayerUpdate }) => {
+const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange, onPlayerUpdate, isAdmin, setView }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
@@ -469,6 +471,25 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                   <SettingItem icon={settings.theme === 'dark' ? Moon : Sun} label="Mode Sombre" iconColor="#5856D6" isSwitch value={settings.theme === 'dark'} onToggle={(val: boolean) => updateSetting('theme', val ? 'dark' : 'light')} />
               </View>
           </View>
+
+          {isAdmin && (
+              <View style={styles.section}>
+                  <Text style={styles.sectionHeader}>ADMINISTRATION</Text>
+                  <View style={styles.card}>
+                      <SettingItem
+                          icon={Shield}
+                          label="Panneau d'administration"
+                          iconColor="#EF4444"
+                          onPress={() => {
+                              if (setView) {
+                                  setView('ADMIN');
+                                  onClose();
+                              }
+                          }}
+                      />
+                  </View>
+              </View>
+          )}
 
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>SUPPORT & LÉGAL</Text>

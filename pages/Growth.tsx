@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { computeProductivityScore } from '../services/productivity';
 import { getPenguinProfile } from '../services/penguin';
 import PenguinAvatar from '../components/PenguinAvatar';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
@@ -34,9 +35,10 @@ interface GrowthProps {
   onStartFocus: (minutes: number) => void;
   isDarkMode?: boolean;
   noPadding?: boolean;
+  productivityScore?: number;
 }
 
-const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], focusSessions = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false, openMenu }) => {
+const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], focusSessions = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false, productivityScore: initialProductivityScore, openMenu }) => {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   
@@ -62,12 +64,12 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       strong: { color: colors.accent, fontWeight: 'bold' },
       list_item_bullet: { color: colors.text, fontSize: 15 },
       paragraph: { marginBottom: 10 },
-      code_inline: { backgroundColor: isDarkMode ? '#333' : '#ddd', borderRadius: 4, paddingHorizontal: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+      code_inline: { backgroundColor: isDarkMode ? '#333' : '#ddd', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   };
 
   const [loading, setLoading] = useState(true);
   const [mainTab, setMainTab] = useState<'DATA' | 'COACH'>('DATA');
-  const [dataSubTab, setDataSubTab] = useState<'GLOBAL' | 'BALANCE' | 'FOCUS'>('GLOBAL');
+  const [dataSubTab, setDataSubTab] = useState<'GLOBAL' | 'BALANCE' | 'FOCUS' | 'MOOD'>('GLOBAL');
   
   // Chat State
   const [chatInput, setChatInput] = useState('');
@@ -128,7 +130,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       const taskRate = Math.round((completedTasks.length / totalTasks) * 100);
       const activeHabits = habits.filter(h => !h.is_archived);
       const avgStreak = activeHabits.length > 0 ? Math.round(activeHabits.reduce((acc, h) => acc + h.streak, 0) / activeHabits.length) : 0;
-      const productivityScore = computeProductivityScore({
+      const productivityScore = initialProductivityScore ?? computeProductivityScore({
           tasks,
           habits,
           goals,
@@ -407,6 +409,36 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
       );
   };
 
+  const renderMoodCorrelation = () => {
+      const moodCounts: Record<string, number> = {};
+      journalHistory.forEach(j => {
+          const mood = j.mood || 'neutral';
+          moodCounts[mood] = (moodCounts[mood] || 0) + 1;
+      });
+
+      const moods = Object.keys(moodCounts);
+      if (moods.length === 0) return <Text style={{color: colors.subText, fontStyle: 'italic'}}>Pas assez de données d'humeur.</Text>;
+
+      const max = Math.max(...Object.values(moodCounts));
+      const w = width - 80;
+
+      return (
+          <View style={{gap: 12, marginTop: 10}}>
+              {moods.map((mood, i) => (
+                  <View key={i}>
+                      <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4}}>
+                          <Text style={{color: colors.text, fontSize: 12, textTransform: 'capitalize'}}>{mood}</Text>
+                          <Text style={{color: colors.subText, fontSize: 12}}>{moodCounts[mood]} entrées</Text>
+                      </View>
+                      <View style={{height: 8, backgroundColor: isDarkMode ? '#333' : '#E5E5EA', borderRadius: 4, overflow: 'hidden'}}>
+                          <View style={{width: `${(moodCounts[mood] / max) * 100}%`, height: '100%', backgroundColor: colors.accent}} />
+                      </View>
+                  </View>
+              ))}
+          </View>
+      );
+  };
+
   const renderConsistency = () => {
       const grid = Array.from({length: 30}).map((_, i) => {
           const d = new Date();
@@ -478,14 +510,14 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                 {/* SUB-TABS */}
                 <View style={styles.subTabsContainer}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 8}}>
-                        {['GLOBAL', 'BALANCE', 'FOCUS'].map((tab: any) => (
+                        {['GLOBAL', 'BALANCE', 'FOCUS', 'MOOD'].map((tab: any) => (
                             <TouchableOpacity 
                                 key={tab} 
                                 onPress={() => { playMenuClick(); LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setDataSubTab(tab); }}
                                 style={[styles.subTab, dataSubTab === tab && {backgroundColor: colors.accent}, {borderColor: colors.border}]}
                             >
                                 <Text style={[styles.subTabText, {color: dataSubTab === tab ? '#000' : colors.subText}]}>
-                                    {tab === 'GLOBAL' ? 'Aperçu' : tab === 'BALANCE' ? 'Équilibre' : 'Énergie'}
+                                    {tab === 'GLOBAL' ? 'Aperçu' : tab === 'BALANCE' ? 'Équilibre' : tab === 'FOCUS' ? 'Énergie' : 'Humeur'}
                                 </Text>
                             </TouchableOpacity>
                         ))}
@@ -523,6 +555,19 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                             </View>
                         </View>
                     </>
+                )}
+
+                {dataSubTab === 'MOOD' && (
+                    <View style={[styles.card, {backgroundColor: colors.card}]}>
+                        <View style={styles.cardHeader}>
+                            <Text style={[styles.cardTitle, {color: colors.text}]}>Humeur vs Productivité</Text>
+                            <PieChart size={18} color={colors.accent} />
+                        </View>
+                        {renderMoodCorrelation()}
+                        <Text style={[styles.analysisText, {color: colors.subText, marginTop: 15}]}>
+                            Analyse de l'impact de votre état émotionnel sur l'accomplissement de vos objectifs.
+                        </Text>
+                    </View>
                 )}
 
                 {dataSubTab === 'BALANCE' && (
@@ -574,22 +619,32 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                 <ScrollView 
                     ref={scrollViewRef}
                     style={styles.chatContainer} 
-                    contentContainerStyle={{paddingBottom: 20}}
+                    contentContainerStyle={{paddingBottom: 20, paddingTop: 10}}
                     keyboardShouldPersistTaps="handled"
                 >
                     {messages.map((m, i) => (
-                        <View key={i} style={[
-                            styles.bubble, 
-                            m.role === 'user' 
-                                ? [styles.bubbleUser, {backgroundColor: colors.userBubble}] 
-                                : [styles.bubbleAi, {backgroundColor: colors.aiBubble}]
-                        ]}>
+                        <Animated.View
+                            key={i}
+                            entering={FadeIn.delay(100)}
+                            style={[
+                                styles.bubble,
+                                m.role === 'user'
+                                    ? [styles.bubbleUser, {backgroundColor: colors.userBubble}]
+                                    : [styles.bubbleAi, {backgroundColor: colors.aiBubble}]
+                            ]}
+                        >
                             {m.role === 'user' ? (
-                                <Text style={{color: '#FFF', fontSize: 16}}>{m.text}</Text>
+                                <Text style={{color: '#FFF', fontSize: 16, lineHeight: 22}}>{m.text}</Text>
                             ) : (
-                                <Markdown style={markdownStyles as any}>{m.text}</Markdown>
+                                <View>
+                                    <View style={styles.aiHeader}>
+                                        <Sparkles size={12} color={colors.accent} fill={colors.accent} />
+                                        <Text style={styles.aiName}>DeepFlow AI</Text>
+                                    </View>
+                                    <Markdown style={markdownStyles as any}>{m.text}</Markdown>
+                                </View>
                             )}
-                        </View>
+                        </Animated.View>
                     ))}
                     {loadingAi && (
                         <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, margin: 20}}>
@@ -633,6 +688,8 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 };
 
 const styles = StyleSheet.create({
+  aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, opacity: 0.8 },
+  aiName: { fontSize: 11, fontWeight: '800', color: '#C4B5FD', letterSpacing: 0.5, textTransform: 'uppercase' },
   container: { flex: 1 },
   header: { paddingHorizontal: 20, paddingBottom: 15, paddingTop: 10, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 22, fontWeight: '800' },
@@ -664,18 +721,18 @@ const styles = StyleSheet.create({
   insightTitle: { fontSize: 14, fontWeight: '700' },
   insightText: { fontSize: 12, fontStyle: 'italic' },
 
-  chatContainer: { flex: 1, paddingHorizontal: 16, paddingTop: 20 },
-  bubble: { padding: 14, borderRadius: 18, marginBottom: 12, maxWidth: '88%' },
-  bubbleUser: { alignSelf: 'flex-end', borderBottomRightRadius: 2 },
-  bubbleAi: { alignSelf: 'flex-start', borderBottomLeftRadius: 2 },
+  chatContainer: { flex: 1, paddingHorizontal: 16 },
+  bubble: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24, marginBottom: 16, maxWidth: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  bubbleUser: { alignSelf: 'flex-end', borderBottomRightRadius: 4, borderTopRightRadius: 24 },
+  bubbleAi: { alignSelf: 'flex-start', borderBottomLeftRadius: 4, borderTopLeftRadius: 24 },
   
-  inputWrapper: { padding: 16, borderTopWidth: 1, gap: 12 }, 
+  inputWrapper: { padding: 16, paddingBottom: 24, borderTopWidth: 1, gap: 12 },
   modeSwitchContainer: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   modePill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 16, gap: 6, backgroundColor: '#333' },
   modeText: { fontSize: 11, fontWeight: '700' },
-  inputRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
-  input: { flex: 1, minHeight: 48, borderRadius: 24, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, fontSize: 16 },
-  sendBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' }
+  inputRow: { flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: 'transparent' },
+  input: { flex: 1, minHeight: 48, borderRadius: 24, paddingHorizontal: 20, paddingVertical: 12, fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4 }
 });
 
 export default Growth;

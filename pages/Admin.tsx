@@ -296,14 +296,14 @@ const Admin: React.FC = () => {
                                     <DetailStat label="Habitudes" value={userDetails.habitsCount} />
                                     <DetailStat label="Objectifs" value={userDetails.goalsCount} />
                                     <DetailStat label="Focus" value={`${Math.round(userDetails.focusMinutes / 60)}h`} />
-                                    <DetailStat label="Niveau" value={userDetails.player.level} />
-                                    <DetailStat label="XP" value={userDetails.player.experience_points} />
+                                    <DetailStat label="Niveau" value={userDetails.player?.level || 'N/A'} />
+                                    <DetailStat label="XP" value={userDetails.player?.experience_points || 0} />
                                 </View>
 
                                 <View style={styles.actionSection}>
                                     <Text style={styles.sectionTitle}>Actions</Text>
                                     <View style={styles.actionButtons}>
-                                        <ActionButton icon={CreditCard} label="Modifier Crédits" value={userDetails.player.credits} onPress={() => handleUpdateCredits(selectedUser!, userDetails.player.credits)} />
+                                        <ActionButton icon={CreditCard} label="Modifier Crédits" value={userDetails.player?.credits || 0} onPress={() => handleUpdateCredits(selectedUser!, userDetails.player?.credits || 0)} />
                                         <ActionButton icon={RefreshCw} label="Forcer Sync Pinguin" onPress={() => handleSync(selectedUser!)} />
                                         {selectedUser?.is_banned ? (
                                             <ActionButton icon={Unlock} label="Débannir" color="#34C759" onPress={() => handleUnban(selectedUser!)} />

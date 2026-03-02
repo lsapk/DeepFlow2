@@ -215,16 +215,6 @@ const PenguinArena: React.FC<PenguinArenaProps> = ({ user, openProfile, isDarkMo
                             <Text style={[styles.title, { color: colors.text }]}>Mon Pingouin</Text>
                             <Text style={[styles.subtitle, { color: colors.textSub }]}>Stade : {profile?.stage.toUpperCase() || 'EGG'}</Text>
                         </View>
-                        {isAdmin && (
-                            <TouchableOpacity
-                                style={[styles.syncBtn, { borderColor: colors.border }]}
-                                onPress={handleSyncProgress}
-                                disabled={syncing}
-                            >
-                                {syncing ? <ActivityIndicator size="small" color={colors.text} /> : <RefreshCw size={18} color={colors.text} />}
-                                <Text style={[styles.syncText, { color: colors.text }]}>Sync</Text>
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </View>
 

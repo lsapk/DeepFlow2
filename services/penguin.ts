@@ -18,32 +18,40 @@ export const getPenguinProfile = async (userId: string): Promise<PenguinProfile 
 
     if (!data) {
         // Create initial profile if it doesn't exist
-        const { data: newProfile, error: createError } = await supabase
-            .from('penguin_profiles')
-            .insert({
-                user_id: userId,
-                stage: 'egg',
-                shrimp_total: 0,
-                salmon_total: 0,
-                golden_fish_total: 0,
-                shrimp_today: 0,
-                shrimp_daily_limit: 10,
-                last_shrimp_reset: new Date().toISOString().split('T')[0],
-                iceberg_size: 1,
-                climate_state: 'active',
-                equipped_accessories: [],
-                has_radio: false,
-                has_library: false,
-                has_lounge_chair: false
-            })
-            .select()
-            .single();
+        try {
+            const { data: newProfile, error: createError } = await supabase
+                .from('penguin_profiles')
+                .insert({
+                    user_id: userId,
+                    stage: 'egg',
+                    shrimp_total: 0,
+                    salmon_total: 0,
+                    golden_fish_total: 0,
+                    shrimp_today: 0,
+                    shrimp_daily_limit: 10,
+                    last_shrimp_reset: new Date().toISOString().split('T')[0],
+                    iceberg_size: 1,
+                    climate_state: 'active',
+                    equipped_accessories: [],
+                    has_radio: false,
+                    has_library: false,
+                    has_lounge_chair: false
+                })
+                .select()
+                .single();
 
-        if (createError) {
-            console.error('Error creating penguin profile:', createError);
+            if (createError) {
+                if (createError.code === '42501') {
+                    console.warn('RLS Policy prevents direct insert of penguin profile. Check database policies.');
+                }
+                console.error('Error creating penguin profile:', createError);
+                return null;
+            }
+            return newProfile;
+        } catch (e) {
+            console.error('Critical error creating penguin profile:', e);
             return null;
         }
-        return newProfile;
     }
 
     // Check for daily reset of shrimp

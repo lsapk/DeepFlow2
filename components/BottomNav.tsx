@@ -54,7 +54,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
     { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true },
     { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal' },
     { view: ViewState.EVOLUTION, icon: TrendingUp, label: 'Évo' },
-    ...(isAdmin ? [{ view: ViewState.ADMIN, icon: Shield, label: 'Admin' }] : []),
   ];
 
   const handlePress = (view: ViewState) => {
