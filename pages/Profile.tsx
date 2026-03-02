@@ -18,6 +18,7 @@ interface ProfileProps {
   onClose: () => void;
   onThemeChange?: (isDark: boolean) => void;
   onPlayerUpdate?: (player: PlayerProfile) => void;
+  onUserUpdate?: (user: UserProfile) => void;
   isAdmin?: boolean;
   setView?: (view: any) => void;
 }
@@ -358,11 +359,14 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
           bio: editBio
       }).eq('id', user.id);
 
-      if (error) Alert.alert("Erreur", "Impossible de mettre à jour le profil.");
-      else {
-          user.display_name = editName; 
-          user.bio = editBio;
+      if (error) {
+          Alert.alert("Erreur", "Impossible de mettre à jour le profil.");
+      } else {
+          // Success
+          const updatedUser = { ...user, display_name: editName, bio: editBio };
+          if (onUserUpdate) onUserUpdate(updatedUser);
           setIsEditing(false);
+          Alert.alert("Succès", "Profil mis à jour !");
       }
       setLoading(false);
   };

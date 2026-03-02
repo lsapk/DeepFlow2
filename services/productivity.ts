@@ -48,7 +48,7 @@ export const computeProductivityScore = ({
 
   let weightedRegularity = 0;
   activityDays.forEach(weight => { weightedRegularity += weight; });
-  const regularityScore = Math.min(100, (weightedRegularity / 45) * 100); // 45 weighted days for max score
+  const regularityScore = Math.min(100, (weightedRegularity / 25) * 100); // Softened from 45 to 25 weighted days
 
   // 2. CONTENT RICHNESS & DIVERSITY (Based on last 14 days)
   const fourteenDaysAgo = new Date(referenceDate);
@@ -83,7 +83,7 @@ export const computeProductivityScore = ({
   const totalRecentFocusMinutes = focusSessions
     .filter(s => new Date(s.completed_at!) >= fourteenDaysAgo)
     .reduce((acc, s) => acc + (s.duration || 0), 0);
-  const intensityScore = Math.min(100, (totalRecentFocusMinutes / 1200) * 100); // 20 hours of focus in 14 days for max
+  const intensityScore = Math.min(100, (totalRecentFocusMinutes / 600) * 100); // Softened: 10 hours of focus in 14 days for max
 
   // FINAL WEIGHTED SCORE
   const score = (regularityScore * 0.30) +
