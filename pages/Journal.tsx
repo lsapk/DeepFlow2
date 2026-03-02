@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
-import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Menu, Calendar } from 'lucide-react-native';
+import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Menu, Calendar, Sparkles, Wind, Target, Activity, Flame, Heart } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -139,12 +139,20 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
   };
 
   const getMoodIcon = (m: string, size = 20, active = true) => {
+      const isActive = active && m === mood;
+      const activeColor = '#000';
       switch(m) {
-          case 'happy': return <Smile size={size} color={active && m === mood ? '#000' : '#4ADE80'} />;
-          case 'sad': return <Frown size={size} color={active && m === mood ? '#000' : '#F87171'} />;
-          case 'energetic': return <Zap size={size} color={active && m === mood ? '#000' : '#FACC15'} />;
-          case 'tired': return <Coffee size={size} color={active && m === mood ? '#000' : '#A8A29E'} />;
-          default: return <Meh size={size} color={active && m === mood ? '#000' : '#9CA3AF'} />;
+          case 'happy': return <Smile size={size} color={isActive ? activeColor : '#4ADE80'} />;
+          case 'sad': return <Frown size={size} color={isActive ? activeColor : '#F87171'} />;
+          case 'energetic': return <Zap size={size} color={isActive ? activeColor : '#FACC15'} />;
+          case 'tired': return <Coffee size={size} color={isActive ? activeColor : '#A8A29E'} />;
+          case 'inspired': return <Sparkles size={size} color={isActive ? activeColor : '#C4B5FD'} />;
+          case 'stressed': return <Activity size={size} color={isActive ? activeColor : '#EF4444'} />;
+          case 'calm': return <Wind size={size} color={isActive ? activeColor : '#60A5FA'} />;
+          case 'focused': return <Target size={size} color={isActive ? activeColor : '#34D399'} />;
+          case 'anxious': return <Flame size={size} color={isActive ? activeColor : '#FB923C'} />;
+          case 'excited': return <Heart size={size} color={isActive ? activeColor : '#F472B6'} />;
+          default: return <Meh size={size} color={isActive ? activeColor : '#9CA3AF'} />;
       }
   };
 
@@ -205,17 +213,19 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <Text style={styles.label}>HUMEUR</Text>
-                        <View style={[styles.moodRow, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
-                            {['happy', 'energetic', 'neutral', 'tired', 'sad'].map(m => (
-                                <TouchableOpacity 
-                                    key={m} 
-                                    onPress={() => setMood(m as any)}
-                                    style={[styles.moodBtn, mood === m && { backgroundColor: colors.text }]}
-                                >
-                                    {getMoodIcon(m, 24, true)}
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.moodScroll, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
+                            <View style={styles.moodRow}>
+                                {['happy', 'energetic', 'inspired', 'excited', 'focused', 'calm', 'neutral', 'tired', 'sad', 'stressed', 'anxious'].map(m => (
+                                    <TouchableOpacity
+                                        key={m}
+                                        onPress={() => setMood(m as any)}
+                                        style={[styles.moodBtn, mood === m && { backgroundColor: colors.text }]}
+                                    >
+                                        {getMoodIcon(m, 24, true)}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
 
                         <Text style={styles.label}>TITRE</Text>
                         <TextInput 
@@ -289,7 +299,8 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
   modalTitle: { fontSize: 20, fontWeight: '700' },
   label: { color: '#8E8E93', fontSize: 12, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' },
-  moodRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, padding: 8, borderRadius: 12 },
+  moodScroll: { marginBottom: 24, borderRadius: 12 },
+  moodRow: { flexDirection: 'row', padding: 8, gap: 8 },
   moodBtn: { padding: 10, borderRadius: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   input: { borderRadius: 12, padding: 14, fontSize: 17, marginBottom: 24 },
   inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14, marginBottom: 24 },

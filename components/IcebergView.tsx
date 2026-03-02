@@ -16,6 +16,9 @@ interface IcebergViewProps {
 const IcebergView: React.FC<IcebergViewProps> = ({ size, climate, children }) => {
     const isDark = climate === 'resting';
 
+    // Ensure size is a valid number and at least 1
+    const safeSize = Math.max(1, typeof size === 'number' && !isNaN(size) ? size : 1);
+
     // Deep Antarctic gradients
     const skyColors = isDark
         ? (['#020617', '#0f172a', '#1e293b'] as const)
@@ -29,8 +32,8 @@ const IcebergView: React.FC<IcebergViewProps> = ({ size, climate, children }) =>
         ? (['#1E293B', '#020617'] as const)
         : (['#0369A1', '#0C4A6E'] as const);
 
-    const icebergWidth = width * 0.75 * (1 + (size - 1) * 0.08);
-    const icebergHeight = 140 * (1 + (size - 1) * 0.04);
+    const icebergWidth = width * 0.75 * (1 + (safeSize - 1) * 0.08);
+    const icebergHeight = 140 * (1 + (safeSize - 1) * 0.04);
 
     return (
         <LinearGradient colors={skyColors} style={styles.container}>

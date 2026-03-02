@@ -603,6 +603,10 @@ const App: React.FC = () => {
                                 setPlayer(updatedPlayer);
                                 saveToCache(CACHE_KEYS.PLAYER, updatedPlayer);
                             }}
+                            onUserUpdate={(updatedUser) => {
+                                setUser(updatedUser);
+                                saveToCache(CACHE_KEYS.USER, updatedUser);
+                            }}
                             isAdmin={userIsAdmin}
                             setView={setCurrentView}
                         />

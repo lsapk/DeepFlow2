@@ -276,7 +276,7 @@ export interface JournalEntry {
   user_id: string;
   title: string;
   content: string;
-  mood: 'happy' | 'neutral' | 'sad' | 'energetic' | 'tired' | string;
+  mood: 'happy' | 'neutral' | 'sad' | 'energetic' | 'tired' | 'inspired' | 'stressed' | 'calm' | 'focused' | 'anxious' | 'excited' | string;
   tags?: string[];
   created_at: string;
 }
