@@ -14,6 +14,7 @@ interface EvolutionProps {
     goals: Goal[];
     quests: Quest[];
     focusSessions: FocusSession[];
+    productivityScore?: number;
     openMenu: () => void;
     openProfile: () => void;
     onAddTask: (title: string, priority: string) => void;
@@ -65,6 +66,7 @@ const Evolution: React.FC<EvolutionProps> = (props) => {
                         habits={props.habits}
                         goals={props.goals}
                         focusSessions={props.focusSessions}
+                        productivityScore={props.productivityScore}
                         openMenu={props.openMenu}
                         openProfile={props.openProfile}
                         onAddTask={props.onAddTask}

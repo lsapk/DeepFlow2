@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, StatusBar, Platform, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -26,8 +26,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import * as NavigationBar from 'expo-navigation-bar';
 import { saveToCache, loadFromCache, addToQueue, processQueue, getQueueSize, CACHE_KEYS, generateId, clearCache } from './services/offline';
-import { awardFood } from './services/penguin';
+import { awardFood, evolvePenguin } from './services/penguin';
 import { isAdmin } from './services/admin';
+import { computeProductivityScore } from './services/productivity';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 // Configuration Notifications
@@ -65,6 +66,17 @@ const App: React.FC = () => {
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   const [journalEntries, setJournalEntries] = useState<any[]>([]);
   const [reflections, setReflections] = useState<any[]>([]);
+
+  const productivityScore = useMemo(() => {
+    return computeProductivityScore({
+      tasks,
+      habits,
+      goals,
+      focusSessions,
+      journalEntries,
+      reflections,
+    });
+  }, [tasks, habits, goals, focusSessions, journalEntries, reflections]);
   
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SYNCING' | 'OFFLINE_PENDING'>('SYNCED');
@@ -410,7 +422,6 @@ const App: React.FC = () => {
 
       // Penguin Evolution Trigger: Egg -> Chick when first goal is created
       if (goals.length === 0) {
-        const { evolvePenguin } = require('./services/penguin');
         evolvePenguin(user.id, 'chick');
       }
 
@@ -510,7 +521,7 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case ViewState.TODAY:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} journalEntries={journalEntries} reflections={reflections} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} journalEntries={journalEntries} reflections={reflections} productivityScore={productivityScore} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
         break;
       case ViewState.PLANNING:
         Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
@@ -519,7 +530,7 @@ const App: React.FC = () => {
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       case ViewState.EVOLUTION:
-        Content = <Evolution isAdmin={userIsAdmin} player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} focusSessions={focusSessions} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
+        Content = <Evolution isAdmin={userIsAdmin} player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} focusSessions={focusSessions} productivityScore={productivityScore} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
         break;
       case ViewState.ADMIN:
         Content = <Admin />;
@@ -592,6 +603,8 @@ const App: React.FC = () => {
                                 setPlayer(updatedPlayer);
                                 saveToCache(CACHE_KEYS.PLAYER, updatedPlayer);
                             }}
+                            isAdmin={userIsAdmin}
+                            setView={setCurrentView}
                         />
                         {session && (
                             <BottomNav isAdmin={userIsAdmin} currentView={currentView} setView={setCurrentView} isDarkMode={isDarkMode} />

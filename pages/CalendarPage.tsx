@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Task, Habit, CalendarEvent } from '../types';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import Constants from 'expo-constants';
 import { playMenuClick } from '../services/sound';
 import Animated, { FadeIn, LayoutAnimationConfig } from 'react-native-reanimated';
@@ -107,6 +108,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ tasks, habits, toggleTask, 
         androidClientId: GOOGLE_CONFIG.androidClientId || undefined,
         webClientId: GOOGLE_CONFIG.webClientId || undefined,
         scopes: ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events'],
+        redirectUri: AuthSession.makeRedirectUri({
+            scheme: 'deepflow', // Match this with your app's scheme in app.json
+            path: 'google-auth',
+        }),
     });
 
     useEffect(() => {

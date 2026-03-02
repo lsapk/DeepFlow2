@@ -22,12 +22,12 @@ const IcebergView: React.FC<IcebergViewProps> = ({ size, climate, children }) =>
         : (['#0ea5e9', '#38bdf8', '#bae6fd'] as const);
 
     const icebergColors = isDark
-        ? (['#94a3b8', '#475569', '#1e293b'] as const)
-        : (['#f8fafc', '#f1f5f9', '#e2e8f0'] as const);
+        ? (['#CBD5E1', '#64748B', '#1E293B'] as const)
+        : (['#FFFFFF', '#F1F5F9', '#CBD5E1'] as const);
 
     const waterColors = isDark
-        ? (['#0f172a', '#020617'] as const)
-        : (['#075985', '#0c4a6e'] as const);
+        ? (['#1E293B', '#020617'] as const)
+        : (['#0369A1', '#0C4A6E'] as const);
 
     const icebergWidth = width * 0.75 * (1 + (size - 1) * 0.08);
     const icebergHeight = 140 * (1 + (size - 1) * 0.04);
@@ -69,9 +69,17 @@ const IcebergView: React.FC<IcebergViewProps> = ({ size, climate, children }) =>
                 <LinearGradient
                     colors={icebergColors}
                     style={styles.icebergBody}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                 >
+                    {/* Glossy highlight */}
+                    <LinearGradient
+                        colors={['rgba(255,255,255,0.6)', 'transparent']}
+                        style={styles.glossyHighlight}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    />
+
                     {/* Snow highlights / cracks */}
                     <View style={styles.iceDetail1} />
                     <View style={styles.iceDetail2} />
@@ -148,8 +156,16 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         paddingBottom: 25,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.4)',
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.6)',
+    },
+    glossyHighlight: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '50%',
+        opacity: 0.5,
     },
     iceDetail1: {
         position: 'absolute',

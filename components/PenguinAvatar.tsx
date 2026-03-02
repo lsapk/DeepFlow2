@@ -1,9 +1,17 @@
 
-import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Text, Image } from 'react-native';
 import { PenguinStage } from '../types';
 import { Circle, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withRepeat,
+    withTiming,
+    withSequence,
+    withSpring
+} from 'react-native-reanimated';
 
 interface PenguinAvatarProps {
     stage: PenguinStage;
@@ -12,6 +20,31 @@ interface PenguinAvatarProps {
 }
 
 const PenguinAvatar: React.FC<PenguinAvatarProps> = ({ stage, accessories = [], size = 100 }) => {
+    const scale = useSharedValue(1);
+    const translateY = useSharedValue(0);
+
+    useEffect(() => {
+        // Breathing effect
+        scale.value = withRepeat(
+            withTiming(1.05, { duration: 2000 }),
+            -1,
+            true
+        );
+
+        // Slight bounce
+        translateY.value = withRepeat(
+            withTiming(-size * 0.05, { duration: 1500 }),
+            -1,
+            true
+        );
+    }, [size]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [
+            { scale: scale.value },
+            { translateY: translateY.value }
+        ]
+    }));
 
     const renderEgg = () => (
         <View style={[styles.eggWrapper, { width: size * 0.7, height: size * 0.9 }]}>
@@ -113,13 +146,15 @@ const PenguinAvatar: React.FC<PenguinAvatarProps> = ({ stage, accessories = [], 
     );
 
     return (
-        <View style={[styles.container, { width: size, height: size }]}>
-            {stage === 'egg' && renderEgg()}
-            {stage === 'chick' && renderChick()}
-            {stage === 'explorer' && renderExplorer()}
-            {stage === 'emperor' && renderEmperor()}
-            {!['egg', 'chick', 'explorer', 'emperor'].includes(stage) && renderDefault()}
-        </View>
+        <Animated.View style={[styles.container, { width: size, height: size }, animatedStyle]}>
+            {stage === 'egg' ? renderEgg() : (
+                <Image
+                    source={require('../assets/penguin_main.png')}
+                    style={{ width: size, height: size }}
+                    resizeMode="contain"
+                />
+            )}
+        </Animated.View>
     );
 };
 
