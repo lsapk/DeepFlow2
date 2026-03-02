@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
-import { Save, Smile, Meh, Frown, Zap, Coffee, Plus, X, Menu, Calendar, Sparkles, Wind, Target, Activity, Flame, Heart } from 'lucide-react-native';
+import { Save, Plus, X, Menu, Calendar } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,20 @@ interface JournalProps {
   noPadding?: boolean;
   deleteEntry?: (id: string) => void;
 }
+
+const MOOD_CONFIG: Record<string, { label: string, color: string }> = {
+    happy: { label: 'Heureux', color: '#4ADE80' },
+    energetic: { label: 'Énergique', color: '#FACC15' },
+    inspired: { label: 'Inspiré', color: '#C4B5FD' },
+    excited: { label: 'Excité', color: '#F472B6' },
+    focused: { label: 'Concentré', color: '#34D399' },
+    calm: { label: 'Calme', color: '#60A5FA' },
+    neutral: { label: 'Neutre', color: '#9CA3AF' },
+    tired: { label: 'Fatigué', color: '#A8A29E' },
+    sad: { label: 'Triste', color: '#F87171' },
+    stressed: { label: 'Stressé', color: '#EF4444' },
+    anxious: { label: 'Anxieux', color: '#FB923C' },
+};
 
 const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, noPadding = false, deleteEntry }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -138,22 +152,12 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
       }
   };
 
-  const getMoodIcon = (m: string, size = 20, active = true) => {
-      const isActive = active && m === mood;
-      const activeColor = '#000';
-      switch(m) {
-          case 'happy': return <Smile size={size} color={isActive ? activeColor : '#4ADE80'} />;
-          case 'sad': return <Frown size={size} color={isActive ? activeColor : '#F87171'} />;
-          case 'energetic': return <Zap size={size} color={isActive ? activeColor : '#FACC15'} />;
-          case 'tired': return <Coffee size={size} color={isActive ? activeColor : '#A8A29E'} />;
-          case 'inspired': return <Sparkles size={size} color={isActive ? activeColor : '#C4B5FD'} />;
-          case 'stressed': return <Activity size={size} color={isActive ? activeColor : '#EF4444'} />;
-          case 'calm': return <Wind size={size} color={isActive ? activeColor : '#60A5FA'} />;
-          case 'focused': return <Target size={size} color={isActive ? activeColor : '#34D399'} />;
-          case 'anxious': return <Flame size={size} color={isActive ? activeColor : '#FB923C'} />;
-          case 'excited': return <Heart size={size} color={isActive ? activeColor : '#F472B6'} />;
-          default: return <Meh size={size} color={isActive ? activeColor : '#9CA3AF'} />;
-      }
+  const getMoodLabel = (m: string) => {
+      return MOOD_CONFIG[m]?.label || 'Neutre';
+  };
+
+  const getMoodColor = (m: string) => {
+      return MOOD_CONFIG[m]?.color || '#9CA3AF';
   };
 
   return (
@@ -185,8 +189,10 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
                                 <Text style={styles.dayNum}>{dateObj.getDate()}</Text>
                                 <Text style={styles.monthStr}>{dateObj.toLocaleDateString('fr-FR', {month: 'short'}).toUpperCase()}</Text>
                             </View>
-                            <View style={styles.moodBadge}>
-                                {getMoodIcon(entry.mood, 20, false)}
+                            <View style={[styles.moodBadgeText, { backgroundColor: getMoodColor(entry.mood) + '20' }]}>
+                                <Text style={[styles.moodLabelSmall, { color: getMoodColor(entry.mood) }]}>
+                                    {getMoodLabel(entry.mood)}
+                                </Text>
                             </View>
                         </View>
                         <View style={styles.cardBody}>
@@ -213,19 +219,27 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <Text style={styles.label}>HUMEUR</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.moodScroll, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
-                            <View style={styles.moodRow}>
-                                {['happy', 'energetic', 'inspired', 'excited', 'focused', 'calm', 'neutral', 'tired', 'sad', 'stressed', 'anxious'].map(m => (
-                                    <TouchableOpacity
-                                        key={m}
-                                        onPress={() => setMood(m as any)}
-                                        style={[styles.moodBtn, mood === m && { backgroundColor: colors.text }]}
-                                    >
-                                        {getMoodIcon(m, 24, true)}
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </ScrollView>
+                        <View style={[styles.moodGrid, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
+                            {['happy', 'energetic', 'inspired', 'excited', 'focused', 'calm', 'neutral', 'tired', 'sad', 'stressed', 'anxious'].map(m => (
+                                <TouchableOpacity
+                                    key={m}
+                                    onPress={() => setMood(m as any)}
+                                    style={[
+                                        styles.moodBtnText,
+                                        { borderColor: getMoodColor(m) + '40' },
+                                        mood === m && { backgroundColor: getMoodColor(m), borderColor: getMoodColor(m) }
+                                    ]}
+                                >
+                                    <Text style={[
+                                        styles.moodBtnLabel,
+                                        { color: getMoodColor(m) },
+                                        mood === m && { color: '#000' }
+                                    ]}>
+                                        {getMoodLabel(m)}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
 
                         <Text style={styles.label}>TITRE</Text>
                         <TextInput 
@@ -286,10 +300,11 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingBottom: 100, gap: 16 },
   emptyText: { fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
   card: { borderRadius: 20, padding: 16, flexDirection: 'row', gap: 16 },
-  cardHeader: { alignItems: 'center', justifyContent: 'space-between', width: 50, borderRightWidth: 1, borderRightColor: '#333', paddingRight: 16 },
+  cardHeader: { alignItems: 'center', justifyContent: 'space-between', width: 80, borderRightWidth: 1, borderRightColor: '#333', paddingRight: 16 },
   dayNum: { fontSize: 24, fontWeight: '700', color: '#8E8E93' },
   monthStr: { fontSize: 12, fontWeight: '600', color: '#8E8E93' },
-  moodBadge: { marginTop: 10 },
+  moodBadgeText: { marginTop: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  moodLabelSmall: { fontSize: 10, fontWeight: '700', textAlign: 'center' },
   cardBody: { flex: 1 },
   cardTitle: { fontSize: 17, fontWeight: '600', marginBottom: 2 },
   timeStr: { fontSize: 12, marginBottom: 8 },
@@ -299,9 +314,9 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
   modalTitle: { fontSize: 20, fontWeight: '700' },
   label: { color: '#8E8E93', fontSize: 12, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' },
-  moodScroll: { marginBottom: 24, borderRadius: 12 },
-  moodRow: { flexDirection: 'row', padding: 8, gap: 8 },
-  moodBtn: { padding: 10, borderRadius: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  moodGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8, marginBottom: 24, borderRadius: 12 },
+  moodBtnText: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, minWidth: '30%', alignItems: 'center', justifyContent: 'center' },
+  moodBtnLabel: { fontSize: 13, fontWeight: '600' },
   input: { borderRadius: 12, padding: 14, fontSize: 17, marginBottom: 24 },
   inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14, marginBottom: 24 },
   textArea: { minHeight: 150 },
