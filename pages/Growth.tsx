@@ -497,7 +497,7 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
                 
                 {showPenguin && (
                     <View style={[styles.penguinInsight, { backgroundColor: colors.card }]}>
-                        <PenguinAvatar stage={penguin.stage} size={50} />
+                        <PenguinAvatar stage={penguin.stage} size={50} scene='planner' />
                         <View style={{ flex: 1 }}>
                             <Text style={[styles.insightTitle, { color: colors.text }]}>Regard de {penguin.stage}</Text>
                             <Text style={[styles.insightText, { color: colors.subText }]}>

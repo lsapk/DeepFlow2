@@ -8,8 +8,30 @@ export interface UserProfile {
   photo_url: string | null;
   bio: string | null;
   created_at: string;
+  updated_at?: string;
   is_banned?: boolean;
   ban_reason?: string | null;
+}
+
+
+export interface Subscriber {
+  id: string;
+  user_id: string;
+  email: string;
+  stripe_customer_id: string | null;
+  subscribed: boolean;
+  subscription_tier: 'basic' | 'premium' | string;
+  subscription_end: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiCredits {
+  id: string;
+  user_id: string;
+  credits: number;
+  created_at: string;
+  last_updated: string;
 }
 
 export interface UserRole {
@@ -17,6 +39,7 @@ export interface UserRole {
   user_id: string;
   role: 'admin' | 'user';
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Announcement {
@@ -57,11 +80,15 @@ export interface UserSettings {
   sound_enabled: boolean;
   focus_mode: boolean;
   clock_format: string;
+  dark_mode?: boolean;
   karma_points?: number;
+  gemini_api_key?: string | null;
   unlocked_features?: {
       ai_permissions?: AiPermissions;
       [key: string]: any;
   };
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Avatar Types
@@ -93,9 +120,12 @@ export interface Subtask {
   parent_task_id: string;
   user_id: string;
   title: string;
+  description?: string | null;
+  priority?: 'low' | 'medium' | 'high';
   completed: boolean;
   sort_order: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Task {
@@ -108,7 +138,11 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   sort_order: number;
   created_at: string;
+  updated_at?: string;
   linked_goal_id?: string | null;
+  google_task_id?: string | null;
+  offline_id?: string | null;
+  synced_at?: string | null;
   subtasks?: Subtask[]; 
   isExpanded?: boolean;
 }
@@ -122,6 +156,7 @@ export interface SubObjective {
   completed: boolean;
   sort_order: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Goal {

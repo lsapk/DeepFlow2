@@ -499,7 +499,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
             <View style={styles.timerTextContainer}>
                 {penguin && penguin.stage !== 'egg' && (
                     <View style={{ marginBottom: 10 }}>
-                        <PenguinAvatar stage={penguin.stage} size={60} />
+                        <PenguinAvatar stage={penguin.stage} size={60} scene='fitness' />
                     </View>
                 )}
                 <Text style={[styles.timeText, { color: '#FFF' }]}>{formatTime(timeLeft)}</Text>

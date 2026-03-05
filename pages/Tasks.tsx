@@ -114,7 +114,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
               description: formDesc,
               linked_goal_id: formGoalId,
               priority: formPriority,
-              due_date: formDate ? new Date(formDate).toISOString() : null
+              due_date: formDate ? new Date(formDate).toISOString() : null,
+              synced_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
           }).eq('id', selectedTask.id);
           refreshTasks();
       }

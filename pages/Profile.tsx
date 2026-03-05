@@ -80,7 +80,7 @@ const LEGAL_CONTENT = {
 **Q41. Comment signaler un bug ?**\nR: Envoyez version app, appareil, capture et étapes de reproduction.
 **Q42. L’app consomme beaucoup de batterie ?**\nR: Le mode focus et sync sont optimisés, mais dépend de votre usage.
 **Q43. Mes données sont-elles chiffrées ?**\nR: Transport chiffré (TLS) et stockage sécurisé côté backend.
-**Q44. Y a-t-il des achats intégrés ?**\nR: Des mécaniques de crédits existent, selon votre environnement de test.
+**Q44. Y a-t-il des achats intégrés ?**\nR: Oui, via Stripe : Basic (5 chats IA/jour, 1 analyse/jour) et Premium (illimité). Les comptes admin restent illimités automatiquement.
 **Q45. Puis-je utiliser plusieurs appareils ?**\nR: Oui avec le même compte, les données se synchronisent.
 **Q46. Comment vider le cache Expo ?**\nR: Lancez la commande npx expo start -c puis relance complète de l’app.
 **Q47. Pourquoi certaines vues sont vides ?**\nR: Aucune donnée disponible ou filtrage actif.
@@ -219,7 +219,7 @@ const AVATAR_HELMETS: AvatarHelmet[] = ['standard', 'visor', 'crown', 'halo'];
 const AVATAR_ARMORS: AvatarArmor[] = ['standard', 'heavy', 'stealth', 'energy'];
 const AVATAR_COLORS: AvatarColor[] = ['#C4B5FD', '#34D399', '#F472B6', '#60A5FA', '#FACC15', '#F87171', '#A78BFA'];
 
-const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange, onPlayerUpdate, isAdmin, setView }) => {
+const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange, onPlayerUpdate, onUserUpdate, isAdmin, setView }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
@@ -305,6 +305,9 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
               sound_enabled: true,
               focus_mode: false,
               clock_format: '24h',
+              dark_mode: true,
+              karma_points: 0,
+              gemini_api_key: null,
               unlocked_features: { ai_permissions: DEFAULT_AI_PERMISSIONS }
           };
           await supabase.from('user_settings').upsert(defaultSettings);
@@ -390,7 +393,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       <View style={styles.tabContent}>
           <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                  <PenguinAvatar stage={penguin?.stage || 'egg'} size={140} />
+                  <PenguinAvatar stage={penguin?.stage || 'egg'} size={140} scene='reading' />
                   <View style={styles.levelBadge}>
                       <Text style={styles.levelBadgeText}>{player.level}</Text>
                   </View>

@@ -78,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, isAdmin = fal
                         style={styles.penguinBanner}
                         onPress={() => handleNavigate(ViewState.EVOLUTION)}
                     >
-                        <PenguinAvatar stage={penguin.stage} size={40} />
+                        <PenguinAvatar stage={penguin.stage} size={40} scene='thinking' />
                         <View>
                             <Text style={styles.penguinStatus}>Compagnon : {penguin.stage.toUpperCase()}</Text>
                             <Text style={styles.penguinSub}>Voir l'évolution</Text>
