@@ -230,7 +230,7 @@ const PenguinArena: React.FC<PenguinArenaProps> = ({ user, openProfile, isDarkMo
                         />
 
                         <IcebergView size={profile.iceberg_size} climate={profile.climate_state}>
-                            <PenguinAvatar stage={profile.stage} />
+                            <PenguinAvatar stage={profile.stage} scene='writing' />
                         </IcebergView>
                     </>
                 )}

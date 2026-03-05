@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { supabase } from './supabase';
+import { getDailyLimit, getUserSubscription, isPremiumSubscriber, isAdminUser, AiFeatureType } from './subscription';
 
 // Expo n'expose côté client que les variables préfixées par EXPO_PUBLIC_.
 // On garde des fallbacks pour compatibilité (web / anciennes configs).
@@ -8,6 +9,54 @@ const getApiKey = () => (
     process.env.GEMINI_API_KEY ||
     process.env.API_KEY
 );
+
+
+
+const getAiLimitMessage = (type: AiFeatureType) => {
+    if (type === 'chat') {
+        return "🚫 **Limite atteinte**\n\nLe plan Basic autorise 5 chats IA par jour. Passez Premium (Stripe) pour des chats illimités.";
+    }
+    return "🚫 **Limite atteinte**\n\nLe plan Basic autorise 1 analyse IA par jour. Passez Premium (Stripe) pour des analyses illimitées.";
+};
+
+const canUseAi = async (type: AiFeatureType): Promise<{ allowed: boolean; message?: string }> => {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { allowed: true };
+
+        const [subscription, usageRes, adminMode] = await Promise.all([
+            getUserSubscription(user.id),
+            supabase
+                .from('daily_usage')
+                .select('ai_chat_count, ai_analysis_count')
+                .eq('user_id', user.id)
+                .eq('usage_date', new Date().toISOString().split('T')[0])
+                .maybeSingle(),
+            isAdminUser(user.id)
+        ]);
+
+        const isPremium = isPremiumSubscriber(subscription);
+
+        // Admin = illimité automatiquement (aligné web app), même sans abonnement Stripe.
+        if (adminMode) return { allowed: true };
+
+        const limit = getDailyLimit(type, isPremium);
+
+        if (limit === Number.POSITIVE_INFINITY) return { allowed: true };
+
+        const count = type === 'chat'
+            ? (usageRes.data?.ai_chat_count || 0)
+            : (usageRes.data?.ai_analysis_count || 0);
+
+        if (count >= limit) {
+            return { allowed: false, message: getAiLimitMessage(type) };
+        }
+
+        return { allowed: true };
+    } catch {
+        return { allowed: true };
+    }
+};
 
 async function logAiUsage(type: 'chat' | 'analysis') {
     try {
@@ -52,6 +101,11 @@ export const generateActionableCoaching = async (
   }
 
   const ai = new GoogleGenAI({ apiKey });
+
+  const chatAccess = await canUseAi('chat');
+  if (!chatAccess.allowed) {
+      return { text: chatAccess.message || getAiLimitMessage('chat') };
+  }
 
   // Tentative légère de logging
   logAiUsage('chat').catch(() => {});
@@ -112,6 +166,9 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
     if (!apiKey) return null;
     const ai = new GoogleGenAI({ apiKey });
 
+    const analysisAccess = await canUseAi('analysis');
+    if (!analysisAccess.allowed) return null;
+
     logAiUsage('analysis').catch(() => {});
 
     try {
@@ -168,6 +225,9 @@ export const generatePenguinPearl = async (userContext: any): Promise<{ message:
     const apiKey = getApiKey();
     if (!apiKey) return null;
     const ai = new GoogleGenAI({ apiKey });
+
+    const analysisAccess = await canUseAi('analysis');
+    if (!analysisAccess.allowed) return null;
 
     logAiUsage('analysis').catch(() => {});
 
