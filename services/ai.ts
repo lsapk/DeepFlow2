@@ -2,13 +2,23 @@ import { GoogleGenAI } from "@google/genai";
 import { supabase } from './supabase';
 import { getDailyLimit, getUserSubscription, isPremiumSubscriber, isAdminUser, AiFeatureType } from './subscription';
 
-// Expo n'expose côté client que les variables préfixées par EXPO_PUBLIC_.
-// On garde des fallbacks pour compatibilité (web / anciennes configs).
-const getApiKey = () => (
-    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.API_KEY
-);
+// La clé Gemini ne doit jamais être codée en dur.
+// Source unique: .env -> EXPO_PUBLIC_GEMINI_API_KEY
+const getApiKey = () => process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+
+const getGeminiFriendlyError = (error: unknown) => {
+    const raw = error instanceof Error ? error.message : String(error || '');
+
+    if (raw.includes('API key was reported as leaked')) {
+        return "🚫 **Clé Gemini compromise**\n\nGoogle a désactivé cette clé car elle a été détectée comme exposée. Générez une nouvelle clé API Gemini, mettez à jour `EXPO_PUBLIC_GEMINI_API_KEY` dans votre `.env`, puis redémarrez Expo (`npx expo start -c`).";
+    }
+
+    if (raw.includes('status: 403') || raw.includes('PERMISSION_DENIED')) {
+        return "🚫 **Accès Gemini refusé (403)**\n\nVérifiez que votre clé API Gemini est valide, active et autorisée pour le projet Google Cloud utilisé.";
+    }
+
+    return "🚫 **Erreur IA**\n\nVérifiez votre connexion internet ou la validité de votre clé API.";
+};
 
 
 
@@ -157,7 +167,7 @@ export const generateActionableCoaching = async (
 
   } catch (error) {
     console.log("Gemini API Error:", error);
-    return { text: "🚫 **Erreur IA**\n\nVérifiez votre connexion internet ou la validité de votre clé API." };
+    return { text: getGeminiFriendlyError(error) };
   }
 };
 

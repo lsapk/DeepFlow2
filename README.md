@@ -31,6 +31,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 
 # IA Gemini (Expo client)
 EXPO_PUBLIC_GEMINI_API_KEY=...
+# Ne jamais coller la clé en dur dans le code (ex: services/ai.ts)
 
 # Google OAuth
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=...
@@ -69,3 +70,16 @@ npx expo start -c
 - Vérifie que chaque variable OAuth est sur **une seule ligne** dans `.env`.
 - Si tu copies/colles des valeurs et vois `\\n` à la fin, supprime-le.
 - Relance Expo avec cache vidé: `npx expo start -c`.
+
+## Dépannage IA Gemini (403 / clé compromise)
+
+Si les logs affichent une erreur du type :
+
+`Your API key was reported as leaked. Please use another API key.`
+
+alors le problème ne vient pas d'Internet : la clé Gemini a été révoquée par Google.
+
+1. Crée une nouvelle clé dans Google AI Studio / Google Cloud.
+2. Mets à jour `.env` : `EXPO_PUBLIC_GEMINI_API_KEY=...`
+3. Redémarre Expo avec cache vidé : `npx expo start -c`
+4. (Recommandé) Restreins la clé (API + éventuellement IP/Android/iOS) pour éviter une nouvelle fuite.
