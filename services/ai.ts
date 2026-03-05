@@ -2,13 +2,9 @@ import { GoogleGenAI } from "@google/genai";
 import { supabase } from './supabase';
 import { getDailyLimit, getUserSubscription, isPremiumSubscriber, isAdminUser, AiFeatureType } from './subscription';
 
-// Expo n'expose côté client que les variables préfixées par EXPO_PUBLIC_.
-// On garde des fallbacks pour compatibilité (web / anciennes configs).
-const getApiKey = () => (
-    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.API_KEY
-);
+// La clé Gemini ne doit jamais être codée en dur.
+// Source unique: .env -> EXPO_PUBLIC_GEMINI_API_KEY
+const getApiKey = () => process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
 const getGeminiFriendlyError = (error: unknown) => {
     const raw = error instanceof Error ? error.message : String(error || '');
