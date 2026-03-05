@@ -10,6 +10,20 @@ const getApiKey = () => (
     process.env.API_KEY
 );
 
+const getGeminiFriendlyError = (error: unknown) => {
+    const raw = error instanceof Error ? error.message : String(error || '');
+
+    if (raw.includes('API key was reported as leaked')) {
+        return "🚫 **Clé Gemini compromise**\n\nGoogle a désactivé cette clé car elle a été détectée comme exposée. Générez une nouvelle clé API Gemini, mettez à jour `EXPO_PUBLIC_GEMINI_API_KEY` dans votre `.env`, puis redémarrez Expo (`npx expo start -c`).";
+    }
+
+    if (raw.includes('status: 403') || raw.includes('PERMISSION_DENIED')) {
+        return "🚫 **Accès Gemini refusé (403)**\n\nVérifiez que votre clé API Gemini est valide, active et autorisée pour le projet Google Cloud utilisé.";
+    }
+
+    return "🚫 **Erreur IA**\n\nVérifiez votre connexion internet ou la validité de votre clé API.";
+};
+
 
 
 const getAiLimitMessage = (type: AiFeatureType) => {
@@ -157,7 +171,7 @@ export const generateActionableCoaching = async (
 
   } catch (error) {
     console.log("Gemini API Error:", error);
-    return { text: "🚫 **Erreur IA**\n\nVérifiez votre connexion internet ou la validité de votre clé API." };
+    return { text: getGeminiFriendlyError(error) };
   }
 };
 
