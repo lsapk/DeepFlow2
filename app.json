@@ -33,7 +33,7 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "1.9.24",
+            "kotlinVersion": "1.9.25",
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
             "buildToolsVersion": "35.0.0"
@@ -43,8 +43,12 @@
           }
         }
       ],
-      "expo-notifications",
-      "./plugins/withComposeKotlinCompatibility"
-    ]
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7890bc1a-2786-4898-9017-2f8f4d4572d3"
+      }
+    }
   }
 }
