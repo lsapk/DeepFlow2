@@ -4,8 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomNav from './components/BottomNav';
 import Sidebar from './components/Sidebar';
-import LevelUpModal from './components/LevelUpModal';
-import { ViewState, UserProfile, PlayerProfile, Task, Habit, Goal, Quest, Subtask, SubObjective, FocusSession } from './types';
+import { ViewState, UserProfile, Task, Habit, Goal, Subtask, SubObjective, FocusSession } from './types';
 import Dashboard from './pages/Dashboard';
 import Focus from './pages/Focus';
 import Profile from './pages/Profile';
@@ -15,7 +14,6 @@ import Goals from './pages/Goals';
 import CalendarPage from './pages/CalendarPage';
 import Planning from './pages/Planning';
 import Introspection from './pages/Introspection';
-import Evolution from './pages/Evolution';
 import Admin from './pages/Admin';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
@@ -26,7 +24,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import * as NavigationBar from 'expo-navigation-bar';
 import { saveToCache, loadFromCache, addToQueue, processQueue, getQueueSize, CACHE_KEYS, generateId, clearCache } from './services/offline';
-import { awardFood, evolvePenguin } from './services/penguin';
 import { isAdmin } from './services/admin';
 import { computeProductivityScore } from './services/productivity';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -49,20 +46,16 @@ const App: React.FC = () => {
   
   // States
   const [checkingOnboarding, setCheckingOnboarding] = useState(true); 
-  const [levelUpVisible, setLevelUpVisible] = useState(false);
-  const previousLevelRef = useRef<number>(1);
   
   // undefined = session en cours de chargement, null = non connecté.
   const [session, setSession] = useState<any | null | undefined>(undefined);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [player, setPlayer] = useState<PlayerProfile | null>(null);
   const [userIsAdmin, setUserIsAdmin] = useState(false);
   
   // Data States
   const [tasks, setTasks] = useState<Task[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [quests, setQuests] = useState<Quest[]>([]);
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   const [journalEntries, setJournalEntries] = useState<any[]>([]);
   const [reflections, setReflections] = useState<any[]>([]);
@@ -150,21 +143,17 @@ const App: React.FC = () => {
   };
 
   const loadOfflineData = async () => {
-      const [cachedTasks, cachedHabits, cachedGoals, cachedUser, cachedPlayer, cachedQuests] = await Promise.all([
+      const [cachedTasks, cachedHabits, cachedGoals, cachedUser] = await Promise.all([
           loadFromCache(CACHE_KEYS.TASKS),
           loadFromCache(CACHE_KEYS.HABITS),
           loadFromCache(CACHE_KEYS.GOALS),
-          loadFromCache(CACHE_KEYS.USER),
-          loadFromCache(CACHE_KEYS.PLAYER),
-          loadFromCache(CACHE_KEYS.QUESTS)
+          loadFromCache(CACHE_KEYS.USER)
       ]);
 
       if (cachedTasks) setTasks(cachedTasks);
       if (cachedHabits) setHabits(cachedHabits);
       if (cachedGoals) setGoals(cachedGoals);
       if (cachedUser) setUser(cachedUser);
-      if (cachedPlayer) setPlayer(cachedPlayer);
-      if (cachedQuests) setQuests(cachedQuests);
       
       // Check if we have pending items from last run
       const qSize = await getQueueSize();
@@ -242,7 +231,6 @@ const App: React.FC = () => {
         setupRealtimeSubscription(session.user.id);
       } else {
         setUser(null);
-        setPlayer(null);
         if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
         setCurrentView(ViewState.AUTH);
       }
@@ -259,21 +247,7 @@ const App: React.FC = () => {
       const channel = supabase.channel('db_changes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'habits', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'quests', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` }, () => scheduleRealtimeRefresh(userId)) // Listen for focus
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'player_profiles', filter: `user_id=eq.${userId}` }, (payload) => {
-                  if (payload.eventType === 'UPDATE') {
-                      const newP = payload.new as PlayerProfile;
-                      setPlayer(prev => {
-                          if (prev && newP.level > prev.level) {
-                              previousLevelRef.current = prev.level;
-                              setLevelUpVisible(true);
-                          }
-                          return newP;
-                      });
-                      saveToCache(CACHE_KEYS.PLAYER, newP);
-                  }
-          })
           .subscribe((status) => {
               if (status === 'CHANNEL_ERROR') {
                   console.warn("Realtime channel error");
@@ -301,28 +275,13 @@ const App: React.FC = () => {
           isAdmin(userId).then(setUserIsAdmin);
       }
 
-      let { data: playerData } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
-      if (!playerData) {
-          const { data: newPlayer } = await supabase.from('player_profiles').insert({
-              user_id: userId, level: 1, experience_points: 0, credits: 0, avatar_type: 'novice'
-          }).select().single();
-          playerData = newPlayer;
-      }
-      
-      if (playerData) {
-          setPlayer(playerData);
-          saveToCache(CACHE_KEYS.PLAYER, playerData);
-          previousLevelRef.current = playerData.level; 
-      }
-
       const { data: settingsData } = await supabase.from('user_settings').select('theme').eq('id', userId).single();
       if (settingsData && settingsData.theme) setIsDarkMode(settingsData.theme === 'dark');
 
-      const [tasksRes, habitsRes, goalsRes, questsRes, focusRes, journalRes, reflectionRes] = await Promise.all([
+      const [tasksRes, habitsRes, goalsRes, focusRes, journalRes, reflectionRes] = await Promise.all([
           supabase.from('tasks').select('*, subtasks(*)').eq('user_id', userId).order('created_at', { ascending: false }),
           supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
           supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId),
-          supabase.from('quests').select('*').eq('user_id', userId).eq('completed', false),
           supabase.from('focus_sessions').select('*').eq('user_id', userId),
           supabase.from('journal_entries').select('created_at').eq('user_id', userId),
           supabase.from('daily_reflections').select('created_at').eq('user_id', userId)
@@ -339,10 +298,6 @@ const App: React.FC = () => {
       if (goalsRes.data) {
           setGoals(goalsRes.data);
           saveToCache(CACHE_KEYS.GOALS, goalsRes.data);
-      }
-      if (questsRes.data) {
-          setQuests(questsRes.data);
-          saveToCache(CACHE_KEYS.QUESTS, questsRes.data);
       }
       if (focusRes.data) {
           setFocusSessions(focusRes.data);
@@ -420,11 +375,6 @@ const App: React.FC = () => {
       setGoals(updatedGoals);
       saveToCache(CACHE_KEYS.GOALS, updatedGoals);
 
-      // Penguin Evolution Trigger: Egg -> Chick when first goal is created
-      if (goals.length === 0) {
-        evolvePenguin(user.id, 'chick');
-      }
-
       const { subobjectives, ...goalDbPayload } = newGoal;
       try { const { error } = await supabase.from('goals').insert(goalDbPayload); if (error) throw error; } catch (e) { queueAction({ type: 'INSERT', table: 'goals', payload: goalDbPayload }); }
   };
@@ -436,10 +386,6 @@ const App: React.FC = () => {
       const updatedTasks = tasks.map(t => t.id === id ? { ...t, completed: isCompleting } : t);
       setTasks(updatedTasks);
       saveToCache(CACHE_KEYS.TASKS, updatedTasks);
-
-      if (isCompleting && user) {
-        awardFood(user.id, 'shrimp', 1, `Task: ${task.title}`);
-      }
 
       try { const { error } = await supabase.from('tasks').update({ completed: isCompleting, synced_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id); if (error) throw error; } catch (e) { queueAction({ type: 'UPDATE', table: 'tasks', payload: { id, completed: isCompleting, synced_at: new Date().toISOString(), updated_at: new Date().toISOString() } }); }
   };
@@ -455,13 +401,6 @@ const App: React.FC = () => {
       const updatedHabits = habits.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: now.toISOString() } : h);
       setHabits(updatedHabits);
       saveToCache(CACHE_KEYS.HABITS, updatedHabits);
-
-      if (user) {
-        awardFood(user.id, 'shrimp', 1, `Habit: ${habit.title}`);
-        if (newStreak % 7 === 0) {
-          awardFood(user.id, 'golden_fish', 1, `7-Day Streak: ${habit.title}`);
-        }
-      }
 
       try {
           await supabase.from('habits').update({ streak: newStreak, last_completed_at: now.toISOString() }).eq('id', id);
@@ -512,7 +451,7 @@ const App: React.FC = () => {
         </View>
     );
 
-    if (!session || !user || !player) return <Auth onLogin={() => fetchData(session?.user?.id)} />;
+    if (!session || !user) return <Auth onLogin={() => fetchData(session?.user?.id)} />;
 
     const commonProps = { isDarkMode };
     const openMenuHandler = () => setIsSidebarVisible(true);
@@ -521,16 +460,13 @@ const App: React.FC = () => {
 
     switch (currentView) {
       case ViewState.TODAY:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} journalEntries={journalEntries} reflections={reflections} productivityScore={productivityScore} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} journalEntries={journalEntries} reflections={reflections} productivityScore={productivityScore} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
         break;
       case ViewState.PLANNING:
         Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
         break;
       case ViewState.INTROSPECTION:
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
-        break;
-      case ViewState.EVOLUTION:
-        Content = <Evolution isAdmin={userIsAdmin} player={player} user={user} tasks={tasks} habits={habits} goals={goals} quests={quests} focusSessions={focusSessions} productivityScore={productivityScore} openMenu={openMenuHandler} openProfile={() => setProfileVisible(true)} onAddTask={createTask} onAddHabit={(t) => createHabit({title: t})} onAddGoal={createGoal} onStartFocus={aiStartFocus} isDarkMode={isDarkMode} />;
         break;
       case ViewState.ADMIN:
         Content = <Admin />;
@@ -557,7 +493,7 @@ const App: React.FC = () => {
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
         break;
       default:
-        Content = <Dashboard user={user} player={player} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
+        Content = <Dashboard user={user} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
     }
 
     const bgStyle = { backgroundColor: isDarkMode ? '#000000' : '#F2F2F7' };
@@ -579,11 +515,8 @@ const App: React.FC = () => {
                     {Content}
                 </Animated.View>
                 
-                {player && (
-                    <LevelUpModal visible={levelUpVisible} newLevel={player.level} onClose={() => setLevelUpVisible(false)} />
-                )}
 
-                {user && player && (
+                {user && (
                     <>
                         <Sidebar 
                             visible={isSidebarVisible} 
@@ -597,12 +530,8 @@ const App: React.FC = () => {
                         <Profile 
                             visible={profileVisible} 
                             onClose={() => setProfileVisible(false)} 
-                            user={user} player={player} logout={handleLogout} 
+                            user={user} logout={handleLogout}
                             onThemeChange={setIsDarkMode}
-                            onPlayerUpdate={(updatedPlayer) => {
-                                setPlayer(updatedPlayer);
-                                saveToCache(CACHE_KEYS.PLAYER, updatedPlayer);
-                            }}
                             onUserUpdate={(updatedUser) => {
                                 setUser(updatedUser);
                                 saveToCache(CACHE_KEYS.USER, updatedUser);
