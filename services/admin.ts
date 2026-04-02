@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { PlatformStats, UserProfile, PlayerProfile, Announcement, Task, Habit, Goal, FocusSession } from '../types';
+import { PlatformStats, UserProfile, Announcement, Task, Habit, Goal, FocusSession } from '../types';
 
 export const isAdmin = async (userId: string): Promise<boolean> => {
     const { data, error } = await supabase
@@ -53,8 +53,7 @@ export const getAllUsers = async (search?: string): Promise<UserProfile[]> => {
 };
 
 export const getUserFullDetails = async (userId: string) => {
-    const [player, tasks, habits, goals, focus] = await Promise.all([
-        supabase.from('player_profiles').select('*').eq('user_id', userId).single(),
+    const [tasks, habits, goals, focus] = await Promise.all([
         supabase.from('tasks').select('*', { count: 'exact' }).eq('user_id', userId),
         supabase.from('habits').select('*', { count: 'exact' }).eq('user_id', userId),
         supabase.from('goals').select('*', { count: 'exact' }).eq('user_id', userId),
@@ -64,7 +63,6 @@ export const getUserFullDetails = async (userId: string) => {
     const totalFocusMinutes = focus.data?.reduce((acc, curr) => acc + curr.duration, 0) || 0;
 
     return {
-        player: player.data as PlayerProfile,
         tasksCount: tasks.count || 0,
         habitsCount: habits.count || 0,
         goalsCount: goals.count || 0,
@@ -78,10 +76,6 @@ export const banUser = async (userId: string, reason: string) => {
 
 export const unbanUser = async (userId: string) => {
     return await supabase.from('user_profiles').update({ is_banned: false, ban_reason: null }).eq('id', userId);
-};
-
-export const updateUserCredits = async (userId: string, amount: number) => {
-    return await supabase.from('player_profiles').update({ credits: amount }).eq('user_id', userId);
 };
 
 export const createAnnouncement = async (title: string, content: string, type: string = 'info') => {

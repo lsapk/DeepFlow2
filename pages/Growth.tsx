@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Dimensions, LayoutAnimation } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, Goal, FocusSession, PenguinProfile } from '../types';
+import { UserProfile, Task, Habit, Goal, FocusSession } from '../types';
 import { Send, MessageSquare, PlusCircle, Sparkles, BrainCircuit, Activity, Zap, RefreshCw, BarChart2, PieChart, Clock, Target, CloudOff, Menu } from 'lucide-react-native';
 import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,8 +12,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { computeProductivityScore } from '../services/productivity';
-import { getPenguinProfile } from '../services/penguin';
-import PenguinAvatar from '../components/PenguinAvatar';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -21,7 +19,6 @@ const { width } = Dimensions.get('window');
 const LIFE_WHEEL_STORAGE_KEY = 'life_wheel_data_v1';
 
 interface GrowthProps {
-  player: PlayerProfile;
   user: UserProfile;
   tasks: Task[]; 
   habits?: Habit[];
@@ -38,7 +35,7 @@ interface GrowthProps {
   productivityScore?: number;
 }
 
-const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals = [], focusSessions = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false, productivityScore: initialProductivityScore, openMenu }) => {
+const Growth: React.FC<GrowthProps> = ({ user, tasks, habits = [], goals = [], focusSessions = [], onAddTask, onAddHabit, onAddGoal, isDarkMode = true, noPadding = false, productivityScore: initialProductivityScore, openMenu }) => {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   
@@ -76,7 +73,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
   const [isCreationMode, setIsCreationMode] = useState(false);
-  const [penguin, setPenguin] = useState<PenguinProfile | null>(null);
   
   // Deep Real Data
   const [lifeWheelData, setLifeWheelData] = useState<number[]>([20, 20, 20, 20, 20, 20]);
@@ -95,19 +91,17 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
               thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
               const isoDate = thirtyDaysAgo.toISOString();
 
-              const [focusRes, journalRes, reflectionRes, habitRes, pengRes] = await Promise.all([
+              const [focusRes, journalRes, reflectionRes, habitRes] = await Promise.all([
                   supabase.from('focus_sessions').select('*').eq('user_id', user.id).gte('completed_at', isoDate).order('completed_at', { ascending: false }),
                   supabase.from('journal_entries').select('created_at, mood, title, content').eq('user_id', user.id).gte('created_at', isoDate),
                   supabase.from('daily_reflections').select('created_at, answer, question').eq('user_id', user.id).gte('created_at', isoDate),
-                  supabase.from('habit_completions').select('*').eq('user_id', user.id).gte('completed_date', isoDate.split('T')[0]),
-                  getPenguinProfile(user.id)
+                  supabase.from('habit_completions').select('*').eq('user_id', user.id).gte('completed_date', isoDate.split('T')[0])
               ]);
 
               if (focusRes.data) setFocusHistory(focusRes.data);
               if (journalRes.data) setJournalHistory(journalRes.data);
               if (reflectionRes.data) setReflectionHistory(reflectionRes.data);
               if (habitRes.data) setHabitCompletions(habitRes.data);
-              if (pengRes) setPenguin(pengRes);
 
           } catch (e) {
               console.log("Error fetching deep data", e);
@@ -471,8 +465,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
 
   if (loading) return <SkeletonAnalysis />;
 
-  const showPenguin = penguin && penguin.stage !== 'egg';
-
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top }]}>
         
@@ -495,18 +487,6 @@ const Growth: React.FC<GrowthProps> = ({ player, user, tasks, habits = [], goals
         {mainTab === 'DATA' ? (
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 
-                {showPenguin && (
-                    <View style={[styles.penguinInsight, { backgroundColor: colors.card }]}>
-                        <PenguinAvatar stage={penguin.stage} size={50} scene='planner' />
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.insightTitle, { color: colors.text }]}>Regard de {penguin.stage}</Text>
-                            <Text style={[styles.insightText, { color: colors.subText }]}>
-                                "Ton score de {stats.productivityScore} est impressionnant ! Continuons ainsi."
-                            </Text>
-                        </View>
-                    </View>
-                )}
-
                 {/* SUB-TABS */}
                 <View style={styles.subTabsContainer}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 8}}>
@@ -716,10 +696,6 @@ const styles = StyleSheet.create({
 
   heatmapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   heatmapCell: { width: (width - 80 - (6*5)) / 6, height: 24, borderRadius: 4 },
-
-  penguinInsight: { flexDirection: 'row', alignItems: 'center', gap: 15, padding: 15, borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  insightTitle: { fontSize: 14, fontWeight: '700' },
-  insightText: { fontSize: 12, fontStyle: 'italic' },
 
   chatContainer: { flex: 1, paddingHorizontal: 16 },
   bubble: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24, marginBottom: 16, maxWidth: '85%', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },

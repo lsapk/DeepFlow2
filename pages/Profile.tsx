@@ -1,23 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Alert, ActivityIndicator, LayoutAnimation, TextInput, Platform, BackHandler, Linking, Modal } from 'react-native';
-import { UserProfile, PlayerProfile, UserSettings, AiPermissions, AvatarConfig, AvatarClass, AvatarHelmet, AvatarArmor, AvatarColor } from '../types';
+import { UserProfile, UserSettings, AiPermissions } from '../types';
 import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target, Palette, Award, Zap as ZapIcon, LayoutGrid, Sparkles } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import PenguinAvatar from '../components/PenguinAvatar';
-import { getPenguinProfile } from '../services/penguin';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
 
 interface ProfileProps {
   user: UserProfile;
-  player: PlayerProfile;
   logout: () => void;
   visible: boolean;
   onClose: () => void;
   onThemeChange?: (isDark: boolean) => void;
-  onPlayerUpdate?: (player: PlayerProfile) => void;
   onUserUpdate?: (user: UserProfile) => void;
   isAdmin?: boolean;
   setView?: (view: any) => void;
@@ -214,16 +211,10 @@ Dernière mise à jour : 2026-02-22.`
 };
 
 
-const AVATAR_CLASSES: AvatarClass[] = ['cyber_knight', 'neon_hacker', 'quantum_warrior', 'shadow_ninja', 'cosmic_sage'];
-const AVATAR_HELMETS: AvatarHelmet[] = ['standard', 'visor', 'crown', 'halo'];
-const AVATAR_ARMORS: AvatarArmor[] = ['standard', 'heavy', 'stealth', 'energy'];
-const AVATAR_COLORS: AvatarColor[] = ['#C4B5FD', '#34D399', '#F472B6', '#60A5FA', '#FACC15', '#F87171', '#A78BFA'];
-
-const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClose, onThemeChange, onPlayerUpdate, onUserUpdate, isAdmin, setView }) => {
+const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThemeChange, onUserUpdate, isAdmin, setView }) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'PROFILE' | 'SETTINGS' | 'STATS'>('PROFILE');
-  const [penguin, setPenguin] = useState<any>(null);
   const [settings, setSettings] = useState<UserSettings>({
       id: user.id,
       theme: 'dark',
@@ -273,14 +264,8 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       if (visible) {
           fetchSettings();
           fetchStats();
-          fetchPenguin();
       }
   }, [visible]);
-
-  const fetchPenguin = async () => {
-      const profile = await getPenguinProfile(user.id);
-      if (profile) setPenguin(profile);
-  };
 
 
 
@@ -393,10 +378,7 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
       <View style={styles.tabContent}>
           <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                  <PenguinAvatar stage={penguin?.stage || 'egg'} size={140} scene='reading' />
-                  <View style={styles.levelBadge}>
-                      <Text style={styles.levelBadgeText}>{player.level}</Text>
-                  </View>
+                  <PenguinAvatar />
               </View>
               {isEditing ? (
                   <View style={{width: '100%', alignItems: 'center', marginBottom: 10}}>
@@ -412,31 +394,8 @@ const Profile: React.FC<ProfileProps> = ({ user, player, logout, visible, onClos
                     <Text style={styles.name}>{user.display_name}</Text>
                     <Text style={styles.email}>{user.email}</Text>
                     {user.bio && <Text style={styles.bio}>{user.bio}</Text>}
-                    <View style={styles.badgeRow}>
-                        <View style={styles.rankBadge}>
-                            <Award size={12} color="#C4B5FD" />
-                            <Text style={styles.rankText}>{penguin?.stage?.toUpperCase() || 'EGG'}</Text>
-                        </View>
-                    </View>
                   </>
               )}
-          </View>
-
-          <View style={styles.infoGrid}>
-              <View style={styles.infoCard}>
-                  <Text style={styles.infoLabel}>XP TOTAL</Text>
-                  <Text style={styles.infoValue}>{player.experience_points}</Text>
-                  <View style={styles.xpBarBgMini}>
-                      <View style={[styles.xpBarFill, { width: `${Math.min(100, (player.experience_points / (player.level * 100 * player.level)) * 100)}%` }]} />
-                  </View>
-              </View>
-              <View style={styles.infoCard}>
-                  <Text style={styles.infoLabel}>CRÉDITS</Text>
-                  <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-                    <Star size={16} color="#FACC15" fill="#FACC15" />
-                    <Text style={styles.infoValue}>{player.credits}</Text>
-                  </View>
-              </View>
           </View>
 
           {!isEditing && (

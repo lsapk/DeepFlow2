@@ -3,7 +3,6 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal,
 import { JournalEntry } from '../types';
 import { Save, Plus, X, Menu, Calendar } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addToQueue, generateId } from '../services/offline';
 
@@ -140,12 +139,6 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
       try {
           const { error } = await supabase.from('journal_entries').insert(newEntry);
           if (error) throw error;
-          
-          // Gamification only if online or we can handle it later (skipping complex queuing for XP to keep it simple)
-          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
-          if (player) {
-              await addXp(userId, REWARDS.JOURNAL, player);
-          }
       } catch (e) {
           console.log("Offline mode: Queuing journal entry");
           addToQueue({ type: 'INSERT', table: 'journal_entries', payload: newEntry });

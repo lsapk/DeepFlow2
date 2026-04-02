@@ -1,11 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
-import { UserProfile, ViewState, PenguinProfile } from '../types';
+import { UserProfile, ViewState } from '../types';
 import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Calendar, Shield } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getPenguinProfile } from '../services/penguin';
-import PenguinAvatar from './PenguinAvatar';
 
 interface SidebarProps {
   visible: boolean;
@@ -19,13 +17,6 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, isAdmin = false, setView, currentView }) => {
   const insets = useSafeAreaInsets();
-  const [penguin, setPenguin] = useState<PenguinProfile | null>(null);
-
-  useEffect(() => {
-    if (visible && user) {
-        getPenguinProfile(user.id).then(setPenguin);
-    }
-  }, [visible, user]);
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Tableau de bord', view: ViewState.TODAY },
@@ -47,8 +38,6 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, isAdmin = fal
       setView(view);
       onClose();
   };
-
-  const showPenguin = penguin && penguin.stage !== 'egg';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -72,19 +61,6 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, isAdmin = fal
                          <X size={24} color="#888" />
                      </TouchableOpacity>
                 </View>
-
-                {showPenguin && (
-                    <TouchableOpacity
-                        style={styles.penguinBanner}
-                        onPress={() => handleNavigate(ViewState.EVOLUTION)}
-                    >
-                        <PenguinAvatar stage={penguin.stage} size={40} scene='thinking' />
-                        <View>
-                            <Text style={styles.penguinStatus}>Compagnon : {penguin.stage.toUpperCase()}</Text>
-                            <Text style={styles.penguinSub}>Voir l'évolution</Text>
-                        </View>
-                    </TouchableOpacity>
-                )}
 
                 <View style={styles.divider} />
 
@@ -175,28 +151,6 @@ const styles = StyleSheet.create({
   userEmail: {
       color: '#666',
       fontSize: 11,
-  },
-  penguinBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      padding: 15,
-      marginHorizontal: 16,
-      marginBottom: 16,
-      backgroundColor: '#1c1c1e',
-      borderRadius: 15,
-      borderWidth: 1,
-      borderColor: '#333',
-  },
-  penguinStatus: {
-      color: '#FFF',
-      fontSize: 13,
-      fontWeight: '700',
-  },
-  penguinSub: {
-      color: '#0EA5E9',
-      fontSize: 11,
-      fontWeight: '600',
   },
   divider: {
       height: 1,

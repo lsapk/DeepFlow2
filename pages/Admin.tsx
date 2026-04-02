@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Modal, Dimensions } from 'react-native';
-import { UserProfile, PlatformStats, PlayerProfile, Announcement } from '../types';
+import { UserProfile, PlatformStats, Announcement } from '../types';
 import { Shield, Users, BarChart3, Megaphone, Search, X, Ban, Unlock, CreditCard, ChevronRight, RefreshCw, Eye, Star, Clock, CheckCircle2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getPlatformStats, getAllUsers, getUserFullDetails, banUser, unbanUser, updateUserCredits, createAnnouncement, getActiveAnnouncements, deleteAnnouncement } from '../services/admin';
-import { syncLegacyProgress } from '../services/penguin';
+import { getPlatformStats, getAllUsers, getUserFullDetails, banUser, unbanUser, createAnnouncement, getActiveAnnouncements, deleteAnnouncement } from '../services/admin';
 
 const { width } = Dimensions.get('window');
 
@@ -86,40 +85,6 @@ const Admin: React.FC = () => {
         await unbanUser(user.id);
         loadData();
         setSelectedUser(null);
-    };
-
-    const handleUpdateCredits = (user: UserProfile, current: number) => {
-        Alert.prompt(
-            "Modifier les crédits",
-            `Crédits actuels : ${current}`,
-            [
-                { text: "Annuler", style: "cancel" },
-                {
-                    text: "Enregistrer",
-                    onPress: async (val) => {
-                        const amount = parseInt(val || "0");
-                        await updateUserCredits(user.id, amount);
-                        handleViewUser(user);
-                    }
-                }
-            ],
-            'plain-text',
-            current.toString()
-        );
-    };
-
-    const handleSync = async (user: UserProfile) => {
-        try {
-            setDetailLoading(true);
-            await syncLegacyProgress(user.id);
-            const details = await getUserFullDetails(user.id);
-            setUserDetails(details);
-            Alert.alert("Succès", "Progression synchronisée.");
-        } catch (e) {
-            Alert.alert("Erreur", "Échec de la synchronisation.");
-        } finally {
-            setDetailLoading(false);
-        }
     };
 
     const handlePostAnnouncement = async () => {
@@ -296,15 +261,11 @@ const Admin: React.FC = () => {
                                     <DetailStat label="Habitudes" value={userDetails.habitsCount} />
                                     <DetailStat label="Objectifs" value={userDetails.goalsCount} />
                                     <DetailStat label="Focus" value={`${Math.round(userDetails.focusMinutes / 60)}h`} />
-                                    <DetailStat label="Niveau" value={userDetails.player?.level || 'N/A'} />
-                                    <DetailStat label="XP" value={userDetails.player?.experience_points || 0} />
                                 </View>
 
                                 <View style={styles.actionSection}>
                                     <Text style={styles.sectionTitle}>Actions</Text>
                                     <View style={styles.actionButtons}>
-                                        <ActionButton icon={CreditCard} label="Modifier Crédits" value={userDetails.player?.credits || 0} onPress={() => handleUpdateCredits(selectedUser!, userDetails.player?.credits || 0)} />
-                                        <ActionButton icon={RefreshCw} label="Forcer Sync Pinguin" onPress={() => handleSync(selectedUser!)} />
                                         {selectedUser?.is_banned ? (
                                             <ActionButton icon={Unlock} label="Débannir" color="#34C759" onPress={() => handleUnban(selectedUser!)} />
                                         ) : (

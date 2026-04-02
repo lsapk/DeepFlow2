@@ -231,48 +231,6 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
     }
 };
 
-export const generatePenguinPearl = async (userContext: any): Promise<{ message: string; pearl_type: 'efficiency' | 'resilience' | 'growth'; data: any } | null> => {
-    const apiKey = getApiKey();
-    if (!apiKey) return null;
-    const ai = new GoogleGenAI({ apiKey });
-
-    const analysisAccess = await canUseAi('analysis');
-    if (!analysisAccess.allowed) return null;
-
-    logAiUsage('analysis').catch(() => {});
-
-    try {
-        const prompt = `
-        Tu es l'esprit du Grand Pingouin, un guide de productivité.
-        Analyse ces données utilisateur : ${JSON.stringify(userContext).substring(0, 10000)}
-        Génère un insight (une "Perle") court, poétique et utile en Français.
-        Le ton doit être calme et inspirant.
-
-        Types possibles :
-        - efficiency : focus sur la vitesse/quantité
-        - resilience : focus sur le maintien des habitudes malgré les obstacles
-        - growth : focus sur l'évolution long terme
-
-        Réponds UNIQUEMENT avec un JSON :
-        { "message": "Ton message ici...", "pearl_type": "efficiency" | "resilience" | "growth", "data": {} }
-        `;
-
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: prompt,
-            config: { responseMimeType: 'application/json' }
-        });
-
-        const text = response.text;
-        if (!text) return null;
-
-        return JSON.parse(text);
-
-    } catch (e) {
-        console.error("Error generating penguin pearl:", e);
-        return null;
-    }
-};
 
 export const generateQuests = async (userLevel: number, context: string): Promise<any[]> => {
     const apiKey = getApiKey();

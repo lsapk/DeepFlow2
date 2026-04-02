@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Platform } from 'react-native';
-import { PlayerProfile, UserProfile, Task, Habit, Goal, ViewState, FocusSession, Announcement, JournalEntry, Reflection } from '../types';
+import { UserProfile, Task, Habit, Goal, ViewState, FocusSession, Announcement, JournalEntry, Reflection } from '../types';
 import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu, Megaphone, X as CloseIcon, Info, AlertTriangle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -16,7 +16,6 @@ const { width } = Dimensions.get('window');
 
 interface DashboardProps {
   user: UserProfile;
-  player: PlayerProfile;
   tasks: Task[];
   habits: Habit[];
   goals: Goal[];
@@ -34,7 +33,7 @@ interface DashboardProps {
   openMenu: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, player, tasks, habits, goals, focusSessions = [], journalEntries = [], reflections = [], productivityScore: initialProductivityScore, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focusSessions = [], journalEntries = [], reflections = [], productivityScore: initialProductivityScore, toggleHabit, toggleTask, openFocus, openProfile, setView, isDarkMode = true, syncStatus = 'SYNCED', openMenu }) => {
   const insets = useSafeAreaInsets();
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
   const [closedAnnouncements, setClosedAnnouncements] = React.useState<string[]>([]);

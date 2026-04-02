@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { Reflection } from '../types';
 import { BookOpen, Sparkles, Send, History, RefreshCw, PenLine, Menu, Calendar } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-import { addXp, REWARDS } from '../services/gamification';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ReflectionProps {
@@ -123,10 +122,6 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
       });
 
       if (!error) {
-          // Gamification
-          const { data: player } = await supabase.from('player_profiles').select('*').eq('user_id', userId).single();
-          if (player) await addXp(userId, REWARDS.JOURNAL, player);
-
           Alert.alert("Réflexion sauvegardée !", "Bravo pour ce moment d'introspection.");
           setAnswer("");
           fetchReflections();
