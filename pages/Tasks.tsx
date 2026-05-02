@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert, Platform, FlatList, ActivityIndicator, InteractionManager, ScrollView } from 'react-native';
 import { Task, Subtask, Goal } from '../types';
-import { Plus, Check, Trash2, X, Calendar, Sparkles, Menu } from 'lucide-react-native';
+import { Plus, Check, Trash2, X, Sparkles, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { generateSubtasks } from '../services/ai';
 import * as Haptics from 'expo-haptics';
@@ -268,7 +268,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 
                     <Text style={styles.label}>DATE</Text>
                     <View style={[styles.inputWithIcon, {backgroundColor: isDarkMode ? '#000' : '#F2F2F7'}]}>
-                        <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
                         <TextInput style={[styles.transparentInput, {color: colors.text}]} value={formDate} onChangeText={setFormDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textSub} />
                     </View>
 

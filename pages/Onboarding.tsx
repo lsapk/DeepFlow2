@@ -17,22 +17,22 @@ interface OnboardingProps {
 const SLIDES = [
     {
         id: 1,
-        title: "Éclosez\nVotre Potentiel",
-        desc: "Commencez avec un œuf. Chaque tâche complétée vous apporte des crevettes pour nourrir votre pingouin.",
-        icon: Fish,
+        title: "Libérez\nVotre Potentiel",
+        desc: "Organisez vos tâches, suivez vos habitudes et atteignez vos objectifs avec une clarté totale.",
+        icon: Target,
         color: ['#0C4A6E', '#0EA5E9']
     },
     {
         id: 2,
-        title: "Focus\nGlacial",
-        desc: "Entrez dans la zone de concentration profonde. Plus vous restez focus, plus votre iceberg grandit.",
-        icon: MountainSnow,
+        title: "Focus\nProfond",
+        desc: "Entrez dans une zone de concentration intense pour accomplir vos travaux les plus importants.",
+        icon: Zap,
         color: ['#1E293B', '#334155']
     },
     {
         id: 3,
-        title: "Devenez\nL'Empereur",
-        desc: "Faites évoluer votre compagnon du stade de poussin à celui d'Empereur en dominant vos objectifs.",
+        title: "Analysez\nVotre Croissance",
+        desc: "Visualisez vos progrès et recevez des conseils personnalisés par l'IA pour vous améliorer chaque jour.",
         icon: TrendingUp,
         color: ['#4F46E5', '#6366F1']
     }
@@ -52,7 +52,7 @@ const QUESTIONS = [
     {
         id: 'difficulty',
         question: "Niveau de défi souhaité ?",
-        options: ["Balade sur la banquise (Facile)", "Exploration (Normal)", "Tempête de neige (Difficile)"]
+        options: ["Serein (Facile)", "Équilibré (Normal)", "Intense (Difficile)"]
     }
 ];
 

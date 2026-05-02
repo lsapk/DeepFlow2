@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
 import { UserProfile, ViewState } from '../types';
-import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Calendar, Shield } from 'lucide-react-native';
+import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Shield } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SidebarProps {
@@ -26,8 +26,6 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, isAdmin = fal
     { icon: Zap, label: 'Mode Focus', view: ViewState.FOCUS_MODE },
     { icon: Book, label: 'Journal', view: ViewState.JOURNAL },
     { icon: BrainCircuit, label: 'Réflexion', view: ViewState.REFLECTION },
-    { icon: Calendar, label: 'Calendrier', view: ViewState.CALENDAR },
-    { icon: TrendingUp, label: 'Croissance & IA', view: ViewState.GROWTH },
   ];
 
   if (isAdmin) {

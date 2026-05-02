@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, Alert, Dimensions } from 'react-native';
 import { Habit, Goal } from '../types';
-import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Calendar, Target, Filter, Grid, List, Zap, Layers, CalendarDays, Menu } from 'lucide-react-native';
+import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Target, Filter, Grid, List, Zap, Layers, CalendarDays, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 

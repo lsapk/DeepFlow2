@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Reflection } from '../types';
-import { BookOpen, Sparkles, Send, History, RefreshCw, PenLine, Menu, Calendar } from 'lucide-react-native';
+import { BookOpen, Sparkles, Send, History, RefreshCw, PenLine, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -205,7 +205,6 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
                         onLongPress={() => confirmDelete(item.id)}
                       >
                           <View style={styles.historyHeader}>
-                              <Calendar size={14} color={colors.subText} style={{marginRight: 6}} />
                               <Text style={[styles.historyDate, {color: colors.subText}]}>{formattedDate}</Text>
                           </View>
                           

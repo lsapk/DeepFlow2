@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal, Alert } from 'react-native';
 import { Goal, SubObjective } from '../types';
-import { Plus, Check, ChevronDown, ChevronUp, X, Calendar, Minus, Flag, GitBranch, Menu } from 'lucide-react-native';
+import { Plus, Check, ChevronDown, ChevronUp, X, Minus, Flag, GitBranch, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -217,7 +217,6 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
 
                     <Text style={styles.inputLabel}>DATE CIBLE (YYYY-MM-DD)</Text>
                     <View style={[styles.inputWithIcon, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
-                        <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
                         <TextInput 
                             style={{ flex: 1, fontSize: 17, color: colors.text, height: 50 }} 
                             value={formDate} 

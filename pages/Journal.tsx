@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { JournalEntry } from '../types';
-import { Save, Plus, X, Menu, Calendar } from 'lucide-react-native';
+import { Save, Plus, X, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addToQueue, generateId } from '../services/offline';
@@ -245,7 +245,6 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 
                         <Text style={styles.label}>DATE & HEURE (YYYY-MM-DDTHH:MM)</Text>
                         <View style={[styles.inputWithIcon, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
-                             <Calendar size={18} color={colors.textSub} style={{marginRight: 10}} />
                              <TextInput 
                                 style={{ flex: 1, fontSize: 17, color: colors.text, height: 50 }} 
                                 value={dateInput} 
