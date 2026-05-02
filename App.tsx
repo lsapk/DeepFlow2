@@ -11,7 +11,6 @@ import Profile from './pages/Profile';
 import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
 import Goals from './pages/Goals';
-import CalendarPage from './pages/CalendarPage';
 import Planning from './pages/Planning';
 import Introspection from './pages/Introspection';
 import Admin from './pages/Admin';
@@ -463,7 +462,32 @@ const App: React.FC = () => {
         Content = <Dashboard user={user} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} journalEntries={journalEntries} reflections={reflections} productivityScore={productivityScore} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
         break;
       case ViewState.PLANNING:
-        Content = <Planning tasks={tasks} habits={habits} goals={goals} toggleTask={toggleTask} toggleHabit={toggleHabit} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
+        Content = <Planning
+          tasks={tasks}
+          habits={habits}
+          goals={goals}
+          toggleTask={toggleTask}
+          addTask={createTask}
+          deleteTask={deleteTask}
+          createSubtask={createSubtask}
+          toggleSubtask={toggleSubtask}
+          deleteSubtask={deleteSubtask}
+          toggleHabit={toggleHabit}
+          createHabit={createHabit}
+          deleteHabit={deleteHabit}
+          toggleGoal={()=>{}}
+          addGoal={createGoal}
+          deleteGoal={deleteGoal}
+          createSubObjective={createSubObjective}
+          toggleSubObjective={toggleSubObjective}
+          deleteSubObjective={deleteSubObjective}
+          userId={user.id}
+          refreshGoals={() => fetchData(user.id)}
+          refreshTasks={() => fetchData(user.id)}
+          refreshHabits={() => fetchData(user.id)}
+          openMenu={openMenuHandler}
+          isDarkMode={isDarkMode}
+        />;
         break;
       case ViewState.INTROSPECTION:
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
@@ -482,9 +506,6 @@ const App: React.FC = () => {
           break;
       case ViewState.FOCUS_MODE:
         Content = <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={openMenuHandler} />;
-        break;
-      case ViewState.CALENDAR:
-        Content = <CalendarPage tasks={tasks} habits={habits} toggleTask={toggleTask} toggleHabit={toggleHabit} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
         break;
       case ViewState.JOURNAL:
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;

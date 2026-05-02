@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, ScrollView, Alert, AppState, AppStateStatus, Platform, LayoutAnimation } from 'react-native';
-import { Play, Pause, X, Clock, List, Plus, Save, Calendar, Menu, Timer, CheckCircle2, MoreHorizontal, History } from 'lucide-react-native';
+import { Play, Pause, X, Clock, List, Plus, Save, Menu, Timer, CheckCircle2, MoreHorizontal, History } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
 import { Task, FocusSession } from '../types';

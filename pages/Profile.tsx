@@ -4,7 +4,6 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch, Al
 import { UserProfile, UserSettings, AiPermissions } from '../types';
 import { LogOut, Bell, Sun, Moon, Volume2, Shield, CreditCard, ChevronRight, X, User, BarChart2, Star, Zap, Crown, Check, Edit2, Brain, FileText, Lock, MessageSquare, Trash2, Heart, CheckCircle, Clock, Mail, HelpCircle, Scale, RefreshCw, Target, Palette, Award, Zap as ZapIcon, LayoutGrid, Sparkles } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
-import PenguinAvatar from '../components/PenguinAvatar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
@@ -38,10 +37,9 @@ const LEGAL_CONTENT = {
 **Q2. Mes données sont-elles privées ?**\nR: Oui, elles sont stockées via Supabase avec RLS et accès limité à votre compte.
 **Q3. Puis-je exporter mes données ?**\nR: Oui, contactez le support ou utilisez la future option d’export en JSON/CSV.
 **Q4. Puis-je supprimer mon compte ?**\nR: Oui, depuis Zone de danger, suppression définitive et irréversible.
-**Q5. Pourquoi mon niveau n’augmente pas ?**\nR: Le niveau dépend de l’XP totale. Vérifiez que vos actions sont bien synchronisées.
-**Q6. Comment gagner des crédits ?**\nR: Complétez des quêtes, tâches et habitudes pour gagner des crédits.
-**Q7. À quoi servent les crédits IA ?**\nR: Ils permettent d’utiliser certaines fonctionnalités d’assistance IA.
-**Q8. L’IA lit-elle tout mon journal ?**\nR: Uniquement selon vos permissions IA dans les réglages.
+**Q5. Pourquoi ma progression n’augmente pas ?**\nR: La progression dépend de vos actions quotidiennes. Vérifiez que vos actions sont bien synchronisées.
+**Q6. Comment fonctionne l'IA ?**\nR: Elle analyse vos données pour vous fournir des conseils personnalisés.
+**Q7. L’IA lit-elle tout mon journal ?**\nR: Uniquement selon vos permissions IA dans les réglages.
 **Q9. Comment désactiver l’IA ?**\nR: Dans Réglages > Permissions IA, désactivez chaque module.
 **Q10. Pourquoi je vois un mode hors ligne ?**\nR: L’app est offline-first. Les actions sont mises en file puis synchronisées.
 **Q11. Comment forcer la synchronisation ?**\nR: Mettez l’app au premier plan avec internet actif ; la sync repart automatiquement.
@@ -53,18 +51,8 @@ const LEGAL_CONTENT = {
 **Q17. Puis-je utiliser l’app sans compte ?**\nR: Non, un compte est nécessaire pour la synchronisation multi-appareils.
 **Q18. Comment marche le focus mode ?**\nR: Lancez une session, terminez-la pour enregistrer durée et progression.
 **Q19. Puis-je lier des tâches à des objectifs ?**\nR: Oui lors de la création/édition des tâches.
-**Q20. Comment fonctionnent les quêtes ?**\nR: Des objectifs gamifiés donnant XP et crédits.
-**Q21. Les quêtes expirent-elles ?**\nR: Certaines oui, selon leur type et date d’expiration.
-**Q22. Comment débloquer des cosmétiques pour mon pingouin ?**\nR: Via la boutique, les succès ou les récompenses d'expéditions.
-**Q23. Le thème clair existe-t-il ?**\nR: Oui, activable depuis Réglages > Apparence.
-**Q24. Puis-je changer d’avatar à tout moment ?**\nR: L'avatar de votre pingouin évolue avec votre progression.
+**Q20. Le thème clair existe-t-il ?**\nR: Oui, activable depuis Réglages > Apparence.
 **Q25. Pourquoi le bouton Enregistrer n’apparaissait pas ?**\nR: Correctif appliqué : bouton désormais fixe en bas du modal.
-**Q26. Google Calendar est-il obligatoire ?**\nR: Non, vous pouvez créer des événements locaux sans Google.
-**Q27. Comment connecter Google Calendar ?**\nR: Ajoutez les Client IDs, relancez Expo, puis connectez depuis Calendrier.
-**Q28. Pourquoi Google refuse la connexion ?**\nR: Client ID, SHA, bundle id ou compte testeur OAuth incorrect.
-**Q29. Puis-je ajouter des événements manuellement ?**\nR: Oui, via le bouton + dans Calendrier.
-**Q30. Puis-je modifier/supprimer un événement local ?**\nR: Oui, appui long sur l’événement local dans l’agenda.
-**Q31. Les événements locaux sont synchronisés ?**\nR: Oui en local immédiat et tentative de sync Supabase si disponible.
 **Q32. Comment contacter le support ?**\nR: Par email depuis Réglages > Contacter le support.
 **Q33. Quel est le délai de réponse support ?**\nR: Généralement 24 à 72h ouvrées.
 **Q34. L’app est-elle conforme RGPD ?**\nR: Oui, avec droits d’accès/suppression/rectification.
@@ -82,8 +70,7 @@ const LEGAL_CONTENT = {
 **Q46. Comment vider le cache Expo ?**\nR: Lancez la commande npx expo start -c puis relance complète de l’app.
 **Q47. Pourquoi certaines vues sont vides ?**\nR: Aucune donnée disponible ou filtrage actif.
 **Q48. Puis-je désactiver les sons ?**\nR: Oui dans Réglages > Son.
-**Q49. Qu’est-ce que les power-ups ?**\nR: Bonus temporaires (XP, protection streak, etc.) appliqués au profil.
-**Q50. Comment débloquer des succès ?**\nR: En atteignant des paliers quêtes/focus/habitudes/niveau/tâches.
+**Q50. Comment débloquer des succès ?**\nR: En atteignant des paliers focus/habitudes/tâches.
 **Q51. Puis-je proposer une fonctionnalité ?**\nR: Oui, envoyez vos idées via support, section feedback.`,
     PRIVACY: `# Politique de Confidentialité
 
@@ -92,7 +79,7 @@ DeepFlow traite vos données pour fournir l'application, la synchronisation, la 
 
 ## 2) Données collectées
 - Données de compte (email, identifiant, pseudo).
-- Données d'usage (tâches, habitudes, objectifs, sessions focus, quêtes, succès, calendrier local).
+- Données d'usage (tâches, habitudes, objectifs, sessions focus, succès).
 - Données techniques minimales (logs applicatifs, erreurs).
 
 ## 3) Finalités
@@ -114,7 +101,7 @@ Les données sont conservées tant que votre compte est actif, puis supprimées 
 
 ## 7) Sous-traitants
 - Supabase (base de données/auth/sync).
-- Google (OAuth Calendar/IA selon usage).
+- Google (IA selon usage).
 
 ## 8) Sécurité
 - Chiffrement TLS en transit.
@@ -138,7 +125,7 @@ Cette politique peut évoluer. La date de mise à jour est affichée dans l'appl
     TERMS: `# Conditions Générales d'Utilisation (CGU)
 
 ## 1) Objet
-DeepFlow est une application de productivité et gamification personnelle.
+DeepFlow est une application de productivité personnelle.
 
 ## 2) Acceptation
 L'utilisation du service implique l'acceptation pleine et entière des présentes CGU.
@@ -378,7 +365,10 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
       <View style={styles.tabContent}>
           <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                  <PenguinAvatar />
+                  <Image
+                    source={{ uri: user.photo_url || "https://via.placeholder.com/100" }}
+                    style={styles.avatar}
+                  />
               </View>
               {isEditing ? (
                   <View style={{width: '100%', alignItems: 'center', marginBottom: 10}}>
@@ -427,7 +417,7 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
                   <View style={styles.separator} />
                   <SettingItem icon={Zap} label="Sessions Focus" iconColor="#3B82F6" isSwitch value={permissions.focus} onToggle={(val: boolean) => updateAiPermission('focus', val)} />
                   <View style={styles.separator} />
-                  <SettingItem icon={User} label="Profil & Niveau" iconColor="#6366F1" isSwitch value={permissions.profile} onToggle={(val: boolean) => updateAiPermission('profile', val)} />
+                  <SettingItem icon={User} label="Profil & Progression" iconColor="#6366F1" isSwitch value={permissions.profile} onToggle={(val: boolean) => updateAiPermission('profile', val)} />
               </View>
           </View>
 

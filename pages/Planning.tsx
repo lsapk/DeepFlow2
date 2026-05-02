@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
-import CalendarPage from './CalendarPage';
+import Tasks from './Tasks';
+import Habits from './Habits';
 import Goals from './Goals';
 import { Task, Habit, Goal } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +11,14 @@ interface PlanningProps {
     habits: Habit[];
     goals: Goal[];
     toggleTask: (id: string) => void;
+    addTask: (title: string, priority: any, goalId?: string, dueDate?: string, description?: string) => void;
+    deleteTask: (id: string) => void;
+    createSubtask: (taskId: string, title: string) => void;
+    toggleSubtask: (subId: string, taskId: string) => void;
+    deleteSubtask: (subId: string, taskId: string) => void;
     toggleHabit: (id: string) => void;
+    createHabit: (habitData: any) => void;
+    deleteHabit: (id: string) => void;
     toggleGoal: (id: string) => void;
     addGoal: (title: string) => void;
     deleteGoal: (id: string) => void;
@@ -19,12 +27,14 @@ interface PlanningProps {
     deleteSubObjective: (subId: string, goalId: string) => void;
     userId: string;
     refreshGoals: () => void;
+    refreshTasks: () => void;
+    refreshHabits: () => void;
     openMenu: () => void;
     isDarkMode?: boolean;
 }
 
 const Planning: React.FC<PlanningProps> = (props) => {
-    const [view, setView] = useState<'CALENDAR' | 'GOALS'>('CALENDAR');
+    const [view, setView] = useState<'TASKS' | 'HABITS' | 'GOALS'>('TASKS');
     const { isDarkMode } = props;
     const insets = useSafeAreaInsets();
 
@@ -41,11 +51,18 @@ const Planning: React.FC<PlanningProps> = (props) => {
             <View style={styles.segmentContainer}>
                 <View style={[styles.segment, { backgroundColor: colors.segmentBg }]}>
                     <TouchableOpacity 
-                        style={[styles.segmentBtn, view === 'CALENDAR' && { backgroundColor: colors.segmentActive }]} 
-                        onPress={() => setView('CALENDAR')}
+                        style={[styles.segmentBtn, view === 'TASKS' && { backgroundColor: colors.segmentActive }]}
+                        onPress={() => setView('TASKS')}
                         activeOpacity={1}
                     >
-                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'CALENDAR' ? '700' : '500' }]}>Calendrier</Text>
+                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'TASKS' ? '700' : '500' }]}>Tâches</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.segmentBtn, view === 'HABITS' && { backgroundColor: colors.segmentActive }]}
+                        onPress={() => setView('HABITS')}
+                        activeOpacity={1}
+                    >
+                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'HABITS' ? '700' : '500' }]}>Habitudes</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.segmentBtn, view === 'GOALS' && { backgroundColor: colors.segmentActive }]} 
@@ -58,15 +75,35 @@ const Planning: React.FC<PlanningProps> = (props) => {
             </View>
 
             <View style={{flex: 1}}>
-                {view === 'CALENDAR' ? (
-                    <CalendarPage 
+                {view === 'TASKS' ? (
+                    <Tasks
                         tasks={props.tasks} 
-                        habits={props.habits} 
+                        goals={props.goals}
                         toggleTask={props.toggleTask} 
-                        toggleHabit={props.toggleHabit} 
-                        openMenu={() => {}} 
+                        addTask={props.addTask}
+                        deleteTask={props.deleteTask}
+                        createSubtask={props.createSubtask}
+                        toggleSubtask={props.toggleSubtask}
+                        deleteSubtask={props.deleteSubtask}
+                        userId={props.userId}
+                        refreshTasks={props.refreshTasks}
+                        openMenu={() => {}}
                         isDarkMode={props.isDarkMode}
-                        noPadding={true} // New prop to prevent double padding
+                        noPadding={true}
+                    />
+                ) : view === 'HABITS' ? (
+                    <Habits
+                        habits={props.habits}
+                        goals={props.goals}
+                        incrementHabit={props.toggleHabit}
+                        userId={props.userId}
+                        createHabit={props.createHabit}
+                        archiveHabit={() => {}}
+                        deleteHabit={props.deleteHabit}
+                        refreshHabits={props.refreshHabits}
+                        openMenu={() => {}}
+                        isDarkMode={props.isDarkMode}
+                        noPadding={true}
                     />
                 ) : (
                     <Goals 
@@ -81,7 +118,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                         refreshGoals={props.refreshGoals}
                         openMenu={() => {}}
                         isDarkMode={props.isDarkMode}
-                        noPadding={true} // New prop
+                        noPadding={true}
                     />
                 )}
             </View>

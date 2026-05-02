@@ -11,14 +11,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.deepflow.app",
       "infoPlist": {
-        "NSCalendarsUsageDescription": "DeepFlow a besoin d'accéder à votre calendrier pour synchroniser vos tâches."
       }
     },
     "android": {
       "package": "com.deepflow.app",
       "permissions": [
-        "READ_CALENDAR",
-        "WRITE_CALENDAR"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

@@ -210,10 +210,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
         <View style={styles.bentoGrid}>
             
             {/* LARGE HERO: PRODUCTIVITY */}
-            <TouchableOpacity 
+            <View
                 style={[styles.bentoHero, { backgroundColor: colors.cardBg }]}
-                activeOpacity={0.9}
-                onPress={() => handleNav(ViewState.EVOLUTION)}
             >
                 <LinearGradient
                     colors={isDarkMode ? ['#1E3A8A', '#000000'] : ['#E0E7FF', '#FFFFFF']}
@@ -250,7 +248,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
                          <Target size={24} color={isDarkMode ? '#FFF' : '#000'} />
                     </View>
                 </View>
-            </TouchableOpacity>
+            </View>
 
             <View style={styles.bentoRow}>
                 {/* SMALL: STREAK */}

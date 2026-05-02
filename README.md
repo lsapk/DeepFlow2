@@ -33,15 +33,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 EXPO_PUBLIC_GEMINI_API_KEY=...
 # Ne jamais coller la clé en dur dans le code (ex: services/ai.ts)
 
-# Google OAuth
-EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=...
-EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=...
-EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=...
-# Obligatoire si vous testez dans Expo Go
-EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID=...
-
 # Important: une seule ligne par variable (sans "\\n" littéral)
-# Exemple incorrect: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=...apps.googleusercontent.com\\n
 ```
 
 Puis redémarre Expo en vidant le cache :
@@ -49,27 +41,6 @@ Puis redémarre Expo en vidant le cache :
 ```bash
 npx expo start -c
 ```
-
-## Google Calendar : checklist pour une connexion fiable
-
-1. Dans Google Cloud Console, active **Google Calendar API**.
-2. Configure l'écran de consentement OAuth (en mode *Testing* ou *Production*).
-3. Crée les OAuth Client IDs correspondants :
-   - **Web client** (pour web),
-   - **iOS client** (bundle id `com.deepflow.app`),
-   - **Android client** (package `com.deepflow.app` + SHA-1/SHA-256),
-   - **Expo client** si test dans Expo Go.
-4. Mets chaque client ID dans la variable `.env` correspondante.
-5. Ajoute votre compte Google dans les testeurs OAuth si l'app est en mode *Testing*.
-6. Relance l'app puis ouvre l'écran **Calendrier** et appuie sur l'icône Google.
-
-> Note : sur Android/iOS, un client ID invalide (ou mauvais package/bundle/SHA) provoque une connexion refusée même si la clé est présente dans `.env`.
-
-### Dépannage rapide Google Calendar
-
-- Vérifie que chaque variable OAuth est sur **une seule ligne** dans `.env`.
-- Si tu copies/colles des valeurs et vois `\\n` à la fin, supprime-le.
-- Relance Expo avec cache vidé: `npx expo start -c`.
 
 ## Dépannage IA Gemini (403 / clé compromise)
 

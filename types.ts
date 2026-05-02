@@ -195,20 +195,6 @@ export interface Reflection {
   created_at: string;
 }
 
-export interface CalendarEvent {
-    id: string;
-    title: string;
-    start_time?: string; 
-    end_time?: string;   
-    is_all_day: boolean;
-    type: 'task' | 'habit' | 'google' | 'custom';
-    status: 'pending' | 'completed';
-    color?: string;
-    description?: string;
-    location?: string;
-    meta?: any;
-}
-
 export enum ViewState {
   AUTH = 'AUTH',
   ONBOARDING = 'ONBOARDING',
@@ -219,9 +205,7 @@ export enum ViewState {
   TASKS = 'TASKS',
   HABITS = 'HABITS',
   GOALS = 'GOALS',    
-  GROWTH = 'GROWTH',
   JOURNAL = 'JOURNAL',
   REFLECTION = 'REFLECTION',
-  CALENDAR = 'CALENDAR',
   ADMIN = 'ADMIN'
 }
