@@ -523,6 +523,7 @@ const App: React.FC = () => {
           focusSessions={focusSessions}
           journalEntries={journalEntries}
           reflections={reflections}
+          productivityScore={productivityScore}
           isDarkMode={isDarkMode}
           onActionGenerated={(action) => {
               if (action.action === 'CREATE_TASK') createTask(action.data.title, action.data.priority);

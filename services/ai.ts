@@ -171,7 +171,19 @@ export const generateActionableCoaching = async (
   }
 };
 
-export const generateLifeWheelAnalysis = async (fullContext: any): Promise<number[] | null> => {
+export interface AnalysisResult {
+    scores: number[];
+    insights: {
+        productivity: string;
+        goals: string;
+        advice: string;
+    };
+    trends: {
+        productivity: string; // e.g. "+5%"
+    };
+}
+
+export const generateLifeWheelAnalysis = async (fullContext: any): Promise<AnalysisResult | null> => {
     const apiKey = getApiKey();
     if (!apiKey) return null;
     const ai = new GoogleGenAI({ apiKey });
@@ -183,11 +195,15 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
 
     try {
         const prompt = `
-        Analyse ces données utilisateur (Tâches, Habitudes, Journal) pour évaluer l'équilibre de vie.
+        Analyse ces données utilisateur (Tâches, Habitudes, Journal) pour évaluer l'équilibre de vie et fournir des insights de productivité.
         Données: ${JSON.stringify(fullContext).substring(0, 10000)} 
         
-        Réponds UNIQUEMENT avec un JSON de scores (0-100) :
-        { "health": number, "leisure": number, "personal": number, "learning": number, "mental": number, "career": number }
+        Réponds UNIQUEMENT avec un JSON structuré comme suit :
+        {
+          "scores": { "health": number, "leisure": number, "personal": number, "learning": number, "mental": number, "career": number },
+          "insights": { "productivity": "phrase courte sur la productivité", "goals": "phrase courte sur les objectifs", "advice": "un conseil personnalisé" },
+          "trends": { "productivity": "+X%" ou "-X%" }
+        }
         `;
 
         const response = await ai.models.generateContent({
@@ -200,10 +216,20 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<numbe
         if (!text) return null;
 
         const data = JSON.parse(text);
-        return [
-            data.health || 50, data.leisure || 50, data.personal || 50,
-            data.learning || 50, data.mental || 50, data.career || 50
-        ];
+        return {
+            scores: [
+                data.scores?.health || 50, data.scores?.leisure || 50, data.scores?.personal || 50,
+                data.scores?.learning || 50, data.scores?.mental || 50, data.scores?.career || 50
+            ],
+            insights: {
+                productivity: data.insights?.productivity || "Analyse en cours...",
+                goals: data.insights?.goals || "Analyse en cours...",
+                advice: data.insights?.advice || "Continuez vos efforts !"
+            },
+            trends: {
+                productivity: data.trends?.productivity || "0%"
+            }
+        };
 
     } catch (e) {
         return null;
