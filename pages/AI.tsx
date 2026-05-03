@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Keyboa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Brain, Send, Sparkles, TrendingUp, LayoutDashboard, History, Zap, Target, BookOpen, RefreshCw, MessageSquare } from 'lucide-react-native';
 import { UserProfile, Task, Habit, Goal, FocusSession, JournalEntry, Reflection } from '../types';
-import { generateActionableCoaching, generateLifeWheelAnalysis } from '../services/ai';
+import { generateActionableCoaching, generateLifeWheelAnalysis, AnalysisResult } from '../services/ai';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import Svg, { Polygon, Line, Circle, Text as SvgText, G } from 'react-native-svg';
@@ -20,6 +20,7 @@ interface AIProps {
     focusSessions: FocusSession[];
     journalEntries: JournalEntry[];
     reflections: Reflection[];
+    productivityScore: number;
     isDarkMode?: boolean;
     onActionGenerated?: (action: any) => void;
 }
@@ -32,7 +33,7 @@ interface Message {
 }
 
 const AI: React.FC<AIProps> = ({
-    user, tasks, habits, goals, focusSessions, journalEntries, reflections, isDarkMode = true, onActionGenerated
+    user, tasks, habits, goals, focusSessions, journalEntries, reflections, productivityScore, isDarkMode = true, onActionGenerated
 }) => {
     const insets = useSafeAreaInsets();
     const [activeTab, setActiveTab] = useState<'CHAT' | 'ANALYSE'>('CHAT');
@@ -50,8 +51,10 @@ const AI: React.FC<AIProps> = ({
     const [isTyping, setIsTyping] = useState(false);
     const scrollViewRef = useRef<ScrollView>(null);
 
+    const BOTTOM_NAV_HEIGHT = 80;
+
     // Analysis State
-    const [analysisData, setAnalysisData] = useState<number[] | null>(null);
+    const [analysisData, setAnalysisData] = useState<AnalysisResult | null>(null);
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
     const colors = {
@@ -78,7 +81,9 @@ const AI: React.FC<AIProps> = ({
             habits: habits.map(h => ({ title: h.title, streak: h.streak })),
             goals: goals.map(g => ({ title: g.title, progress: g.progress })),
             journalCount: journalEntries.length,
-            reflectionCount: reflections.length
+            reflectionCount: reflections.length,
+            productivityScore: productivityScore,
+            recentFocus: focusSessions.slice(-5)
         };
         const result = await generateLifeWheelAnalysis(context);
         if (result) setAnalysisData(result);
@@ -103,7 +108,7 @@ const AI: React.FC<AIProps> = ({
             tasks: tasks.filter(t => !t.completed).slice(0, 5),
             habits: habits.slice(0, 5),
             goals: goals.slice(0, 5),
-            productivityScore: 75 // Mock or compute
+            productivityScore: productivityScore
         };
 
         const response = await generateActionableCoaching(userMsg.text, context, false);
@@ -132,7 +137,7 @@ const AI: React.FC<AIProps> = ({
         const labels = ['Santé', 'Loisirs', 'Perso', 'Apprentissage', 'Mental', 'Carrière'];
         const angles = labels.map((_, i) => (i * 2 * Math.PI) / labels.length - Math.PI / 2);
 
-        const points = analysisData.map((val, i) => {
+        const points = analysisData.scores.map((val, i) => {
             const r = (val / 100) * radius;
             const x = center + r * Math.cos(angles[i]);
             const y = center + r * Math.sin(angles[i]);
@@ -272,7 +277,7 @@ const AI: React.FC<AIProps> = ({
                         )}
                     </ScrollView>
 
-                    <View style={[styles.inputWrapper, { paddingBottom: insets.bottom + 10 }]}>
+                    <View style={[styles.inputWrapper, { paddingBottom: insets.bottom + BOTTOM_NAV_HEIGHT }]}>
                         <BlurView intensity={30} tint={isDarkMode ? 'dark' : 'light'} style={[styles.inputBlur, { borderColor: colors.border }]}>
                             <TextInput
                                 style={[styles.textInput, { color: colors.text }]}
@@ -312,14 +317,14 @@ const AI: React.FC<AIProps> = ({
                                 <Animated.View entering={FadeInDown.delay(100)} style={[styles.insightCard, { backgroundColor: colors.card }]}>
                                     <Zap size={24} color="#FACC15" style={{ marginBottom: 10 }} />
                                     <Text style={[styles.insightTitle, { color: colors.text }]}>Productivité</Text>
-                                    <Text style={[styles.insightValue, { color: colors.text }]}>78%</Text>
-                                    <Text style={[styles.insightSub, { color: colors.textSub }]}>+5% vs hier</Text>
+                                    <Text style={[styles.insightValue, { color: colors.text }]}>{productivityScore}%</Text>
+                                    <Text style={[styles.insightSub, { color: colors.textSub }]}>{analysisData?.trends.productivity || "0%"} vs période précédente</Text>
                                 </Animated.View>
                                 <Animated.View entering={FadeInDown.delay(200)} style={[styles.insightCard, { backgroundColor: colors.card }]}>
                                     <Target size={24} color="#EF4444" style={{ marginBottom: 10 }} />
                                     <Text style={[styles.insightTitle, { color: colors.text }]}>Objectifs</Text>
                                     <Text style={[styles.insightValue, { color: colors.text }]}>{goals.filter(g => g.completed).length}/{goals.length}</Text>
-                                    <Text style={[styles.insightSub, { color: colors.textSub }]}>En bonne voie</Text>
+                                    <Text style={[styles.insightSub, { color: colors.textSub }]}>{analysisData?.insights.goals || "Chargement..."}</Text>
                                 </Animated.View>
                             </View>
 
@@ -329,7 +334,7 @@ const AI: React.FC<AIProps> = ({
                                     <Text style={[styles.cardTitle, { color: colors.text }]}>Conseil du jour</Text>
                                 </View>
                                 <Text style={[styles.insightText, { color: colors.textSub }]}>
-                                    Basé sur votre journal d'hier, vous semblez plus productif le matin. Essayez de placer vos tâches complexes avant 11h.
+                                    {analysisData?.insights.advice || "Chargement de votre conseil personnalisé..."}
                                 </Text>
                             </Animated.View>
                         </>
