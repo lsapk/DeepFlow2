@@ -207,5 +207,6 @@ export enum ViewState {
   GOALS = 'GOALS',    
   JOURNAL = 'JOURNAL',
   REFLECTION = 'REFLECTION',
+  AI = 'AI',
   ADMIN = 'ADMIN'
 }

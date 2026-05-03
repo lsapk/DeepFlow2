@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Platform } from 'react-native';
-import { LayoutDashboard, Target, BookOpen, TrendingUp, Zap, Shield } from 'lucide-react-native';
+import { LayoutDashboard, Target, BookOpen, TrendingUp, Zap, Shield, Brain } from 'lucide-react-native';
 import { ViewState } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -53,6 +53,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView, isDarkMode 
     { view: ViewState.PLANNING, icon: Target, label: 'Plan' },
     { view: ViewState.FOCUS_MODE, icon: Zap, label: 'Focus', isSpecial: true },
     { view: ViewState.INTROSPECTION, icon: BookOpen, label: 'Journal' },
+    { view: ViewState.AI, icon: Brain, label: 'IA' },
   ];
 
   const handlePress = (view: ViewState) => {
