@@ -18,6 +18,7 @@ interface PlanningProps {
     deleteSubtask: (subId: string, taskId: string) => void;
     toggleHabit: (id: string) => void;
     createHabit: (habitData: any) => void;
+    archiveHabit: (habit: Habit) => void;
     deleteHabit: (id: string) => void;
     toggleGoal: (id: string) => void;
     addGoal: (title: string) => void;
@@ -98,7 +99,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                         incrementHabit={props.toggleHabit}
                         userId={props.userId}
                         createHabit={props.createHabit}
-                        archiveHabit={() => {}}
+                        archiveHabit={props.archiveHabit}
                         deleteHabit={props.deleteHabit}
                         refreshHabits={props.refreshHabits}
                         openMenu={() => {}}

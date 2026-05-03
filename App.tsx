@@ -394,20 +394,46 @@ const App: React.FC = () => {
       const habit = habits.find(h => h.id === id);
       if (!habit) return;
       const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      const lastCompleted = habit.last_completed_at ? new Date(habit.last_completed_at).toISOString().split('T')[0] : null;
-      if (lastCompleted === todayStr) return; 
-      const newStreak = habit.streak + 1;
-      const updatedHabits = habits.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: now.toISOString() } : h);
-      setHabits(updatedHabits);
-      saveToCache(CACHE_KEYS.HABITS, updatedHabits);
 
-      try {
-          await supabase.from('habits').update({ streak: newStreak, last_completed_at: now.toISOString() }).eq('id', id);
-          await supabase.from('habit_completions').insert({ user_id: user?.id, habit_id: id, completed_date: todayStr });
-      } catch (e) {
-          queueAction({ type: 'UPDATE', table: 'habits', payload: { id, streak: newStreak, last_completed_at: now.toISOString() } });
-          queueAction({ type: 'INSERT', table: 'habit_completions', payload: { user_id: user?.id, habit_id: id, completed_date: todayStr } });
+      const getLocalDateString = (date: Date) => {
+          const offset = date.getTimezoneOffset();
+          const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+          return localDate.toISOString().split('T')[0];
+      };
+
+      const todayStr = getLocalDateString(now);
+      const lastCompletedStr = habit.last_completed_at ? getLocalDateString(new Date(habit.last_completed_at)) : null;
+
+      const isDoneToday = lastCompletedStr === todayStr;
+
+      if (isDoneToday) {
+          // UNCHECK
+          const newStreak = Math.max(0, habit.streak - 1);
+          const updatedHabits = habits.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: null } : h);
+          setHabits(updatedHabits);
+          saveToCache(CACHE_KEYS.HABITS, updatedHabits);
+
+          try {
+              await supabase.from('habits').update({ streak: newStreak, last_completed_at: null }).eq('id', id);
+              await supabase.from('habit_completions').delete().eq('habit_id', id).eq('completed_date', todayStr);
+          } catch (e) {
+              queueAction({ type: 'UPDATE', table: 'habits', payload: { id, streak: newStreak, last_completed_at: null } });
+              // Note: deletion by complex filter not fully supported in offline queue yet, but we'll try to find a way or leave it for online
+          }
+      } else {
+          // CHECK
+          const newStreak = habit.streak + 1;
+          const updatedHabits = habits.map(h => h.id === id ? { ...h, streak: newStreak, last_completed_at: now.toISOString() } : h);
+          setHabits(updatedHabits);
+          saveToCache(CACHE_KEYS.HABITS, updatedHabits);
+
+          try {
+              await supabase.from('habits').update({ streak: newStreak, last_completed_at: now.toISOString() }).eq('id', id);
+              await supabase.from('habit_completions').insert({ user_id: user?.id, habit_id: id, completed_date: todayStr });
+          } catch (e) {
+              queueAction({ type: 'UPDATE', table: 'habits', payload: { id, streak: newStreak, last_completed_at: now.toISOString() } });
+              queueAction({ type: 'INSERT', table: 'habit_completions', payload: { user_id: user?.id, habit_id: id, completed_date: todayStr } });
+          }
       }
   };
 
@@ -423,6 +449,18 @@ const App: React.FC = () => {
       setHabits(updatedHabits);
       saveToCache(CACHE_KEYS.HABITS, updatedHabits);
       try { await supabase.from('habits').delete().eq('id', id); } catch (e) { queueAction({ type: 'DELETE', table: 'habits', payload: { id } }); }
+  };
+
+  const archiveHabit = async (habit: Habit) => {
+      const isArchiving = !habit.is_archived;
+      const updatedHabits = habits.map(h => h.id === habit.id ? { ...h, is_archived: isArchiving } : h);
+      setHabits(updatedHabits);
+      saveToCache(CACHE_KEYS.HABITS, updatedHabits);
+      try {
+          await supabase.from('habits').update({ is_archived: isArchiving }).eq('id', habit.id);
+      } catch (e) {
+          queueAction({ type: 'UPDATE', table: 'habits', payload: { id: habit.id, is_archived: isArchiving } });
+      }
   };
 
   // ... (Other CRUD actions: createSubtask, toggleSubtask, deleteSubtask, deleteGoal, createSubObjective, etc. kept same) ...
@@ -475,6 +513,7 @@ const App: React.FC = () => {
           deleteSubtask={deleteSubtask}
           toggleHabit={toggleHabit}
           createHabit={createHabit}
+          archiveHabit={archiveHabit}
           deleteHabit={deleteHabit}
           toggleGoal={()=>{}}
           addGoal={createGoal}
@@ -500,7 +539,7 @@ const App: React.FC = () => {
           Content = <Tasks tasks={tasks} goals={goals} toggleTask={toggleTask} addTask={createTask} deleteTask={deleteTask} createSubtask={createSubtask} toggleSubtask={toggleSubtask} deleteSubtask={deleteSubtask} userId={user.id} refreshTasks={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
           break;
       case ViewState.HABITS: 
-          Content = <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={(h) => {}} deleteHabit={deleteHabit} refreshHabits={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
+          Content = <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={archiveHabit} deleteHabit={deleteHabit} refreshHabits={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
           break;
       case ViewState.GOALS:
           Content = <Goals goals={goals} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
