@@ -143,7 +143,7 @@ export const generateActionableCoaching = async (
     }
 
     const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview", 
+        model: "gemini-1.5-flash",
         contents: userMessage,
         config: {
             systemInstruction: systemInstruction,
@@ -207,7 +207,7 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<Analy
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
@@ -244,7 +244,7 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
     try {
         const prompt = `Découpe cette tâche en sous-tâches (max 5) : "${taskTitle}". Renvoie un tableau JSON de strings.`;
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
@@ -254,6 +254,53 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
         return Array.isArray(data) ? data : [];
     } catch (e) {
         return [];
+    }
+};
+
+export const analyzeQualitativeProductivity = async (fullContext: any): Promise<number> => {
+    const apiKey = getApiKey();
+    if (!apiKey) return 0;
+    const ai = new GoogleGenAI({ apiKey });
+
+    // We use 'analysis' type for usage logging
+    logAiUsage('analysis').catch(() => {});
+
+    try {
+        // We structure the context to prioritize qualitative data and avoid truncation of important bits
+        const qualitativeContext = {
+            journalEntries: fullContext.journalEntries?.slice(0, 5), // last 5 entries
+            reflections: fullContext.reflections?.slice(0, 5),      // last 5 reflections
+            tasks: fullContext.tasks?.filter((t: any) => t.completed).slice(0, 10), // last 10 completed tasks
+            habits: fullContext.habits?.filter((h: any) => h.streak > 0)
+        };
+
+        const prompt = `
+        Analyse les données qualitatives de l'utilisateur pour évaluer sa productivité réelle au-delà des chiffres.
+        Données: ${JSON.stringify(qualitativeContext)}
+
+        Évalue des critères comme : la clarté d'esprit, le fait d'avoir surmonté des obstacles complexes, et la satisfaction personnelle exprimée dans les journaux ou réflexions.
+
+        Réponds UNIQUEMENT avec un JSON structuré :
+        {
+          "offset": number // Un nombre entre -20 et +20 représentant l'ajustement qualitatif du score.
+        }
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+
+        const text = response.text;
+        if (!text) return 0;
+
+        const data = JSON.parse(text);
+        return data.offset || 0;
+
+    } catch (e) {
+        console.error("Error in analyzeQualitativeProductivity:", e);
+        return 0;
     }
 };
 
@@ -269,7 +316,7 @@ export const generateQuests = async (userLevel: number, context: string): Promis
         Format JSON : [{ "title": "...", "description": "...", "reward_xp": 50, "reward_credits": 20, "target_value": 1, "quest_type": "daily" }]
         `;
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });

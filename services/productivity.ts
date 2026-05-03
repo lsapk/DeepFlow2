@@ -8,6 +8,7 @@ interface ComputeProductivityScoreParams {
   journalEntries?: Array<{ created_at: string }>;
   reflections?: Array<{ created_at: string }>;
   referenceDate?: Date;
+  aiOffset?: number;
 }
 
 export const computeProductivityScore = ({
@@ -18,79 +19,54 @@ export const computeProductivityScore = ({
   journalEntries = [],
   reflections = [],
   referenceDate = new Date(),
+  aiOffset = 0,
 }: ComputeProductivityScoreParams): number => {
-  const isSameDay = (d1: Date, d2: Date) => (
-    d1.getDate() === d2.getDate() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getFullYear() === d2.getFullYear()
-  );
 
-  const sixtyDaysAgo = new Date(referenceDate);
-  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  // 1. RECENT ACTIVITY (Last 7 days)
+  const sevenDaysAgo = new Date(referenceDate);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // 1. REGULARITY (Last 60 days) - Exponential decay for older activity
-  const activityDays = new Map<string, number>();
-  const addActivity = (dateStr?: string | null) => {
-    if (!dateStr) return;
-    const d = new Date(dateStr);
-    if (d >= sixtyDaysAgo && d <= referenceDate) {
-      const dateKey = d.toISOString().split('T')[0];
-      const daysDiff = Math.floor((referenceDate.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-      const weight = Math.exp(-daysDiff / 30); // Higher weight for recent days
-      activityDays.set(dateKey, Math.max(activityDays.get(dateKey) || 0, weight));
-    }
-  };
+  const recentCompletedTasks = tasks.filter(t => t.completed && t.updated_at && new Date(t.updated_at) >= sevenDaysAgo).length;
+  const recentFocusMinutes = focusSessions
+    .filter(s => new Date(s.completed_at!) >= sevenDaysAgo)
+    .reduce((acc, s) => acc + (s.duration || 0), 0);
 
-  focusSessions.forEach(s => addActivity(s.completed_at));
-  journalEntries.forEach(j => addActivity(j.created_at));
-  reflections.forEach(r => addActivity(r.created_at));
-  tasks.forEach(t => { if (t.completed) addActivity(t.created_at || t.due_date); });
+  // 12 tasks in a week = 50 pts
+  const taskComponent = Math.min(50, (recentCompletedTasks / 12) * 50);
+  // 6 hours of focus in a week = 50 pts
+  const focusComponent = Math.min(50, (recentFocusMinutes / 360) * 50);
+  const recentActivityScore = taskComponent + focusComponent; // Max 100
 
-  let weightedRegularity = 0;
-  activityDays.forEach(weight => { weightedRegularity += weight; });
-  const regularityScore = Math.min(100, (weightedRegularity / 25) * 100); // Softened from 45 to 25 weighted days
-
-  // 2. CONTENT RICHNESS & DIVERSITY (Based on last 14 days)
-  const fourteenDaysAgo = new Date(referenceDate);
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-
-  const hasJournal = journalEntries.some(j => new Date(j.created_at) >= fourteenDaysAgo) ? 20 : 0;
-  const hasReflections = reflections.some(r => new Date(r.created_at) >= fourteenDaysAgo) ? 20 : 0;
-  const hasFocus = focusSessions.some(s => new Date(s.completed_at!) >= fourteenDaysAgo) ? 20 : 0;
-  const hasTasks = tasks.some(t => t.completed && new Date(t.created_at) >= fourteenDaysAgo) ? 20 : 0;
-  const hasHabits = habits.some(h => h.streak > 0) ? 20 : 0;
-  const contentDiversityScore = hasJournal + hasReflections + hasFocus + hasTasks + hasHabits;
-
-  // 3. PERFORMANCE (Last 30 days)
-  const thirtyDaysAgo = new Date(referenceDate);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const recentTasks = tasks.filter(t => new Date(t.created_at) >= thirtyDaysAgo);
-  const taskRate = recentTasks.length > 0 ? (recentTasks.filter(t => t.completed).length / recentTasks.length) * 100 : 70;
-
-  const recentGoals = goals.filter(g => !g.is_archived);
-  const goalRate = recentGoals.length > 0 ? (recentGoals.reduce((acc, g) => acc + (g.progress || (g.completed ? 100 : 0)), 0) / recentGoals.length) : 50;
-
-  const performanceScore = (taskRate * 0.5) + (goalRate * 0.5);
-
-  // 4. HABITS & STREAKS (Focus on consistency)
+  // 2. HABITS & CONSISTENCY (Last 14 days)
   const activeHabits = habits.filter(h => !h.is_archived);
   const habitConsistency = activeHabits.length > 0
-    ? (activeHabits.reduce((acc, h) => acc + Math.min(100, (h.streak / 30) * 100), 0) / activeHabits.length)
+    ? (activeHabits.reduce((acc, h) => acc + Math.min(100, (h.streak / 14) * 100), 0) / activeHabits.length)
     : 0;
 
-  // 5. INTENSITY (Focus Duration)
-  const totalRecentFocusMinutes = focusSessions
-    .filter(s => new Date(s.completed_at!) >= fourteenDaysAgo)
-    .reduce((acc, s) => acc + (s.duration || 0), 0);
-  const intensityScore = Math.min(100, (totalRecentFocusMinutes / 600) * 100); // Softened: 10 hours of focus in 14 days for max
+  // 3. GOALS PROGRESS
+  const activeGoals = goals.filter(g => !g.is_archived);
+  const goalRate = activeGoals.length > 0
+    ? (activeGoals.reduce((acc, g) => acc + (g.progress || (g.completed ? 100 : 0)), 0) / activeGoals.length)
+    : 70; // Default to 70 if no goals to not penalize
 
-  // FINAL WEIGHTED SCORE
-  const score = (regularityScore * 0.30) +
-                (contentDiversityScore * 0.20) +
-                (performanceScore * 0.20) +
-                (habitConsistency * 0.15) +
-                (intensityScore * 0.15);
+  // 4. CONTENT DIVERSITY (Bonus for using the app's features)
+  const hasJournal = journalEntries.some(j => new Date(j.created_at) >= sevenDaysAgo) ? 50 : 0;
+  const hasReflections = reflections.some(r => new Date(r.created_at) >= sevenDaysAgo) ? 50 : 0;
+  const diversityScore = hasJournal + hasReflections; // Max 100
 
-  return Math.round(Math.min(100, score));
+  // FINAL WEIGHTED SCORE (Algorithm part)
+  // Recent Activity (Tasks/Focus): 50%
+  // Habit Consistency: 20%
+  // Goal Progress: 20%
+  // Diversity (Journal/Reflection): 10%
+
+  const algoScore = (recentActivityScore * 0.50) +
+                    (habitConsistency * 0.20) +
+                    (goalRate * 0.20) +
+                    (diversityScore * 0.10);
+
+  // Apply AI Offset
+  let finalScore = algoScore + aiOffset;
+
+  return Math.round(Math.max(0, Math.min(100, finalScore)));
 };

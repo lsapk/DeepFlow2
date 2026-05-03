@@ -26,6 +26,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import { saveToCache, loadFromCache, addToQueue, processQueue, getQueueSize, CACHE_KEYS, generateId, clearCache } from './services/offline';
 import { isAdmin } from './services/admin';
 import { computeProductivityScore } from './services/productivity';
+import { analyzeQualitativeProductivity } from './services/ai';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 // Configuration Notifications
@@ -59,6 +60,7 @@ const App: React.FC = () => {
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   const [journalEntries, setJournalEntries] = useState<any[]>([]);
   const [reflections, setReflections] = useState<any[]>([]);
+  const [aiProductivityOffset, setAiProductivityOffset] = useState(0);
 
   const productivityScore = useMemo(() => {
     return computeProductivityScore({
@@ -68,8 +70,9 @@ const App: React.FC = () => {
       focusSessions,
       journalEntries,
       reflections,
+      aiOffset: aiProductivityOffset,
     });
-  }, [tasks, habits, goals, focusSessions, journalEntries, reflections]);
+  }, [tasks, habits, goals, focusSessions, journalEntries, reflections, aiProductivityOffset]);
   
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'SYNCED' | 'SYNCING' | 'OFFLINE_PENDING'>('SYNCED');
@@ -309,6 +312,16 @@ const App: React.FC = () => {
           setReflections(reflectionRes.data);
       }
 
+      // Check for AI productivity update
+      checkAndRunAiProductivityAnalysis(userId, {
+        tasks: tasksRes.data || [],
+        habits: habitsRes.data || [],
+        goals: goalsRes.data || [],
+        focusSessions: focusRes.data || [],
+        journalEntries: journalRes.data || [],
+        reflections: reflectionRes.data || []
+      });
+
       const savedSession = await AsyncStorage.getItem('active_focus_session');
       if (savedSession) {
           setCurrentView(ViewState.FOCUS_MODE);
@@ -474,6 +487,28 @@ const App: React.FC = () => {
   const deleteJournalEntry = async (id: string) => { try { await supabase.from('journal_entries').delete().eq('id', id); } catch(e) { console.error("Delete journal error", e); } };
   const deleteReflection = async (id: string) => { try { await supabase.from('daily_reflections').delete().eq('id', id); } catch(e) { console.error("Delete reflection error", e); } };
   const aiStartFocus = (m: number) => setCurrentView(ViewState.FOCUS_MODE);
+
+  const checkAndRunAiProductivityAnalysis = async (userId: string, context: any) => {
+    try {
+        const lastRun = await AsyncStorage.getItem(`last_ai_productivity_run_${userId}`);
+        const today = new Date().toISOString().split('T')[0];
+
+        // Load cached offset if it exists
+        const cachedOffset = await AsyncStorage.getItem(`ai_productivity_offset_${userId}`);
+        if (cachedOffset) {
+            setAiProductivityOffset(parseFloat(cachedOffset));
+        }
+
+        if (lastRun !== today) {
+            const offset = await analyzeQualitativeProductivity(context);
+            setAiProductivityOffset(offset);
+            await AsyncStorage.setItem(`ai_productivity_offset_${userId}`, offset.toString());
+            await AsyncStorage.setItem(`last_ai_productivity_run_${userId}`, today);
+        }
+    } catch (e) {
+        console.error("AI Productivity update error:", e);
+    }
+  };
 
   const renderContent = () => {
     if (checkingOnboarding || loading) return (
