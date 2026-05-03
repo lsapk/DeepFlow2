@@ -12,6 +12,7 @@ import Tasks from './pages/Tasks';
 import Habits from './pages/Habits';
 import Goals from './pages/Goals';
 import Planning from './pages/Planning';
+import AI from './pages/AI';
 import Introspection from './pages/Introspection';
 import Admin from './pages/Admin';
 import Auth from './pages/Auth';
@@ -512,6 +513,23 @@ const App: React.FC = () => {
         break;
       case ViewState.REFLECTION:
         Content = <Introspection userId={user.id} openMenu={openMenuHandler} isDarkMode={isDarkMode} deleteJournalEntry={deleteJournalEntry} deleteReflection={deleteReflection} />;
+        break;
+      case ViewState.AI:
+        Content = <AI
+          user={user}
+          tasks={tasks}
+          habits={habits}
+          goals={goals}
+          focusSessions={focusSessions}
+          journalEntries={journalEntries}
+          reflections={reflections}
+          isDarkMode={isDarkMode}
+          onActionGenerated={(action) => {
+              if (action.action === 'CREATE_TASK') createTask(action.data.title, action.data.priority);
+              if (action.action === 'CREATE_HABIT') createHabit(action.data);
+              if (action.action === 'CREATE_GOAL') createGoal(action.data.title);
+          }}
+        />;
         break;
       default:
         Content = <Dashboard user={user} tasks={tasks} habits={habits} goals={goals} focusSessions={focusSessions} toggleHabit={toggleHabit} toggleTask={toggleTask} openFocus={() => setCurrentView(ViewState.FOCUS_MODE)} openProfile={() => setProfileVisible(true)} setView={setCurrentView} syncStatus={syncStatus} openMenu={openMenuHandler} {...commonProps} />;
