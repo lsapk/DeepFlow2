@@ -143,7 +143,7 @@ export const generateActionableCoaching = async (
     }
 
     const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-3-flash-preview",
         contents: userMessage,
         config: {
             systemInstruction: systemInstruction,
@@ -207,7 +207,7 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<Analy
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
@@ -244,7 +244,7 @@ export const generateSubtasks = async (taskTitle: string): Promise<string[]> => 
     try {
         const prompt = `Découpe cette tâche en sous-tâches (max 5) : "${taskTitle}". Renvoie un tableau JSON de strings.`;
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
@@ -287,7 +287,7 @@ export const analyzeQualitativeProductivity = async (fullContext: any): Promise<
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
@@ -316,7 +316,7 @@ export const generateQuests = async (userLevel: number, context: string): Promis
         Format JSON : [{ "title": "...", "description": "...", "reward_xp": 50, "reward_credits": 20, "target_value": 1, "quest_type": "daily" }]
         `;
         const response = await ai.models.generateContent({
-            model: "gemini-1.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
