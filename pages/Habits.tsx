@@ -17,6 +17,7 @@ interface HabitsProps {
   refreshHabits: () => void;
   openMenu: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
