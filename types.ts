@@ -42,6 +42,14 @@ export interface UserRole {
   updated_at?: string;
 }
 
+export interface AvatarConfig {
+  class?: string;
+  helmet?: string;
+  armor?: string;
+  color?: string;
+  glow_color?: string;
+}
+
 export interface Announcement {
   id: string;
   title: string;

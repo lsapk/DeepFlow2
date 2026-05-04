@@ -22,6 +22,7 @@ interface TasksProps {
   refreshTasks: () => void;
   openMenu: () => void; 
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
 const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
