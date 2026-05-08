@@ -22,9 +22,10 @@ interface TasksProps {
   refreshTasks: () => void;
   openMenu: () => void; 
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
+const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true, noPadding = false }) => {
   const insets = useSafeAreaInsets(); // Hook pour gérer les marges de sécurité (encoche, barre home)
   
   const [isReady, setIsReady] = useState(false);
@@ -202,8 +203,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.bg }, noPadding && { paddingTop: 0 }]}>
+      <View style={[styles.header, noPadding && { marginTop: 0 }]}>
           <View style={{flex: 1}}>
             <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
             <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>

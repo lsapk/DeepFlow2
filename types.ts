@@ -168,6 +168,14 @@ export interface Habit {
   linked_goal_id?: string | null;
 }
 
+export interface AvatarConfig {
+  class: string;
+  helmet: string;
+  armor: string;
+  color: string;
+  glow_color: string;
+}
+
 export interface FocusSession {
   id: string;
   duration: number; // in minutes

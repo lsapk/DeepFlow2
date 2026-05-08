@@ -17,12 +17,13 @@ interface HabitsProps {
   refreshHabits: () => void;
   openMenu: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const { width } = Dimensions.get('window');
 
-const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, createHabit, archiveHabit, deleteHabit, refreshHabits, openMenu, isDarkMode = true }) => {
+const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, createHabit, archiveHabit, deleteHabit, refreshHabits, openMenu, isDarkMode = true, noPadding = false }) => {
   const [showArchived, setShowArchived] = useState(false);
   const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
   const [filterMode, setFilterMode] = useState<'TODAY' | 'ALL'>('TODAY');
@@ -267,9 +268,9 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg }, noPadding && { paddingTop: 0 }]}>
       {/* HEADER iOS Style */}
-      <View style={styles.header}>
+      <View style={[styles.header, noPadding && { marginTop: 0 }]}>
          <View style={{flexDirection: 'row', alignItems: 'center'}}>
              <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
          </View>
