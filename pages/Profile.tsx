@@ -624,34 +624,34 @@ const styles = StyleSheet.create({
   email: { fontSize: 14, color: '#666', marginBottom: 12 },
   bio: { fontSize: 15, color: '#8E8E93', marginBottom: 16, textAlign: 'center', paddingHorizontal: 30, lineHeight: 22 },
   badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  rankBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(196, 181, 253, 0.1)', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(196, 181, 253, 0.2)' },
+  rankBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(196, 181, 253, 0.1)', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(196, 181, 253, 0.2)' },
   rankText: { fontSize: 11, fontWeight: '800', color: '#C4B5FD', letterSpacing: 1 },
 
   infoGrid: { flexDirection: 'row', gap: 12, marginBottom: 10 },
-  infoCard: { flex: 1, backgroundColor: '#1C1C1E', padding: 16, borderRadius: 20, justifyContent: 'center' },
+  infoCard: { flex: 1, backgroundColor: '#1C1C1E', padding: 16, borderRadius: 24, justifyContent: 'center' },
   infoLabel: { fontSize: 10, fontWeight: '700', color: '#666', marginBottom: 6, letterSpacing: 0.5 },
   infoValue: { fontSize: 20, fontWeight: '800', color: '#FFF' },
   xpBarBgMini: { height: 4, backgroundColor: '#333', borderRadius: 2, marginTop: 8, overflow: 'hidden' },
   
   editInput: { backgroundColor: '#1C1C1E', color: '#FFF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  cancelBtn: { backgroundColor: '#333', padding: 10, borderRadius: 20 },
-  confirmBtn: { backgroundColor: '#34C759', padding: 10, borderRadius: 20 },
+  cancelBtn: { backgroundColor: '#333', padding: 10, borderRadius: 24 },
+  confirmBtn: { backgroundColor: '#34C759', padding: 10, borderRadius: 24 },
 
-  xpCard: { backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16 },
+  xpCard: { backgroundColor: '#1C1C1E', borderRadius: 24, padding: 16 },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   xpLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
   xpValue: { color: '#FFF', fontSize: 12, fontWeight: '600' },
   xpBarBg: { height: 8, backgroundColor: '#333', borderRadius: 4, overflow: 'hidden' },
   xpBarFill: { height: '100%', backgroundColor: '#007AFF' },
 
-  editProfileBtn: { backgroundColor: '#1C1C1E', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  editProfileBtn: { backgroundColor: '#1C1C1E', paddingVertical: 14, borderRadius: 24, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   editProfileText: { color: '#FFF', fontWeight: '600' },
 
   // Settings Tab
   section: { marginBottom: 10 },
   sectionHeader: { fontSize: 12, color: '#888', marginBottom: 4, marginLeft: 4, fontWeight: '700', textTransform: 'uppercase' },
   sectionSubHeader: { fontSize: 12, color: '#555', marginBottom: 12, marginLeft: 4 },
-  card: { backgroundColor: '#1C1C1E', borderRadius: 14, overflow: 'hidden' },
+  card: { backgroundColor: '#1C1C1E', borderRadius: 24, overflow: 'hidden' },
   item: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, minHeight: 56 },
   separator: { height: 1, backgroundColor: '#262626', marginLeft: 56 },
   itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
@@ -672,18 +672,18 @@ const styles = StyleSheet.create({
 
   // Stats Tab
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statCard: { width: '48%', backgroundColor: '#1C1C1E', padding: 16, borderRadius: 16, alignItems: 'center' },
+  statCard: { width: '48%', backgroundColor: '#1C1C1E', padding: 16, borderRadius: 24, alignItems: 'center' },
   statCardValue: { color: '#FFF', fontSize: 24, fontWeight: '700', marginBottom: 4 },
   statCardLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
 
   inputLabel: { fontSize: 12, color: '#888', fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
-  choiceBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#333', marginRight: 10, borderWidth: 1, borderColor: 'transparent' },
+  choiceBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24, backgroundColor: '#333', marginRight: 10, borderWidth: 1, borderColor: 'transparent' },
   choiceBtnActive: { backgroundColor: '#007AFF', borderColor: '#FFF' },
   choiceText: { color: '#888', fontWeight: '600', textTransform: 'capitalize' },
   choiceTextActive: { color: '#FFF' },
-  colorCircle: { width: 40, height: 40, borderRadius: 20 },
+  colorCircle: { width: 40, height: 40, borderRadius: 24 },
   stickySaveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, backgroundColor: 'rgba(17,17,17,0.98)', borderTopWidth: 1, borderTopColor: '#2A2A2A' },
-  saveMainBtn: { backgroundColor: '#007AFF', padding: 16, borderRadius: 14, alignItems: 'center' },
+  saveMainBtn: { backgroundColor: '#007AFF', padding: 16, borderRadius: 24, alignItems: 'center' },
   saveMainBtnText: { color: '#FFF', fontWeight: '700', fontSize: 17 },
 });
 

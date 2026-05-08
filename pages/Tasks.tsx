@@ -22,9 +22,10 @@ interface TasksProps {
   refreshTasks: () => void;
   openMenu: () => void; 
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
+const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true, noPadding = false }) => {
   const insets = useSafeAreaInsets(); // Hook pour gérer les marges de sécurité (encoche, barre home)
   
   const [isReady, setIsReady] = useState(false);
@@ -203,7 +204,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: noPadding ? 10 : insets.top + 20 }]}>
           <View style={{flex: 1}}>
             <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
             <Text style={[styles.subtitle, {color: colors.textSub}]}>{activeTasks.length} en attente</Text>
@@ -380,18 +381,18 @@ const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColo
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16, marginTop: 20 },
-  largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
+  largeTitle: { fontSize: 36, fontWeight: '900', letterSpacing: 0.37 },
   subtitle: { fontSize: 15, fontWeight: '500', marginTop: 4 },
-  addButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+  addButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 3 },
   
   scrollContent: { paddingHorizontal: 20 },
   
   completedGroup: { marginTop: 30 },
   groupHeader: { fontSize: 13, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   
-  taskCard: { borderRadius: 12, borderLeftWidth: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  taskCard: { borderRadius: 24, borderLeftWidth: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 2, overflow: 'hidden' },
   taskItem: { flexDirection: 'row', alignItems: 'center', padding: 16, minHeight: 60 },
-  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  checkbox: { width: 24, height: 24, borderRadius: 24, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   taskContent: { flex: 1 },
   taskTitle: { fontSize: 17, fontWeight: '600' },
   dateText: { fontSize: 12, marginTop: 4, fontWeight: '500' },
@@ -407,8 +408,8 @@ const styles = StyleSheet.create({
   addSubtaskRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
   subInput: { flex: 1, fontSize: 15, marginRight: 10, height: 40 },
   
-  leftAction: { backgroundColor: '#34C759', justifyContent: 'center', alignItems: 'flex-end', flex: 1, paddingRight: 20, borderRadius: 12 },
-  rightAction: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'flex-start', flex: 1, paddingLeft: 20, borderRadius: 12 },
+  leftAction: { backgroundColor: '#34C759', justifyContent: 'center', alignItems: 'flex-end', flex: 1, paddingRight: 20, borderRadius: 24 },
+  rightAction: { backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'flex-start', flex: 1, paddingLeft: 20, borderRadius: 24 },
   
   quickAddWrapper: { 
       position: 'absolute', 
@@ -421,11 +422,11 @@ const styles = StyleSheet.create({
       shadowColor: "#000",
       shadowOffset: { width: 0, height: -2 },
       shadowOpacity: 0.1,
-      shadowRadius: 4,
+      shadowRadius: 15,
       elevation: 5,
   },
   quickAddInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  quickPriorityBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  quickPriorityBtn: { width: 40, height: 40, borderRadius: 24, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   priorityDot: { width: 12, height: 12, borderRadius: 6 },
   quickInput: { flex: 1, height: 44, fontSize: 16 },
 
@@ -434,16 +435,16 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   modalTitle: { fontSize: 20, fontWeight: '700' },
   label: { fontSize: 12, color: '#8E8E93', marginBottom: 8, marginTop: 16, fontWeight: '600', letterSpacing: 0.5 },
-  modalInput: { padding: 14, borderRadius: 12, fontSize: 17 },
-  inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14 },
+  modalInput: { padding: 14, borderRadius: 24, fontSize: 17 },
+  inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 24, paddingHorizontal: 14 },
   transparentInput: { flex: 1, height: 50, fontSize: 17 },
   priorityRow: { flexDirection: 'row', gap: 12 },
   priorityPill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, flex: 1, alignItems: 'center' },
   deleteActionBtn: { alignItems: 'center', padding: 16, marginTop: 20 },
   deleteText: { color: '#FF3B30', fontWeight: '600', fontSize: 17 },
-  saveBtn: { padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 30 },
+  saveBtn: { padding: 16, borderRadius: 24, alignItems: 'center', marginTop: 30 },
   saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 17 },
-  magicBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 12, marginTop: 8, gap: 8 },
+  magicBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 24, marginTop: 8, gap: 8 },
   magicBtnText: { fontWeight: '700', fontSize: 14 }
 });
 

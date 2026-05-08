@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Tasks from './Tasks';
 import Habits from './Habits';
 import Goals from './Goals';
@@ -47,32 +48,32 @@ const Planning: React.FC<PlanningProps> = (props) => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top + 10 }]}>
+        <View style={[styles.container, { backgroundColor: colors.bg }]}>
             {/* Top Navigation Segment */}
-            <View style={styles.segmentContainer}>
-                <View style={[styles.segment, { backgroundColor: colors.segmentBg }]}>
+            <View style={[styles.segmentWrapper, { paddingTop: insets.top + 10 }]}>
+                <BlurView intensity={Platform.OS === 'ios' ? 40 : 20} tint={isDarkMode ? 'dark' : 'light'} style={[styles.segment, { backgroundColor: colors.segmentBg }]}>
                     <TouchableOpacity 
                         style={[styles.segmentBtn, view === 'TASKS' && { backgroundColor: colors.segmentActive }]}
                         onPress={() => setView('TASKS')}
-                        activeOpacity={1}
+                        activeOpacity={0.8}
                     >
-                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'TASKS' ? '700' : '500' }]}>Tâches</Text>
+                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'TASKS' ? '900' : '500' }]}>Tâches</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.segmentBtn, view === 'HABITS' && { backgroundColor: colors.segmentActive }]}
                         onPress={() => setView('HABITS')}
-                        activeOpacity={1}
+                        activeOpacity={0.8}
                     >
-                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'HABITS' ? '700' : '500' }]}>Habitudes</Text>
+                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'HABITS' ? '900' : '500' }]}>Habitudes</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.segmentBtn, view === 'GOALS' && { backgroundColor: colors.segmentActive }]} 
                         onPress={() => setView('GOALS')}
-                        activeOpacity={1}
+                        activeOpacity={0.8}
                     >
-                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'GOALS' ? '700' : '500' }]}>Objectifs</Text>
+                        <Text style={[styles.segmentText, { color: colors.text, fontWeight: view === 'GOALS' ? '900' : '500' }]}>Objectifs</Text>
                     </TouchableOpacity>
-                </View>
+                </BlurView>
             </View>
 
             <View style={{flex: 1}}>
@@ -131,14 +132,16 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    segmentContainer: {
+    segmentWrapper: {
         paddingHorizontal: 20,
         paddingBottom: 10,
+        zIndex: 10,
     },
     segment: {
         flexDirection: 'row',
         padding: 4,
-        borderRadius: 12,
+        borderRadius: 24,
+        overflow: 'hidden',
     },
     segmentBtn: {
         flex: 1,

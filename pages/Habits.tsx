@@ -5,6 +5,7 @@ import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Target, Filter
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn, LinearTransition, Layout } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface HabitsProps {
   habits: Habit[];
@@ -17,12 +18,14 @@ interface HabitsProps {
   refreshHabits: () => void;
   openMenu: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const { width } = Dimensions.get('window');
 
-const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, createHabit, archiveHabit, deleteHabit, refreshHabits, openMenu, isDarkMode = true }) => {
+const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, createHabit, archiveHabit, deleteHabit, refreshHabits, openMenu, isDarkMode = true, noPadding = false }) => {
+  const insets = useSafeAreaInsets();
   const [showArchived, setShowArchived] = useState(false);
   const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
   const [filterMode, setFilterMode] = useState<'TODAY' | 'ALL'>('TODAY');
@@ -234,7 +237,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                         <Text style={[styles.habitTitle, {color: colors.text}, isCompletedToday && {textDecorationLine: 'line-through', color: colors.textSub}]}>{habit.title}</Text>
                         <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
                             <Text style={[styles.categoryLabel, {color: colors.textSub}]}>{habit.category?.toUpperCase() || 'GENERAL'}</Text>
-                            <Text style={{color: colors.orange, fontSize: 10, fontWeight: '800'}}>{habit.streak} 🔥</Text>
+                            <Text style={{color: colors.orange, fontSize: 10, fontWeight: '900'}}>{habit.streak} 🔥</Text>
                         </View>
                     </View>
                 </View>
@@ -269,7 +272,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* HEADER iOS Style */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: noPadding ? 10 : insets.top + 20 }]}>
          <View style={{flexDirection: 'row', alignItems: 'center'}}>
              <Text style={[styles.largeTitle, {color: colors.text}]}>Habitudes</Text>
          </View>
@@ -403,8 +406,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   largeTitle: {
-    fontSize: 34,
-    fontWeight: '800',
+    fontSize: 36,
+    fontWeight: '900',
     letterSpacing: 0.37,
   },
   headerRight: {
@@ -414,14 +417,14 @@ const styles = StyleSheet.create({
   iconButton: {
       width: 40,
       height: 40,
-      borderRadius: 20,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
   },
   addButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -447,7 +450,7 @@ const styles = StyleSheet.create({
   addInlineBtn: {
       paddingHorizontal: 20,
       paddingVertical: 10,
-      borderRadius: 12,
+      borderRadius: 24,
   },
   
   // LIST VIEW CARD
@@ -457,8 +460,8 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
     elevation: 2,
   },
   cardHeader: {
@@ -476,7 +479,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -493,7 +496,7 @@ const styles = StyleSheet.create({
   actionButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -524,7 +527,7 @@ const styles = StyleSheet.create({
   moreButton: {
       width: 32,
       height: 32,
-      borderRadius: 16,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
   },
@@ -544,13 +547,13 @@ const styles = StyleSheet.create({
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.1,
-      shadowRadius: 8,
+      shadowRadius: 15,
       elevation: 3,
   },
   gridIcon: {
       width: 44,
       height: 44,
-      borderRadius: 14,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
   },
@@ -593,7 +596,7 @@ const styles = StyleSheet.create({
       textTransform: 'uppercase',
   },
   input: {
-      borderRadius: 12,
+      borderRadius: 24,
       padding: 14,
       fontSize: 17,
       marginBottom: 20,
@@ -609,7 +612,7 @@ const styles = StyleSheet.create({
   dayCircle: {
       width: 40,
       height: 40,
-      borderRadius: 20,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
   },
@@ -629,7 +632,7 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       gap: 6,
       padding: 14,
-      borderRadius: 12,
+      borderRadius: 24,
   },
   deleteBtn: {
       flex: 1,
@@ -639,12 +642,12 @@ const styles = StyleSheet.create({
       gap: 6,
       backgroundColor: 'rgba(255, 59, 48, 0.1)',
       padding: 14,
-      borderRadius: 12,
+      borderRadius: 24,
   },
   saveMainBtn: {
       flexDirection: 'row',
       padding: 16,
-      borderRadius: 14,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 40,

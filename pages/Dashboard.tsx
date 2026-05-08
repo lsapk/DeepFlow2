@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Activ
 import { UserProfile, Task, Habit, Goal, ViewState, FocusSession, Announcement, JournalEntry, Reflection } from '../types';
 import { Check, Flame, Plus, Play, ChevronRight, Zap, Target, Cloud, CloudOff, RefreshCw, Menu, Megaphone, X as CloseIcon, Info, AlertTriangle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn, LinearTransition, Layout } from 'react-native-reanimated';
 import { Image } from 'expo-image';
@@ -155,7 +156,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       
       {/* HEADER - Safe Area Padding + Standard Flex Row */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top + 10, paddingBottom: 10, backgroundColor: colors.bg }]}>
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 10, paddingBottom: 10 }]}>
+          <BlurView intensity={Platform.OS === 'ios' ? 20 : 10} tint={isDarkMode ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
           <View style={styles.headerLeft}>
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
                   <Text style={[styles.greetingSub, {color: colors.textSub}]}>
@@ -197,7 +199,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
             >
                 {a.announcement_type === 'alert' ? <AlertTriangle size={18} color="#FFF" style={{ marginRight: 10 }} /> : (a.announcement_type === 'update' ? <Plus size={18} color="#FFF" style={{ marginRight: 10 }} /> : <Info size={18} color="#FFF" style={{ marginRight: 10 }} />)}
                 <View style={{ flex: 1 }}>
-                    <Text style={[styles.announcementText, { fontWeight: '800' }]}>{a.title}</Text>
+                    <Text style={[styles.announcementText, { fontWeight: '900' }]}>{a.title}</Text>
                     <Text style={[styles.announcementText, { fontSize: 12, opacity: 0.9 }]}>{a.content}</Text>
                 </View>
                 <TouchableOpacity onPress={() => handleCloseAnnouncement(a.id)} style={styles.announcementClose}>
@@ -412,7 +414,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 24,
     marginBottom: 20,
   },
   announcementText: {
@@ -439,7 +441,7 @@ const styles = StyleSheet.create({
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.1,
-      shadowRadius: 10,
+      shadowRadius: 15,
       elevation: 5,
   },
   heroContent: {
@@ -456,7 +458,7 @@ const styles = StyleSheet.create({
   },
   heroValue: {
       fontSize: 42,
-      fontWeight: '800',
+      fontWeight: '900',
       marginBottom: 4,
   },
   heroSub: {
@@ -482,8 +484,8 @@ const styles = StyleSheet.create({
       alignItems: 'flex-start',
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 5,
+      shadowOpacity: 0.1,
+      shadowRadius: 15,
       elevation: 2,
   },
   iconCircle: {
@@ -536,19 +538,19 @@ const styles = StyleSheet.create({
   habitCard: {
       width: 110,
       height: 110,
-      borderRadius: 20,
+      borderRadius: 24,
       padding: 14,
       justifyContent: 'space-between',
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
+      shadowOpacity: 0.1,
+      shadowRadius: 15,
       elevation: 2,
   },
   habitIcon: {
       width: 32,
       height: 32,
-      borderRadius: 12,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
   },
@@ -563,7 +565,7 @@ const styles = StyleSheet.create({
   addHabitCard: {
       width: 60,
       height: 110,
-      borderRadius: 20,
+      borderRadius: 24,
       borderWidth: 1,
       borderStyle: 'dashed',
       alignItems: 'center',
@@ -576,8 +578,8 @@ const styles = StyleSheet.create({
       paddingVertical: 4,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
+      shadowOpacity: 0.1,
+      shadowRadius: 15,
       elevation: 2,
   },
   taskRow: {

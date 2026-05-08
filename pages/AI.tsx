@@ -211,9 +211,10 @@ const AI: React.FC<AIProps> = ({
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+        <View style={[styles.container, { backgroundColor: colors.bg }]}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+                <BlurView intensity={Platform.OS === 'ios' ? 20 : 10} tint={isDarkMode ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
                 <View style={styles.titleContainer}>
                     <Brain size={24} color={colors.accent} style={{ marginRight: 10 }} />
                     <Text style={[styles.title, { color: colors.text }]}>DeepFlow AI</Text>
@@ -349,21 +350,21 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     header: { paddingHorizontal: 20, paddingVertical: 15 },
     titleContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-    title: { fontSize: 24, fontWeight: '800' },
-    tabContainer: { flexDirection: 'row', borderRadius: 12, padding: 4 },
+    title: { fontSize: 24, fontWeight: '900' },
+    tabContainer: { flexDirection: 'row', borderRadius: 24, padding: 4 },
     tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 10, gap: 8 },
     tabText: { fontSize: 14, fontWeight: '600' },
 
     // Chat
     chatScroll: { flex: 1, paddingHorizontal: 20 },
-    messageBubble: { maxWidth: '85%', padding: 16, borderRadius: 20, marginBottom: 12 },
+    messageBubble: { maxWidth: '85%', padding: 16, borderRadius: 24, marginBottom: 12 },
     userBubble: { alignSelf: 'flex-end', backgroundColor: '#007AFF' },
     aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
     userText: { color: '#FFF', fontSize: 16 },
     inputWrapper: { paddingHorizontal: 20 },
     inputBlur: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
     textInput: { flex: 1, paddingHorizontal: 12, maxHeight: 100, fontSize: 16 },
-    sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    sendBtn: { width: 40, height: 40, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
 
     // Analysis
     analysisContainer: { flex: 1, paddingHorizontal: 20 },
@@ -371,11 +372,11 @@ const styles = StyleSheet.create({
     cardTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
     cardSub: { fontSize: 14, marginBottom: 20 },
     chartContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 },
-    refreshBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, marginTop: 20 },
+    refreshBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 24, borderWidth: 1, marginTop: 20 },
     insightGrid: { flexDirection: 'row', gap: 15, marginBottom: 20 },
     insightCard: { flex: 1, borderRadius: 24, padding: 20 },
     insightTitle: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-    insightValue: { fontSize: 22, fontWeight: '800', marginBottom: 4 },
+    insightValue: { fontSize: 22, fontWeight: '900', marginBottom: 4 },
     insightSub: { fontSize: 12 },
     cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
     insightText: { fontSize: 15, lineHeight: 22 }

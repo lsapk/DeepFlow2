@@ -478,6 +478,17 @@ const App: React.FC = () => {
 
   // ... (Other CRUD actions: createSubtask, toggleSubtask, deleteSubtask, deleteGoal, createSubObjective, etc. kept same) ...
   const createSubtask = async (taskId: string, title: string) => { if (!user) return; const newSub: Subtask = { id: generateId(), parent_task_id: taskId, user_id: user.id, title: title, description: null, priority: 'medium', completed: false, sort_order: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: [...(t.subtasks || []), newSub] } : t); setTasks(updatedTasks); saveToCache(CACHE_KEYS.TASKS, updatedTasks); try { await supabase.from('subtasks').insert(newSub); } catch (e) { queueAction({ type: 'INSERT', table: 'subtasks', payload: newSub }); } };
+  const toggleGoal = async (id: string) => {
+      const goal = goals.find(g => g.id === id);
+      if (!goal) return;
+      const isCompleting = !goal.completed;
+      const updatedGoals = goals.map(g => g.id === id ? { ...g, completed: isCompleting } : g);
+      setGoals(updatedGoals);
+      saveToCache(CACHE_KEYS.GOALS, updatedGoals);
+
+      try { const { error } = await supabase.from('goals').update({ completed: isCompleting }).eq('id', id); if (error) throw error; } catch (e) { queueAction({ type: 'UPDATE', table: 'goals', payload: { id, completed: isCompleting } }); }
+  };
+
   const toggleSubtask = async (subId: string, taskId: string) => { const task = tasks.find(t => t.id === taskId); const sub = task?.subtasks?.find(s => s.id === subId); if (sub) { const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks?.map(s => s.id === subId ? { ...s, completed: !s.completed } : s) } : t); setTasks(updatedTasks); saveToCache(CACHE_KEYS.TASKS, updatedTasks); try { await supabase.from('subtasks').update({ completed: !sub.completed }).eq('id', subId); } catch (e) { queueAction({ type: 'UPDATE', table: 'subtasks', payload: { id: subId, completed: !sub.completed } }); } } };
   const deleteSubtask = async (subId: string, taskId: string) => { const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, subtasks: t.subtasks?.filter(s => s.id !== subId) } : t); setTasks(updatedTasks); saveToCache(CACHE_KEYS.TASKS, updatedTasks); try { await supabase.from('subtasks').delete().eq('id', subId); } catch (e) { queueAction({ type: 'DELETE', table: 'subtasks', payload: { id: subId } }); } };
   const deleteGoal = async (id: string) => { const updatedGoals = goals.filter(g => g.id !== id); setGoals(updatedGoals); saveToCache(CACHE_KEYS.GOALS, updatedGoals); try { await supabase.from('goals').delete().eq('id', id); } catch (e) { queueAction({ type: 'DELETE', table: 'goals', payload: { id } }); } };
@@ -550,7 +561,7 @@ const App: React.FC = () => {
           createHabit={createHabit}
           archiveHabit={archiveHabit}
           deleteHabit={deleteHabit}
-          toggleGoal={()=>{}}
+          toggleGoal={toggleGoal}
           addGoal={createGoal}
           deleteGoal={deleteGoal}
           createSubObjective={createSubObjective}
@@ -577,7 +588,7 @@ const App: React.FC = () => {
           Content = <Habits habits={habits} goals={goals} incrementHabit={toggleHabit} userId={user.id} createHabit={createHabit} archiveHabit={archiveHabit} deleteHabit={deleteHabit} refreshHabits={() => fetchData(user.id)} openMenu={openMenuHandler} {...commonProps} />;
           break;
       case ViewState.GOALS:
-          Content = <Goals goals={goals} toggleGoal={()=>{}} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
+          Content = <Goals goals={goals} toggleGoal={toggleGoal} addGoal={createGoal} deleteGoal={deleteGoal} createSubObjective={createSubObjective} toggleSubObjective={toggleSubObjective} deleteSubObjective={deleteSubObjective} userId={user.id} refreshGoals={() => fetchData(user.id)} openMenu={openMenuHandler} isDarkMode={isDarkMode} />;
           break;
       case ViewState.FOCUS_MODE:
         Content = <Focus onExit={() => setCurrentView(ViewState.TODAY)} tasks={tasks} isDarkMode={isDarkMode} openMenu={openMenuHandler} />;
@@ -623,7 +634,7 @@ const App: React.FC = () => {
             <View style={{ flex: 1 }}>
                 <Animated.View 
                     key={currentView} 
-                    entering={FadeIn.duration(200)}
+                    entering={FadeIn.duration(300)}
                     style={{flex: 1}}
                 >
                     {Content}
