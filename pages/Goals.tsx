@@ -4,6 +4,7 @@ import { Goal, SubObjective } from '../types';
 import { Plus, Check, ChevronDown, ChevronUp, X, Minus, Flag, GitBranch, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface GoalsProps {
   goals: Goal[];
@@ -21,6 +22,7 @@ interface GoalsProps {
 }
 
 const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, createSubObjective, toggleSubObjective, deleteSubObjective, userId, refreshGoals, openMenu, isDarkMode = true, noPadding = false }) => {
+  const insets = useSafeAreaInsets();
   const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = useState(false);
   
@@ -101,8 +103,8 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   const completedGoals = goals.filter(t => t.completed);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : 20 }]}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.header, { paddingTop: noPadding ? 10 : insets.top + 20 }]}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
                <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
           </View>
@@ -340,7 +342,7 @@ const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLon
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20 },
   header: { paddingHorizontal: 20, marginBottom: 16, marginTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: 0.37 },
+  largeTitle: { fontSize: 36, fontWeight: '900', letterSpacing: 0.37 },
   addButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 150 },
   sectionHeader: { marginBottom: 8, marginLeft: 4 },
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
   toggleCompletedBtn: { padding: 16, alignItems: 'center' },
   toggleText: { fontSize: 15, fontWeight: '500' },
   emptyText: { padding: 20, textAlign: 'center', fontStyle: 'italic' },
-  goalCard: { borderRadius: 16, overflow: 'hidden', paddingBottom: 4 },
+  goalCard: { borderRadius: 24, overflow: 'hidden', paddingBottom: 4 },
   taskItem: { padding: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   taskContent: { flex: 1 },
@@ -385,12 +387,12 @@ const styles = StyleSheet.create({
   modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   modalTitle: { fontSize: 20, fontWeight: '700' },
-  modalInput: { padding: 14, borderRadius: 12, fontSize: 17, marginBottom: 20 },
-  inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14, marginBottom: 20 },
+  modalInput: { padding: 14, borderRadius: 24, fontSize: 17, marginBottom: 20 },
+  inputWithIcon: { flexDirection: 'row', alignItems: 'center', borderRadius: 24, paddingHorizontal: 14, marginBottom: 20 },
   inputLabel: { fontSize: 12, fontWeight: '600', color: '#8E8E93', marginBottom: 8, textTransform: 'uppercase' },
   deleteActionBtn: { alignItems: 'center', marginTop: 20, padding: 10 },
   deleteText: { color: '#FF3B30', fontWeight: '600', fontSize: 17 },
-  saveBtn: { padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 10 },
+  saveBtn: { padding: 16, borderRadius: 24, alignItems: 'center', marginTop: 10 },
   saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 17 }
 });
 

@@ -210,3 +210,11 @@ export enum ViewState {
   AI = 'AI',
   ADMIN = 'ADMIN'
 }
+
+export interface AvatarConfig {
+  class: string;
+  helmet: string;
+  armor: string;
+  color: string;
+  glow_color: string;
+}
