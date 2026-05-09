@@ -63,6 +63,14 @@ export interface PlatformStats {
   totalFocusHours: number;
 }
 
+export interface AvatarConfig {
+  class?: string;
+  helmet?: string;
+  armor?: string;
+  color?: string;
+  glow_color?: string;
+}
+
 export interface AiPermissions {
     tasks: boolean;
     habits: boolean;
