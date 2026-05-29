@@ -1,6 +1,14 @@
 
 // derived from provided schema
 
+export interface AvatarConfig {
+  class?: string;
+  helmet?: string;
+  armor?: string;
+  color?: string;
+  glow_color?: string;
+}
+
 export interface UserProfile {
   id: string;
   display_name: string | null;

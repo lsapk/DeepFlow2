@@ -4,6 +4,9 @@ import { Reflection } from '../types';
 import { BookOpen, Sparkles, Send, History, RefreshCw, PenLine, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 
 interface ReflectionProps {
   userId: string;
@@ -56,15 +59,13 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
   const [saving, setSaving] = useState(false);
 
   const colors = {
-      bg: isDarkMode ? '#000' : '#F2F2F7',
-      card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      text: isDarkMode ? '#FFF' : '#000',
-      subText: isDarkMode ? '#8E8E93' : '#8E8E93',
-      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      inputBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      accent: '#C4B5FD', // Violet soft
-      button: '#007AFF', // Apple Blue
-      questionBg: isDarkMode ? 'rgba(196, 181, 253, 0.1)' : '#F5F3FF'
+      ...Theme.colors,
+      bg: Theme.colors.background,
+      card: Theme.colors.surface,
+      subText: Theme.colors.textSecondary,
+      accent: Theme.colors.violet,
+      button: Theme.colors.primary,
+      questionBg: 'rgba(196, 181, 253, 0.1)'
   };
 
   useEffect(() => {
@@ -139,7 +140,7 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
               
               {/* Question Card */}
-              <View style={[styles.questionCard, {backgroundColor: colors.questionBg, borderColor: colors.accent}]}>
+              <GlassCard style={[styles.questionCard, {borderColor: colors.accent}]}>
                   <View style={styles.questionHeader}>
                       <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
                           <Sparkles size={16} color={colors.accent} fill={colors.accent} />
@@ -150,10 +151,10 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
                       </TouchableOpacity>
                   </View>
                   <Text style={[styles.questionText, {color: colors.text}]}>{currentQuestion}</Text>
-              </View>
+              </GlassCard>
 
               {/* Input Area */}
-              <View style={[styles.inputContainer, {backgroundColor: colors.inputBg}]}>
+              <View style={[styles.inputContainer, {backgroundColor: 'rgba(255,255,255,0.05)'}]}>
                   <TextInput 
                       style={[styles.textArea, {color: colors.text}]}
                       multiline
@@ -198,9 +199,9 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
                   const formattedDate = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
                   
                   return (
+                      <GlassCard key={item.id} style={{ marginBottom: 16 }}>
                       <TouchableOpacity 
-                        key={item.id} 
-                        style={[styles.historyCard, {backgroundColor: colors.card}]}
+                        style={styles.historyCard}
                         activeOpacity={0.7}
                         onLongPress={() => confirmDelete(item.id)}
                       >
@@ -208,12 +209,13 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
                               <Text style={[styles.historyDate, {color: colors.subText}]}>{formattedDate}</Text>
                           </View>
                           
-                          <View style={[styles.historyQuestionBox, {backgroundColor: isDarkMode ? '#2C2C2E' : '#F2F2F7'}]}>
+                          <View style={[styles.historyQuestionBox, {backgroundColor: 'rgba(255,255,255,0.05)'}]}>
                               <Text style={[styles.historyQuestion, {color: colors.text}]}>{item.question}</Text>
                           </View>
                           
-                          <Text style={[styles.historyAnswer, {color: colors.subText}]}>{item.answer}</Text>
+                          <Text style={[styles.historyAnswer, {color: Theme.colors.textSecondary}]}>{item.answer}</Text>
                       </TouchableOpacity>
+                      </GlassCard>
                   );
               })
           )}
@@ -221,7 +223,7 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
   );
 
   return (
-    <View style={[styles.container, {backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top}]}>
+    <PageContainer style={[styles.container, {paddingTop: noPadding ? 0 : insets.top}]}>
       {/* Header Styled Apple */}
       <View style={styles.header}>
         <View style={styles.headerTitleContainer}>
@@ -251,7 +253,7 @@ const ReflectionPage: React.FC<ReflectionProps> = ({ userId, openMenu, isDarkMod
       <View style={styles.contentContainer}>
           {viewMode === 'WRITE' ? renderWriteMode() : renderHistoryMode()}
       </View>
-    </View>
+    </PageContainer>
   );
 };
 
@@ -286,6 +288,7 @@ const styles = StyleSheet.create({
       borderRadius: 16,
       gap: 6,
       zIndex: 50,
+      backgroundColor: 'rgba(255,255,255,0.1)',
   },
   toggleText: {
       fontSize: 12,
@@ -302,7 +305,6 @@ const styles = StyleSheet.create({
   // Write Mode Styles
   questionCard: {
       padding: 20,
-      borderRadius: 20,
       marginBottom: 20,
       borderWidth: 1,
       marginTop: 10,
@@ -375,9 +377,7 @@ const styles = StyleSheet.create({
       fontStyle: 'italic',
   },
   historyCard: {
-      borderRadius: 20,
       padding: 20,
-      marginBottom: 16,
   },
   historyHeader: {
       flexDirection: 'row',

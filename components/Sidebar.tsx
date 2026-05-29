@@ -1,9 +1,11 @@
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, ScrollView, Platform } from 'react-native';
 import { UserProfile, ViewState } from '../types';
 import { LayoutDashboard, TrendingUp, Target, CheckSquare, RefreshCw, Book, Zap, X, BrainCircuit, Shield, Brain } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { Theme } from '../theme';
 
 interface SidebarProps {
   visible: boolean;
@@ -42,6 +44,11 @@ const Sidebar: React.FC<SidebarProps> = ({ visible, onClose, user, isAdmin = fal
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
         <View style={styles.overlay}>
             <View style={[styles.drawer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
+                {Platform.OS !== 'web' ? (
+                  <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(9, 9, 9, 0.95)', backdropFilter: 'blur(10px)' } as any]} />
+                )}
                 
                 <View style={styles.header}>
                      {user && (
@@ -107,12 +114,13 @@ const styles = StyleSheet.create({
   drawer: {
       width: '80%', 
       maxWidth: 300,
-      backgroundColor: '#090909',
+      backgroundColor: 'transparent',
       height: '100%',
       borderRightWidth: 1,
-      borderRightColor: '#262626',
+      borderRightColor: 'rgba(255,255,255,0.1)',
       display: 'flex',
       flexDirection: 'column',
+      overflow: 'hidden',
   },
   header: {
       paddingHorizontal: 20,
@@ -172,7 +180,7 @@ const styles = StyleSheet.create({
       gap: 12,
   },
   menuItemActive: {
-      backgroundColor: '#FFF',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   iconBox: {
       width: 24,
@@ -187,7 +195,7 @@ const styles = StyleSheet.create({
       fontWeight: '500',
   },
   menuTextActive: {
-      color: '#000',
+      color: '#FFF',
       fontWeight: '700',
   },
   footerInfo: {

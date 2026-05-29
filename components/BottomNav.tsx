@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue, withTiming, FadeIn } from 'react-native-reanimated';
+import { Theme } from '../theme';
 
 interface BottomNavProps {
   currentView: ViewState;
@@ -186,10 +187,10 @@ const styles = StyleSheet.create({
       width: 64,
       height: 64,
       borderRadius: 32,
-      backgroundColor: '#007AFF',
+      backgroundColor: Theme.colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: '#007AFF',
+      shadowColor: Theme.colors.primary,
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.4,
       shadowRadius: 12,

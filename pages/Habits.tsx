@@ -5,6 +5,9 @@ import { Flame, Check, Plus, Archive, X, Trash2, Save, RefreshCw, Target, Filter
 import { supabase } from '../services/supabase';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn, LinearTransition, Layout } from 'react-native-reanimated';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 
 interface HabitsProps {
   habits: Habit[];
@@ -17,6 +20,7 @@ interface HabitsProps {
   refreshHabits: () => void;
   openMenu: () => void;
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
@@ -39,15 +43,13 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
   const [linkedGoalId, setLinkedGoalId] = useState<string | null>(null);
 
   const colors = {
-      bg: isDarkMode ? '#000000' : '#F2F2F7',
-      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      text: isDarkMode ? '#FFFFFF' : '#000000',
-      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
-      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      accent: '#007AFF',
-      orange: '#FF9500',
-      success: '#34C759',
-      streak: '#FF5733'
+      ...Theme.colors,
+      bg: Theme.colors.background,
+      cardBg: Theme.colors.surface,
+      textSub: Theme.colors.textSecondary,
+      accent: Theme.colors.primary,
+      orange: Theme.colors.warning,
+      streak: Theme.colors.danger
   };
 
   const openCreateModal = () => {
@@ -188,43 +190,48 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
       return <View style={styles.chainContainer}>{dots}</View>;
   }
 
-  const renderGridItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean) => (
+  const renderGridItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean, index: number) => (
       <Animated.View
           key={habit.id}
           layout={LinearTransition}
-          entering={FadeInDown}
+          entering={FadeInDown.duration(400).delay(index * 50).springify()}
       >
           <TouchableOpacity
-              style={[styles.gridCard, {backgroundColor: colors.cardBg, opacity: isScheduledToday || isCompletedToday ? 1 : 0.6}]}
               onPress={() => handleIncrement(habit.id)}
               onLongPress={() => openEditModal(habit)}
               activeOpacity={0.8}
           >
-              <View style={[styles.gridIcon, {backgroundColor: isCompletedToday ? colors.success : (isDarkMode ? '#2C2C2E' : '#F2F2F7')}]}>
-                   {isCompletedToday ? <Check size={24} color="#FFF" strokeWidth={3} /> : <Flame size={24} color={isDarkMode ? colors.orange : '#FF9500'} fill={isDarkMode ? colors.orange : '#FF9500'} />}
-              </View>
-              <View>
-                  <Text style={[styles.gridTitle, {color: colors.text}]} numberOfLines={2}>{habit.title}</Text>
-                  <View style={styles.gridFooter}>
-                      <Text style={{color: colors.orange, fontSize: 13, fontWeight: '700'}}>{habit.streak} 🔥</Text>
-                  </View>
-              </View>
+            <GlassCard
+                style={[styles.gridCard, { opacity: isScheduledToday || isCompletedToday ? 1 : 0.6 }]}
+            >
+                <View style={[styles.gridIcon, {backgroundColor: isCompletedToday ? colors.success : 'rgba(255,255,255,0.1)'}]}>
+                   {isCompletedToday ? <Check size={24} color="#FFF" strokeWidth={3} /> : <Flame size={24} color={colors.orange} fill={colors.orange} />}
+                </View>
+                <View>
+                    <Text style={[styles.gridTitle, {color: colors.text}]} numberOfLines={2}>{habit.title}</Text>
+                    <View style={styles.gridFooter}>
+                        <Text style={{color: colors.orange, fontSize: 13, fontWeight: '700'}}>{habit.streak} 🔥</Text>
+                    </View>
+                </View>
+            </GlassCard>
           </TouchableOpacity>
       </Animated.View>
   );
 
-  const renderListItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean) => (
+  const renderListItem = (habit: Habit, isCompletedToday: boolean, isScheduledToday: boolean, index: number) => (
     <Animated.View
         key={habit.id}
         layout={LinearTransition}
-        entering={FadeInDown}
+        entering={FadeInDown.duration(400).delay(index * 50).springify()}
     >
         <TouchableOpacity
-            style={[styles.card, {backgroundColor: colors.cardBg}, !(isScheduledToday || isCompletedToday) && {opacity: 0.5}]}
             onPress={() => handleIncrement(habit.id)}
             onLongPress={() => openEditModal(habit)}
             activeOpacity={0.9}
         >
+          <GlassCard
+              style={[styles.card, !(isScheduledToday || isCompletedToday) && {opacity: 0.5}]}
+          >
             <View style={styles.cardHeader}>
                 <View style={styles.headerLeft}>
                     <View style={[styles.iconContainer, { backgroundColor: isCompletedToday ? colors.success : (isDarkMode ? '#2C2C2E' : '#F2F2F7') }]}>
@@ -262,12 +269,13 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
                  <StreakChain streak={habit.streak} isCompletedToday={isCompletedToday || false} />
                  <Text style={[styles.streakCount, {color: colors.textSub}]}>{habit.streak} jours</Text>
             </View>
+          </GlassCard>
         </TouchableOpacity>
     </Animated.View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <PageContainer style={styles.container}>
       {/* HEADER iOS Style */}
       <View style={styles.header}>
          <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -318,17 +326,17 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
         
         {viewMode === 'GRID' ? (
             <View style={styles.gridContainer}>
-                {displayedHabits.map(habit => {
+                {displayedHabits.map((habit, index) => {
                     const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toDateString() === new Date().toDateString();
                     const isScheduledToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(todayIndex);
-                    return renderGridItem(habit, !!isCompletedToday, isScheduledToday);
+                    return renderGridItem(habit, !!isCompletedToday, isScheduledToday, index);
                 })}
             </View>
         ) : (
-            displayedHabits.map(habit => {
+            displayedHabits.map((habit, index) => {
                 const isCompletedToday = habit.last_completed_at && new Date(habit.last_completed_at).toDateString() === new Date().toDateString();
                 const isScheduledToday = !habit.days_of_week || habit.days_of_week.length === 0 || habit.days_of_week.includes(todayIndex);
-                return renderListItem(habit, !!isCompletedToday, isScheduledToday);
+                return renderListItem(habit, !!isCompletedToday, isScheduledToday, index);
             })
         )}
 
@@ -385,7 +393,7 @@ const Habits: React.FC<HabitsProps> = ({ habits, goals, incrementHabit, userId, 
               </View>
           </View>
       </Modal>
-    </View>
+    </PageContainer>
   );
 };
 
@@ -538,14 +546,8 @@ const styles = StyleSheet.create({
   gridCard: {
       width: (width - 52) / 2, // 2 cols with padding
       height: 160,
-      borderRadius: 24,
       padding: 16,
       justifyContent: 'space-between',
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 3,
   },
   gridIcon: {
       width: 44,

@@ -8,6 +8,9 @@ import Animated, { FadeInDown, FadeIn, LinearTransition, Layout } from 'react-na
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 import { computeProductivityScore } from '../services/productivity';
 import { getActiveAnnouncements } from '../services/admin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -66,15 +69,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
   const visibleAnnouncements = announcements.filter(a => !closedAnnouncements.includes(a.id));
   
   const colors = {
-      bg: isDarkMode ? '#000000' : '#F2F2F7',
-      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      text: isDarkMode ? '#FFFFFF' : '#000000',
-      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
-      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      accent: '#007AFF',
-      success: '#34C759',
-      danger: '#FF3B30',
-      orange: '#FF9500',
+      ...Theme.colors,
+      textSub: Theme.colors.textSecondary,
+      orange: Theme.colors.warning
   };
 
   const isSameDay = (d1: Date, d2: Date) => {
@@ -152,13 +149,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <PageContainer style={styles.container}>
       
       {/* HEADER - Safe Area Padding + Standard Flex Row */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top + 10, paddingBottom: 10, backgroundColor: colors.bg }]}>
+      <View style={[styles.headerContainer, { paddingTop: insets.top + 10, paddingBottom: 10 }]}>
           <View style={styles.headerLeft}>
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2}}>
-                  <Text style={[styles.greetingSub, {color: colors.textSub}]}>
+                  <Text style={[styles.greetingSub, {color: colors.textSecondary}]}>
                       {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
                   </Text>
                   {renderSyncIcon()}
@@ -210,32 +207,33 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
         <View style={styles.bentoGrid}>
             
             {/* LARGE HERO: PRODUCTIVITY */}
-            <View
-                style={[styles.bentoHero, { backgroundColor: colors.cardBg }]}
+            <Animated.View entering={FadeInDown.duration(600).delay(100).springify()}>
+            <GlassCard
+                style={styles.bentoHero}
             >
                 <LinearGradient
-                    colors={isDarkMode ? ['#1E3A8A', '#000000'] : ['#E0E7FF', '#FFFFFF']}
+                    colors={[Theme.colors.violet + '40', 'transparent']}
                     style={StyleSheet.absoluteFill}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                 />
                 <View style={styles.heroContent}>
                     <View>
-                        <Text style={[styles.heroLabel, { color: isDarkMode ? '#BFDBFE' : '#6366F1' }]}>SCORE DE PRODUCTIVITÉ</Text>
-                        <Text style={[styles.heroValue, { color: isDarkMode ? '#FFF' : '#111' }]}>{productivityScore}</Text>
-                        <Text style={[styles.heroSub, { color: isDarkMode ? '#9CA3AF' : '#6B7280' }]}>Performance globale</Text>
+                        <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>SCORE DE PRODUCTIVITÉ</Text>
+                        <Text style={[styles.heroValue, { color: colors.text }]}>{productivityScore}</Text>
+                        <Text style={[styles.heroSub, { color: colors.textSecondary }]}>Performance globale</Text>
                     </View>
                     <View style={styles.ringContainer}>
                          <Svg width={size} height={size} style={{position: 'absolute'}}>
                             <Circle 
                                 cx={size / 2} cy={size / 2} r={radius} 
-                                stroke={isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"} 
+                                stroke="rgba(255,255,255,0.1)"
                                 strokeWidth={strokeWidth}
                                 fill="transparent"
                             />
                             <Circle 
                                 cx={size / 2} cy={size / 2} r={radius} 
-                                stroke={isDarkMode ? "#60A5FA" : "#6366F1"} 
+                                stroke={colors.violet}
                                 strokeWidth={strokeWidth}
                                 strokeDasharray={circumference}
                                 strokeDashoffset={strokeDashoffset}
@@ -245,42 +243,49 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
                                 origin={`${size / 2}, ${size/2}`}
                             />
                          </Svg>
-                         <Target size={24} color={isDarkMode ? '#FFF' : '#000'} />
+                         <Target size={24} color={colors.text} />
                     </View>
                 </View>
-            </View>
+            </GlassCard>
+            </Animated.View>
 
             <View style={styles.bentoRow}>
                 {/* SMALL: STREAK */}
-                <View style={[styles.bentoSmall, { backgroundColor: colors.cardBg }]}>
+                <Animated.View entering={FadeInDown.duration(600).delay(200).springify()} style={{ flex: 1 }}>
+                <GlassCard style={styles.bentoSmall}>
                     <View style={[styles.iconCircle, { backgroundColor: 'rgba(255, 149, 0, 0.15)' }]}>
-                        <Flame size={20} color={colors.orange} fill={colors.orange} />
+                        <Flame size={20} color={colors.warning} fill={colors.warning} />
                     </View>
                     <View>
                         <Text style={[styles.statValue, { color: colors.text }]}>{Math.round(averageStreak)}</Text>
-                        <Text style={[styles.statLabel, { color: colors.textSub }]}>Streak Moy.</Text>
+                        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Streak Moy.</Text>
                     </View>
-                </View>
+                </GlassCard>
+                </Animated.View>
 
                 {/* SMALL: FOCUS ACTION */}
+                <Animated.View entering={FadeInDown.duration(600).delay(300).springify()} style={{ flex: 1 }}>
                 <TouchableOpacity 
-                    style={[styles.bentoSmall, { backgroundColor: isDarkMode ? '#1C1C1E' : '#FFF' }]}
+                    style={{ flex: 1 }}
                     onPress={openFocus}
                     activeOpacity={0.7}
                 >
+                  <GlassCard style={styles.bentoSmall}>
                     <View style={[styles.iconCircle, { backgroundColor: 'rgba(52, 199, 89, 0.15)' }]}>
                         <Zap size={20} color={colors.success} fill={colors.success} />
                     </View>
                      <View>
                         <Text style={[styles.statValue, { color: colors.text }]}>Focus</Text>
-                        <Text style={[styles.statLabel, { color: colors.textSub }]}>Démarrer</Text>
+                        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Démarrer</Text>
                     </View>
+                  </GlassCard>
                 </TouchableOpacity>
+                </Animated.View>
             </View>
         </View>
 
         {/* HABITS SECTION */}
-        <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
+        <Animated.View entering={FadeInDown.duration(600).delay(400).springify()} style={styles.sectionContainer}>
             <TouchableOpacity 
                 style={styles.sectionHeaderBtn} 
                 onPress={() => handleNav(ViewState.HABITS)}
@@ -295,38 +300,40 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
             
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScroll}>
                 {sortedHabits.length === 0 && (
-                    <Text style={{color: colors.textSub, fontStyle: 'italic', paddingLeft: 4}}>Rien de prévu aujourd'hui.</Text>
+                    <Text style={{color: colors.textSecondary, fontStyle: 'italic', paddingLeft: 4}}>Rien de prévu aujourd'hui.</Text>
                 )}
                 {sortedHabits.map((habit) => {
                     const isDone = habit.last_completed_at && isSameDay(new Date(habit.last_completed_at), today);
                     return (
                         <TouchableOpacity 
                             key={habit.id} 
-                            style={[
-                                styles.habitCard, 
-                                { backgroundColor: colors.cardBg },
-                                isDone && { opacity: 0.6 }
-                            ]} 
                             onPress={() => handleToggleHabit(habit.id)}
                             activeOpacity={0.6}
                         >
-                            <View style={[styles.habitIcon, { backgroundColor: isDone ? colors.success : (isDarkMode ? '#333' : '#F2F2F7') }]}>
-                                {isDone ? <Check size={16} color="#FFF" strokeWidth={3} /> : <Flame size={16} color={colors.textSub} />}
+                          <GlassCard
+                              style={[
+                                  styles.habitCard,
+                                  isDone && { opacity: 0.6 }
+                              ]}
+                          >
+                            <View style={[styles.habitIcon, { backgroundColor: isDone ? colors.success : 'rgba(255,255,255,0.1)' }]}>
+                                {isDone ? <Check size={16} color="#FFF" strokeWidth={3} /> : <Flame size={16} color={colors.textSecondary} />}
                             </View>
                             <Text style={[styles.habitTitle, { color: colors.text }, isDone && styles.textMuted]} numberOfLines={2}>
                                 {habit.title}
                             </Text>
+                          </GlassCard>
                         </TouchableOpacity>
                     )
                 })}
                 <TouchableOpacity style={[styles.addHabitCard, { borderColor: colors.border }]} onPress={() => handleNav(ViewState.HABITS)}>
-                    <Plus size={24} color={colors.textSub} />
+                    <Plus size={24} color={colors.textSecondary} />
                 </TouchableOpacity>
             </ScrollView>
         </Animated.View>
 
         {/* TASKS LIST */}
-        <Animated.View entering={FadeInDown.duration(300)} style={styles.sectionContainer}>
+        <Animated.View entering={FadeInDown.duration(600).delay(500).springify()} style={styles.sectionContainer}>
             <TouchableOpacity 
                 style={styles.sectionHeaderBtn} 
                 onPress={() => handleNav(ViewState.TASKS)}
@@ -339,10 +346,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
                 </View>
             </TouchableOpacity>
 
-            <View style={[styles.taskList, { backgroundColor: colors.cardBg }]}>
+            <GlassCard style={styles.taskList}>
                 {activeTasks.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={[styles.emptyText, {color: colors.textSub}]}>Tout est fait pour l'instant.</Text>
+                        <Text style={[styles.emptyText, {color: colors.textSecondary}]}>Tout est fait pour l'instant.</Text>
                     </View>
                 ) : (
                     activeTasks.map((task, index) => (
@@ -352,7 +359,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
                             onPress={() => handleToggleTask(task.id)}
                             activeOpacity={0.6}
                         >
-                            <View style={[styles.checkbox, { borderColor: colors.textSub }]}>
+                            <View style={[styles.checkbox, { borderColor: colors.textSecondary }]}>
                                 {task.completed && <Check size={12} color="#FFF" strokeWidth={3} />}
                             </View>
                             <View style={{flex: 1}}>
@@ -362,11 +369,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tasks, habits, goals, focus
                         </TouchableOpacity>
                     ))
                 )}
-            </View>
+            </GlassCard>
         </Animated.View>
 
       </ScrollView>
-    </View>
+    </PageContainer>
   );
 };
 

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert, Platform } from 'react-native';
 import { JournalEntry } from '../types';
 import { Save, Plus, X, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addToQueue, generateId } from '../services/offline';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
+import { BlurView } from 'expo-blur';
 
 interface JournalProps {
   userId: string;
@@ -41,13 +45,11 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
   const [dateInput, setDateInput] = useState(''); // YYYY-MM-DDTHH:mm
 
   const colors = {
-      bg: isDarkMode ? '#000' : '#F2F2F7',
-      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      text: isDarkMode ? '#FFF' : '#000',
-      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
-      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      accent: '#007AFF',
-      orange: '#FF9500',
+      ...Theme.colors,
+      bg: Theme.colors.background,
+      cardBg: Theme.colors.surface,
+      textSub: Theme.colors.textSecondary,
+      accent: Theme.colors.primary,
   };
 
   useEffect(() => {
@@ -154,7 +156,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : insets.top }]}>
+    <PageContainer style={[styles.container, { paddingTop: noPadding ? 0 : 20 }]}>
         <View style={styles.header}>
             <View style={styles.headerTitleContainer}>
                 <Text style={[styles.largeTitle, { color: colors.text }]}>Journal</Text>
@@ -171,38 +173,39 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
             {entries.map(entry => {
                 const dateObj = new Date(entry.created_at);
                 return (
-                    <TouchableOpacity 
-                        key={entry.id} 
-                        style={[styles.card, { backgroundColor: colors.cardBg }]}
-                        activeOpacity={0.7}
-                        onLongPress={() => confirmDelete(entry.id)}
-                    >
-                        <View style={styles.cardHeader}>
-                            <View>
-                                <Text style={styles.dayNum}>{dateObj.getDate()}</Text>
-                                <Text style={styles.monthStr}>{dateObj.toLocaleDateString('fr-FR', {month: 'short'}).toUpperCase()}</Text>
+                    <GlassCard key={entry.id}>
+                        <TouchableOpacity
+                            style={styles.card}
+                            activeOpacity={0.7}
+                            onLongPress={() => confirmDelete(entry.id)}
+                        >
+                            <View style={styles.cardHeader}>
+                                <View style={{ alignItems: 'center' }}>
+                                    <Text style={[styles.dayNum, { color: colors.text }]}>{dateObj.getDate()}</Text>
+                                    <Text style={styles.monthStr}>{dateObj.toLocaleDateString('fr-FR', {month: 'short'}).toUpperCase()}</Text>
+                                </View>
+                                <View style={[styles.moodBadgeText, { backgroundColor: getMoodColor(entry.mood) + '20' }]}>
+                                    <Text style={[styles.moodLabelSmall, { color: getMoodColor(entry.mood) }]}>
+                                        {getMoodLabel(entry.mood)}
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={[styles.moodBadgeText, { backgroundColor: getMoodColor(entry.mood) + '20' }]}>
-                                <Text style={[styles.moodLabelSmall, { color: getMoodColor(entry.mood) }]}>
-                                    {getMoodLabel(entry.mood)}
+                            <View style={styles.cardBody}>
+                                <Text style={[styles.cardTitle, { color: colors.text }]}>{entry.title}</Text>
+                                <Text style={[styles.timeStr, { color: colors.textSub }]}>
+                                    {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                 </Text>
+                                <Text style={[styles.cardContent, { color: colors.textSecondary }]} numberOfLines={3}>{entry.content}</Text>
                             </View>
-                        </View>
-                        <View style={styles.cardBody}>
-                            <Text style={[styles.cardTitle, { color: colors.text }]}>{entry.title}</Text>
-                            <Text style={[styles.timeStr, { color: colors.textSub }]}>
-                                {dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </Text>
-                            <Text style={[styles.cardContent, { color: colors.textSub }]} numberOfLines={3}>{entry.content}</Text>
-                        </View>
-                    </TouchableOpacity>
+                        </TouchableOpacity>
+                    </GlassCard>
                 );
             })}
         </ScrollView>
 
-        <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
-            <View style={[styles.modalOverlay, { backgroundColor: colors.bg }]}>
-                <View style={[styles.modalContent, { backgroundColor: colors.cardBg }]}>
+        <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)} transparent>
+            <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                <View style={[styles.modalContent, { backgroundColor: colors.bg, borderTopColor: colors.border, borderTopWidth: 1 }]}>
                     <View style={styles.modalHeader}>
                         <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle Entrée</Text>
                         <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -212,7 +215,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <Text style={styles.label}>HUMEUR</Text>
-                        <View style={[styles.moodGrid, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
+                        <View style={[styles.moodGrid, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
                             {['happy', 'energetic', 'inspired', 'excited', 'focused', 'calm', 'neutral', 'tired', 'sad', 'stressed', 'anxious'].map(m => (
                                 <TouchableOpacity
                                     key={m}
@@ -236,7 +239,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 
                         <Text style={styles.label}>TITRE</Text>
                         <TextInput 
-                            style={[styles.input, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text }]} 
+                            style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.05)', color: colors.text }]}
                             placeholder="Titre..." 
                             placeholderTextColor={colors.textSub}
                             value={title}
@@ -244,7 +247,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
                         />
 
                         <Text style={styles.label}>DATE & HEURE (YYYY-MM-DDTHH:MM)</Text>
-                        <View style={[styles.inputWithIcon, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7' }]}>
+                        <View style={[styles.inputWithIcon, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
                              <TextInput 
                                 style={{ flex: 1, fontSize: 17, color: colors.text, height: 50 }} 
                                 value={dateInput} 
@@ -254,7 +257,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
                         
                         <Text style={styles.label}>TAGS</Text>
                         <TextInput 
-                            style={[styles.input, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text }]} 
+                            style={[styles.input, { backgroundColor: 'rgba(255,255,255,0.05)', color: colors.text }]}
                             placeholder="ex: travail, idée..." 
                             placeholderTextColor={colors.textSub}
                             value={tagsInput}
@@ -263,7 +266,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
 
                         <Text style={styles.label}>CONTENU</Text>
                         <TextInput 
-                            style={[styles.input, styles.textArea, { backgroundColor: isDarkMode ? '#000' : '#F2F2F7', color: colors.text }]} 
+                            style={[styles.input, styles.textArea, { backgroundColor: 'rgba(255,255,255,0.05)', color: colors.text }]}
                             placeholder="Écrivez ici..." 
                             placeholderTextColor={colors.textSub}
                             value={content}
@@ -279,7 +282,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
                 </View>
             </View>
         </Modal>
-    </View>
+    </PageContainer>
   );
 };
 
