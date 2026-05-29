@@ -3,6 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions, TextInput, Scroll
 import { Play, Pause, X, Clock, List, Plus, Save, Menu, Timer, CheckCircle2, MoreHorizontal, History } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../services/supabase';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 import { Task, FocusSession } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -58,13 +61,12 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   const pulse = useSharedValue(1);
 
   const colors = {
-      bg: isDarkMode ? '#000' : '#F2F2F7',
-      text: isDarkMode ? '#FFF' : '#000',
-      card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      subText: isDarkMode ? '#8E8E93' : '#666',
-      accent: '#007AFF',
-      inputBg: isDarkMode ? '#1C1C1E' : '#FFFFFF'
+      ...Theme.colors,
+      bg: Theme.colors.background,
+      card: Theme.colors.surface,
+      subText: Theme.colors.textSecondary,
+      accent: Theme.colors.primary,
+      inputBg: 'rgba(255,255,255,0.05)'
   };
 
   // --- ANIMATION EFFECTS ---
@@ -382,13 +384,13 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                         onPress={() => { setDurationMinutes(m); setCustomDuration(''); }} 
                         style={[
                             styles.presetBtn, 
-                            { backgroundColor: colors.card, borderColor: colors.border }, 
+                            { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: colors.border },
                             durationMinutes === m && !customDuration && { backgroundColor: colors.text, borderColor: colors.text }
                         ]}
                     >
                         <Text style={[
                             styles.presetText, 
-                            { color: durationMinutes === m && !customDuration ? (isDarkMode ? '#000' : '#FFF') : colors.text }
+                            { color: durationMinutes === m && !customDuration ? '#000' : colors.text }
                         ]}>
                             {m}
                         </Text>
@@ -414,7 +416,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
                             key={task.id} 
                             style={[
                                 styles.taskChip, 
-                                { backgroundColor: selectedTaskId === task.id ? colors.accent : colors.card, borderColor: colors.border }
+                                { backgroundColor: selectedTaskId === task.id ? colors.accent : 'rgba(255,255,255,0.05)', borderColor: colors.border }
                             ]}
                             onPress={() => selectTask(task)}
                         >
@@ -507,18 +509,20 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 40}}>
               {history.length === 0 && <Text style={{color: colors.subText, textAlign: 'center', marginTop: 40}}>Aucune session récente.</Text>}
               {history.map((session, index) => (
-                  <View key={index} style={[styles.historyRow, { borderBottomColor: colors.border }]}>
-                      <View style={[styles.historyIcon, {backgroundColor: colors.card}]}>
-                          <CheckCircle2 size={16} color={colors.accent} />
+                  <GlassCard key={index} style={{ marginBottom: 12 }}>
+                      <View style={styles.historyRow}>
+                          <View style={[styles.historyIcon, {backgroundColor: 'rgba(255,255,255,0.05)'}]}>
+                              <CheckCircle2 size={16} color={colors.accent} />
+                          </View>
+                          <View style={{flex: 1}}>
+                              <Text style={[styles.hTitle, {color: colors.text}]}>{session.title || 'Focus'}</Text>
+                              <Text style={[styles.hDate, {color: colors.subText}]}>
+                                  {session.completed_at ? new Date(session.completed_at).toLocaleDateString() : '-'}
+                              </Text>
+                          </View>
+                          <Text style={[styles.hDuration, {color: colors.text}]}>{session.duration} min</Text>
                       </View>
-                      <View style={{flex: 1}}>
-                          <Text style={[styles.hTitle, {color: colors.text}]}>{session.title || 'Focus'}</Text>
-                          <Text style={[styles.hDate, {color: colors.subText}]}>
-                              {session.completed_at ? new Date(session.completed_at).toLocaleDateString() : '-'}
-                          </Text>
-                      </View>
-                      <Text style={[styles.hDuration, {color: colors.text}]}>{session.duration} min</Text>
-                  </View>
+                  </GlassCard>
               ))}
           </ScrollView>
           <TouchableOpacity onPress={() => changeView('CONFIG')} style={styles.closeHistoryBtn}>
@@ -528,7 +532,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+    <PageContainer style={[styles.container, { paddingTop: insets.top }]}>
         
         {/* Custom Header with Buttons moved here */}
         {viewMode !== 'RUNNING' && (
@@ -556,7 +560,7 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
         {viewMode === 'RUNNING' && renderRunning()}
         {viewMode === 'MANUAL' && renderManual()}
         {viewMode === 'HISTORY' && renderHistory()}
-    </View>
+    </PageContainer>
   );
 };
 
@@ -755,8 +759,7 @@ const styles = StyleSheet.create({
   historyRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 16,
-      borderBottomWidth: 1,
+      padding: 16,
   },
   historyIcon: {
       width: 40,

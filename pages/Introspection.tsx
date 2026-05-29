@@ -3,6 +3,8 @@ import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import Journal from './Journal';
 import ReflectionPage from './Reflection';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Theme } from '../theme';
+import { PageContainer } from '../components/PageContainer';
 
 interface IntrospectionProps {
     userId: string;
@@ -18,14 +20,14 @@ const Introspection: React.FC<IntrospectionProps> = (props) => {
     const insets = useSafeAreaInsets();
 
     const colors = {
-        bg: isDarkMode ? '#000000' : '#F2F2F7',
-        text: isDarkMode ? '#FFFFFF' : '#000000',
-        segmentBg: isDarkMode ? '#1C1C1E' : '#E5E5EA',
-        segmentActive: isDarkMode ? '#636366' : '#FFFFFF',
+        ...Theme.colors,
+        bg: Theme.colors.background,
+        segmentBg: 'rgba(255,255,255,0.1)',
+        segmentActive: 'rgba(255,255,255,0.2)',
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top + 10 }]}>
+        <PageContainer style={[styles.container, { paddingTop: insets.top + 10 }]}>
             <View style={styles.segmentContainer}>
                 <View style={[styles.segment, { backgroundColor: colors.segmentBg }]}>
                     <TouchableOpacity 
@@ -64,7 +66,7 @@ const Introspection: React.FC<IntrospectionProps> = (props) => {
                     />
                 )}
             </View>
-        </View>
+        </PageContainer>
     );
 };
 

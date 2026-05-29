@@ -7,6 +7,9 @@ import { generateActionableCoaching, generateLifeWheelAnalysis, AnalysisResult }
 import { BlurView } from 'expo-blur';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import Svg, { Polygon, Line, Circle, Text as SvgText, G } from 'react-native-svg';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 import Markdown from 'react-native-markdown-display';
 import SkeletonAnalysis from '../components/SkeletonAnalysis';
 
@@ -58,14 +61,11 @@ const AI: React.FC<AIProps> = ({
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
     const colors = {
-        bg: isDarkMode ? '#000000' : '#F2F2F7',
-        card: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-        text: isDarkMode ? '#FFFFFF' : '#000000',
-        textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
-        accent: '#8B5CF6', // Purple
-        accentLight: 'rgba(139, 92, 246, 0.1)',
-        border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-        input: isDarkMode ? '#2C2C2E' : '#F2F2F7'
+        ...Theme.colors,
+        bg: Theme.colors.background,
+        card: Theme.colors.surface,
+        textSub: Theme.colors.textSecondary,
+        accent: Theme.colors.violet,
     };
 
     useEffect(() => {
@@ -211,7 +211,7 @@ const AI: React.FC<AIProps> = ({
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+        <PageContainer style={[styles.container, { paddingTop: insets.top }]}>
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.titleContainer}>
@@ -255,24 +255,28 @@ const AI: React.FC<AIProps> = ({
                                 entering={FadeInDown}
                                 style={[
                                     styles.messageBubble,
-                                    msg.sender === 'user' ? styles.userBubble : [styles.aiBubble, { backgroundColor: colors.card }]
+                                    msg.sender === 'user' ? styles.userBubble : styles.aiBubble
                                 ]}
                             >
                                 {msg.sender === 'ai' ? (
+                                  <GlassCard style={{ padding: 16 }}>
                                     <Markdown style={{
                                         body: { color: colors.text, fontSize: 16 },
                                         paragraph: { marginBottom: 0 }
                                     }}>
                                         {msg.text}
                                     </Markdown>
+                                  </GlassCard>
                                 ) : (
                                     <Text style={styles.userText}>{msg.text}</Text>
                                 )}
                             </Animated.View>
                         ))}
                         {isTyping && (
-                            <View style={[styles.messageBubble, styles.aiBubble, { backgroundColor: colors.card, width: 60 }]}>
-                                <ActivityIndicator size="small" color={colors.accent} />
+                            <View style={[styles.messageBubble, styles.aiBubble, { width: 60 }]}>
+                                <GlassCard style={{ padding: 12, alignItems: 'center' }}>
+                                  <ActivityIndicator size="small" color={colors.accent} />
+                                </GlassCard>
                             </View>
                         )}
                     </ScrollView>
@@ -303,45 +307,53 @@ const AI: React.FC<AIProps> = ({
                         <SkeletonAnalysis />
                     ) : (
                         <>
-                            <Animated.View entering={FadeInDown} style={[styles.analysisCard, { backgroundColor: colors.card }]}>
-                                <Text style={[styles.cardTitle, { color: colors.text }]}>Roue de la Vie</Text>
-                                <Text style={[styles.cardSub, { color: colors.textSub }]}>Équilibre actuel basé sur vos activités</Text>
-                                {renderRadarChart()}
-                                <TouchableOpacity style={[styles.refreshBtn, { borderColor: colors.accent }]} onPress={runAnalysis}>
-                                    <RefreshCw size={16} color={colors.accent} style={{ marginRight: 8 }} />
-                                    <Text style={{ color: colors.accent, fontWeight: '600' }}>Actualiser l'analyse</Text>
-                                </TouchableOpacity>
+                            <Animated.View entering={FadeInDown}>
+                                <GlassCard style={styles.analysisCard}>
+                                    <Text style={[styles.cardTitle, { color: colors.text }]}>Roue de la Vie</Text>
+                                    <Text style={[styles.cardSub, { color: colors.textSub }]}>Équilibre actuel basé sur vos activités</Text>
+                                    {renderRadarChart()}
+                                    <TouchableOpacity style={[styles.refreshBtn, { borderColor: colors.accent }]} onPress={runAnalysis}>
+                                        <RefreshCw size={16} color={colors.accent} style={{ marginRight: 8 }} />
+                                        <Text style={{ color: colors.accent, fontWeight: '600' }}>Actualiser l'analyse</Text>
+                                    </TouchableOpacity>
+                                </GlassCard>
                             </Animated.View>
 
                             <View style={styles.insightGrid}>
-                                <Animated.View entering={FadeInDown.delay(100)} style={[styles.insightCard, { backgroundColor: colors.card }]}>
-                                    <Zap size={24} color="#FACC15" style={{ marginBottom: 10 }} />
-                                    <Text style={[styles.insightTitle, { color: colors.text }]}>Productivité</Text>
-                                    <Text style={[styles.insightValue, { color: colors.text }]}>{productivityScore}%</Text>
-                                    <Text style={[styles.insightSub, { color: colors.textSub }]}>{analysisData?.trends.productivity || "0%"} vs période précédente</Text>
+                                <Animated.View entering={FadeInDown.delay(100)} style={{ flex: 1 }}>
+                                    <GlassCard style={styles.insightCard}>
+                                        <Zap size={24} color="#FACC15" style={{ marginBottom: 10 }} />
+                                        <Text style={[styles.insightTitle, { color: colors.text }]}>Productivité</Text>
+                                        <Text style={[styles.insightValue, { color: colors.text }]}>{productivityScore}%</Text>
+                                        <Text style={[styles.insightSub, { color: colors.textSub }]}>{analysisData?.trends.productivity || "0%"} vs période précédente</Text>
+                                    </GlassCard>
                                 </Animated.View>
-                                <Animated.View entering={FadeInDown.delay(200)} style={[styles.insightCard, { backgroundColor: colors.card }]}>
-                                    <Target size={24} color="#EF4444" style={{ marginBottom: 10 }} />
-                                    <Text style={[styles.insightTitle, { color: colors.text }]}>Objectifs</Text>
-                                    <Text style={[styles.insightValue, { color: colors.text }]}>{goals.filter(g => g.completed).length}/{goals.length}</Text>
-                                    <Text style={[styles.insightSub, { color: colors.textSub }]}>{analysisData?.insights.goals || "Chargement..."}</Text>
+                                <Animated.View entering={FadeInDown.delay(200)} style={{ flex: 1 }}>
+                                    <GlassCard style={styles.insightCard}>
+                                        <Target size={24} color="#EF4444" style={{ marginBottom: 10 }} />
+                                        <Text style={[styles.insightTitle, { color: colors.text }]}>Objectifs</Text>
+                                        <Text style={[styles.insightValue, { color: colors.text }]}>{goals.filter(g => g.completed).length}/{goals.length}</Text>
+                                        <Text style={[styles.insightSub, { color: colors.textSub }]}>{analysisData?.insights.goals || "Chargement..."}</Text>
+                                    </GlassCard>
                                 </Animated.View>
                             </View>
 
-                            <Animated.View entering={FadeInDown.delay(300)} style={[styles.analysisCard, { backgroundColor: colors.card }]}>
-                                <View style={styles.cardHeader}>
-                                    <Sparkles size={20} color={colors.accent} style={{ marginRight: 10 }} />
-                                    <Text style={[styles.cardTitle, { color: colors.text }]}>Conseil du jour</Text>
-                                </View>
-                                <Text style={[styles.insightText, { color: colors.textSub }]}>
-                                    {analysisData?.insights.advice || "Chargement de votre conseil personnalisé..."}
-                                </Text>
+                            <Animated.View entering={FadeInDown.delay(300)}>
+                                <GlassCard style={styles.analysisCard}>
+                                    <View style={styles.cardHeader}>
+                                        <Sparkles size={20} color={colors.accent} style={{ marginRight: 10 }} />
+                                        <Text style={[styles.cardTitle, { color: colors.text }]}>Conseil du jour</Text>
+                                    </View>
+                                    <Text style={[styles.insightText, { color: colors.textSub }]}>
+                                        {analysisData?.insights.advice || "Chargement de votre conseil personnalisé..."}
+                                    </Text>
+                                </GlassCard>
                             </Animated.View>
                         </>
                     )}
                 </ScrollView>
             )}
-        </View>
+        </PageContainer>
     );
 };
 
@@ -356,9 +368,9 @@ const styles = StyleSheet.create({
 
     // Chat
     chatScroll: { flex: 1, paddingHorizontal: 20 },
-    messageBubble: { maxWidth: '85%', padding: 16, borderRadius: 20, marginBottom: 12 },
-    userBubble: { alignSelf: 'flex-end', backgroundColor: '#007AFF' },
-    aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
+    messageBubble: { maxWidth: '85%', borderRadius: 20, marginBottom: 12 },
+    userBubble: { alignSelf: 'flex-end', backgroundColor: '#007AFF', padding: 16 },
+    aiBubble: { alignSelf: 'flex-start' },
     userText: { color: '#FFF', fontSize: 16 },
     inputWrapper: { paddingHorizontal: 20 },
     inputBlur: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 24, borderWidth: 1, overflow: 'hidden' },
@@ -367,13 +379,13 @@ const styles = StyleSheet.create({
 
     // Analysis
     analysisContainer: { flex: 1, paddingHorizontal: 20 },
-    analysisCard: { borderRadius: 24, padding: 20, marginBottom: 20 },
+    analysisCard: { padding: 20, marginBottom: 20 },
     cardTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
     cardSub: { fontSize: 14, marginBottom: 20 },
     chartContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 },
     refreshBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, marginTop: 20 },
     insightGrid: { flexDirection: 'row', gap: 15, marginBottom: 20 },
-    insightCard: { flex: 1, borderRadius: 24, padding: 20 },
+    insightCard: { flex: 1, padding: 20 },
     insightTitle: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
     insightValue: { fontSize: 22, fontWeight: '800', marginBottom: 4 },
     insightSub: { fontSize: 12 },

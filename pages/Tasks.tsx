@@ -8,6 +8,10 @@ import * as Haptics from 'expo-haptics';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeOut, LinearTransition, Layout } from 'react-native-reanimated';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 
 interface TasksProps {
   tasks: Task[];
@@ -22,6 +26,7 @@ interface TasksProps {
   refreshTasks: () => void;
   openMenu: () => void; 
   isDarkMode?: boolean;
+  noPadding?: boolean;
 }
 
 const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, deleteTask, createSubtask, toggleSubtask, deleteSubtask, userId, refreshTasks, openMenu, isDarkMode = true }) => {
@@ -40,17 +45,14 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
   const [isSplitting, setIsSplitting] = useState(false);
 
   const colors = {
-      bg: isDarkMode ? '#000000' : '#F2F2F7',
-      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      text: isDarkMode ? '#FFFFFF' : '#000000',
-      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
-      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      accent: '#007AFF',
-      danger: '#FF3B30',
-      success: '#34C759',
-      priorityHigh: '#FF3B30',
-      priorityMed: '#FF9500',
-      priorityLow: '#34C759'
+      ...Theme.colors,
+      bg: Theme.colors.background,
+      cardBg: Theme.colors.surface,
+      textSub: Theme.colors.textSecondary,
+      accent: Theme.colors.primary,
+      priorityHigh: Theme.colors.danger,
+      priorityMed: Theme.colors.warning,
+      priorityLow: Theme.colors.success
   };
 
   useEffect(() => {
@@ -160,8 +162,12 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       return colors.priorityLow;
   };
 
-  const renderItem = useCallback(({ item }: { item: Task }) => (
-    <View style={{marginBottom: 10}}>
+  const renderItem = useCallback(({ item, index }: { item: Task, index: number }) => (
+    <Animated.View
+        entering={FadeInDown.duration(400).delay(index * 50).springify()}
+        layout={LinearTransition}
+        style={{marginBottom: 10}}
+    >
         <SwipeableRow onSwipeRight={() => toggleTask(item.id)} onSwipeLeft={() => confirmDeleteTask(item.id)}>
             <TaskItem 
                 task={item} 
@@ -174,7 +180,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                 priorityColor={getPriorityColor(item.priority)}
             />
         </SwipeableRow>
-    </View>
+    </Animated.View>
   ), [colors, toggleTask, deleteTask, openEditModal, createSubtask, toggleSubtask, deleteSubtask]);
 
   const ListFooter = () => (
@@ -182,7 +188,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
         <View style={styles.completedGroup}>
             <Text style={[styles.groupHeader, {color: colors.textSub}]}>TERMINÉES ({completedTasks.length})</Text>
             {completedTasks.map((task) => (
-                <View key={task.id} style={{marginBottom: 10}}>
+                <Animated.View key={task.id} layout={LinearTransition} style={{marginBottom: 10}}>
                     <SwipeableRow onSwipeLeft={() => confirmDeleteTask(task.id)}>
                         <TaskItem 
                             task={task} 
@@ -195,14 +201,14 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
                             priorityColor={colors.border}
                         />
                     </SwipeableRow>
-                </View>
+                </Animated.View>
             ))}
         </View>
       ) : null
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+    <PageContainer style={styles.container}>
       <View style={styles.header}>
           <View style={{flex: 1}}>
             <Text style={[styles.largeTitle, {color: colors.text}]}>Tâches</Text>
@@ -284,7 +290,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
               </View>
           </View>
       </Modal>
-    </View>
+    </PageContainer>
   );
 };
 
@@ -335,7 +341,7 @@ const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColo
     const toggleExpand = () => setIsExpanded(!isExpanded);
 
     return (
-        <View style={[styles.taskCard, {backgroundColor: colors.cardBg, borderLeftColor: priorityColor}]}>
+        <GlassCard style={[styles.taskCard, { borderLeftColor: priorityColor }]}>
             <TouchableOpacity style={styles.taskItem} onPress={toggleExpand} onLongPress={onLongPress} activeOpacity={0.7}>
                 <TouchableOpacity onPress={onToggle} style={[styles.checkbox, { borderColor: task.completed ? colors.success : colors.textSub, backgroundColor: task.completed ? colors.success : 'transparent' }]}>
                     {task.completed && <Check size={14} color="#FFF" strokeWidth={4} />}
@@ -367,7 +373,7 @@ const TaskItem = React.memo(({ task, onToggle, onLongPress, colors, priorityColo
                     </View>
                 </View>
             )}
-        </View>
+        </GlassCard>
     )
 }, (prev, next) => {
     return (
@@ -389,7 +395,7 @@ const styles = StyleSheet.create({
   completedGroup: { marginTop: 30 },
   groupHeader: { fontSize: 13, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   
-  taskCard: { borderRadius: 12, borderLeftWidth: 4, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  taskCard: { borderLeftWidth: 4 },
   taskItem: { flexDirection: 'row', alignItems: 'center', padding: 16, minHeight: 60 },
   checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   taskContent: { flex: 1 },

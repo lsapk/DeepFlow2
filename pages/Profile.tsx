@@ -7,6 +7,9 @@ import { supabase } from '../services/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { SlideInDown, SlideOutDown, FadeIn } from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 
 interface ProfileProps {
   user: UserProfile;
@@ -406,7 +409,7 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>INTELLIGENCE ARTIFICIELLE</Text>
               <Text style={styles.sectionSubHeader}>Contrôlez quelles données DeepFlow AI peut analyser pour vous coacher.</Text>
-              <View style={styles.card}>
+              <GlassCard>
                   <SettingItem icon={Brain} label="Journal & Émotions" iconColor="#8B5CF6" isSwitch value={permissions.journal} onToggle={(val: boolean) => updateAiPermission('journal', val)} />
                   <View style={styles.separator} />
                   <SettingItem icon={Check} label="Tâches & Projets" iconColor="#10B981" isSwitch value={permissions.tasks} onToggle={(val: boolean) => updateAiPermission('tasks', val)} />
@@ -418,20 +421,20 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
                   <SettingItem icon={Zap} label="Sessions Focus" iconColor="#3B82F6" isSwitch value={permissions.focus} onToggle={(val: boolean) => updateAiPermission('focus', val)} />
                   <View style={styles.separator} />
                   <SettingItem icon={User} label="Profil & Progression" iconColor="#6366F1" isSwitch value={permissions.profile} onToggle={(val: boolean) => updateAiPermission('profile', val)} />
-              </View>
+              </GlassCard>
           </View>
 
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>APPARENCE</Text>
-              <View style={styles.card}>
+              <GlassCard>
                   <SettingItem icon={settings.theme === 'dark' ? Moon : Sun} label="Mode Sombre" iconColor="#5856D6" isSwitch value={settings.theme === 'dark'} onToggle={(val: boolean) => updateSetting('theme', val ? 'dark' : 'light')} />
-              </View>
+              </GlassCard>
           </View>
 
           {isAdmin && (
               <View style={styles.section}>
                   <Text style={styles.sectionHeader}>ADMINISTRATION</Text>
-                  <View style={styles.card}>
+                  <GlassCard>
                       <SettingItem
                           icon={Shield}
                           label="Panneau d'administration"
@@ -443,13 +446,13 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
                               }
                           }}
                       />
-                  </View>
+                  </GlassCard>
               </View>
           )}
 
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>SUPPORT & LÉGAL</Text>
-              <View style={styles.card}>
+              <GlassCard>
                   <SettingItem icon={Mail} label="Contacter le Support" iconColor="#EC4899" onPress={contactSupport} />
                   <View style={styles.separator} />
                   <SettingItem icon={HelpCircle} label="FAQ" iconColor="#14B8A6" onPress={() => openLegal('Foire Aux Questions', LEGAL_CONTENT.FAQ)} />
@@ -459,12 +462,12 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
                   <SettingItem icon={FileText} label="Conditions d'Utilisation (CGU)" iconColor="#64748B" onPress={() => openLegal('Conditions Générales', LEGAL_CONTENT.TERMS)} />
                   <View style={styles.separator} />
                   <SettingItem icon={Scale} label="Mentions Légales" iconColor="#64748B" onPress={() => openLegal('Mentions Légales', LEGAL_CONTENT.LEGAL)} />
-              </View>
+              </GlassCard>
           </View>
 
           <View style={styles.section}>
               <Text style={styles.sectionHeader}>ZONE DE DANGER</Text>
-              <View style={styles.card}>
+              <GlassCard>
                   <TouchableOpacity style={styles.item} onPress={() => Alert.alert("Déconnexion", "Voulez-vous vraiment vous déconnecter ?", [{text: "Annuler"}, {text: "Oui", style: 'destructive', onPress: logout}])}>
                         <View style={styles.itemLeft}><View style={[styles.iconBox, { backgroundColor: '#F59E0B' }]}><LogOut size={18} color="white" /></View><Text style={[styles.label, {color: '#F59E0B'}]}>Se déconnecter</Text></View>
                   </TouchableOpacity>
@@ -472,7 +475,7 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
                   <TouchableOpacity style={styles.item} onPress={() => { Alert.alert("Attention", "Cette action est irréversible. Vos données seront effacées.", [{text: "Annuler"}, {text: "Supprimer", style: 'destructive', onPress: () => Alert.alert("Confirmation", "Contactez le support pour finaliser la suppression.")}]) }}>
                         <View style={styles.itemLeft}><View style={[styles.iconBox, { backgroundColor: '#EF4444' }]}><Trash2 size={18} color="white" /></View><Text style={[styles.label, {color: '#EF4444'}]}>Supprimer mon compte</Text></View>
                   </TouchableOpacity>
-              </View>
+              </GlassCard>
           </View>
           
           <View style={styles.footer}>
@@ -501,7 +504,7 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
         exiting={SlideOutDown.duration(300)}
         style={styles.overlay}
     >
-        <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? 20 : insets.top }]}>
+        <PageContainer style={[styles.container, { paddingTop: Platform.OS === 'android' ? 20 : insets.top }]}>
             <View style={styles.header}>
                 <View />
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -525,7 +528,7 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
 
             {loading ? (
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#FFF" />
+                    <ActivityIndicator size="large" color={Theme.colors.primary} />
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -534,7 +537,7 @@ const Profile: React.FC<ProfileProps> = ({ user, logout, visible, onClose, onThe
                     {activeTab === 'STATS' && renderStatsTab()}
                 </ScrollView>
             )}
-        </View>
+        </PageContainer>
 
 
         {/* LEGAL MODAL */}
@@ -577,11 +580,11 @@ const SettingItem = ({ icon: Icon, label, isSwitch, value, onToggle, iconColor, 
 );
 
 const StatCard = ({ label, value, icon: Icon, color }: any) => (
-    <View style={styles.statCard}>
+    <GlassCard style={styles.statCard}>
         <Icon size={24} color={color} style={{marginBottom: 8}} />
-        <Text style={styles.statCardValue}>{value}</Text>
+        <Text style={[styles.statCardValue, { color: Theme.colors.text }]}>{value}</Text>
         <Text style={styles.statCardLabel}>{label}</Text>
-    </View>
+    </GlassCard>
 );
 
 const styles = StyleSheet.create({
@@ -617,7 +620,7 @@ const styles = StyleSheet.create({
   // Profile Tab
   profileHeader: { alignItems: 'center', marginBottom: 10 },
   avatarContainer: { marginBottom: 16, alignItems: 'center', justifyContent: 'center' },
-  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: '#1C1C1E' },
+  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: Theme.colors.border },
   levelBadge: { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#007AFF', width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#000' },
   levelBadgeText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
   name: { fontSize: 24, fontWeight: '800', color: '#FFF', marginBottom: 4 },
@@ -654,7 +657,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#1C1C1E', borderRadius: 14, overflow: 'hidden' },
   item: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, minHeight: 56 },
   separator: { height: 1, backgroundColor: '#262626', marginLeft: 56 },
-  itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
   iconBox: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 16, color: '#FFF', fontWeight: '500' },
 
@@ -672,7 +675,7 @@ const styles = StyleSheet.create({
 
   // Stats Tab
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statCard: { width: '48%', backgroundColor: '#1C1C1E', padding: 16, borderRadius: 16, alignItems: 'center' },
+  statCard: { width: '48%', padding: 16, alignItems: 'center' },
   statCardValue: { color: '#FFF', fontSize: 24, fontWeight: '700', marginBottom: 4 },
   statCardLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
 

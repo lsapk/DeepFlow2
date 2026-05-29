@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
 import Tasks from './Tasks';
 import Habits from './Habits';
 import Goals from './Goals';
 import { Task, Habit, Goal } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Theme } from '../theme';
+import { PageContainer } from '../components/PageContainer';
+import { BlurView } from 'expo-blur';
 
 interface PlanningProps {
     tasks: Task[];
@@ -40,14 +43,14 @@ const Planning: React.FC<PlanningProps> = (props) => {
     const insets = useSafeAreaInsets();
 
     const colors = {
-        bg: isDarkMode ? '#000000' : '#F2F2F7',
-        text: isDarkMode ? '#FFFFFF' : '#000000',
-        segmentBg: isDarkMode ? '#1C1C1E' : '#E5E5EA',
-        segmentActive: isDarkMode ? '#636366' : '#FFFFFF',
+        bg: Theme.colors.background,
+        text: Theme.colors.text,
+        segmentBg: 'rgba(255,255,255,0.05)',
+        segmentActive: 'rgba(255,255,255,0.15)',
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top + 10 }]}>
+        <PageContainer style={[styles.container, { paddingTop: insets.top + 10 }]}>
             {/* Top Navigation Segment */}
             <View style={styles.segmentContainer}>
                 <View style={[styles.segment, { backgroundColor: colors.segmentBg }]}>
@@ -123,7 +126,7 @@ const Planning: React.FC<PlanningProps> = (props) => {
                     />
                 )}
             </View>
-        </View>
+        </PageContainer>
     );
 };
 

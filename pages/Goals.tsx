@@ -4,6 +4,9 @@ import { Goal, SubObjective } from '../types';
 import { Plus, Check, ChevronDown, ChevronUp, X, Minus, Flag, GitBranch, Menu } from 'lucide-react-native';
 import { supabase } from '../services/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Theme } from '../theme';
+import { GlassCard } from '../components/GlassCard';
+import { PageContainer } from '../components/PageContainer';
 
 interface GoalsProps {
   goals: Goal[];
@@ -34,15 +37,12 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   const [formProgress, setFormProgress] = useState(0);
 
   const colors = {
-      bg: isDarkMode ? '#000000' : '#F2F2F7',
-      cardBg: isDarkMode ? '#1C1C1E' : '#FFFFFF',
-      text: isDarkMode ? '#FFFFFF' : '#000000',
-      textSub: isDarkMode ? '#8E8E93' : '#8E8E93',
-      border: isDarkMode ? '#2C2C2E' : '#E5E5EA',
-      accent: '#007AFF',
-      orange: '#FF9500',
-      danger: '#FF3B30',
-      success: '#34C759'
+      ...Theme.colors,
+      bg: Theme.colors.background,
+      cardBg: Theme.colors.surface,
+      textSub: Theme.colors.textSecondary,
+      accent: Theme.colors.primary,
+      orange: Theme.colors.warning,
   };
 
   const openCreateModal = () => {
@@ -101,7 +101,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
   const completedGoals = goals.filter(t => t.completed);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: noPadding ? 0 : 20 }]}>
+    <PageContainer style={[styles.container, { paddingTop: noPadding ? 0 : 20 }]}>
       <View style={styles.header}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
                <Text style={[styles.largeTitle, { color: colors.text }]}>Objectifs</Text>
@@ -251,7 +251,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, toggleGoal, addGoal, deleteGoal, c
           </View>
       </Modal>
 
-    </View>
+    </PageContainer>
   );
 };
 
@@ -272,7 +272,7 @@ const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLon
     };
 
     return (
-        <View style={[styles.goalCard, {backgroundColor: colors.cardBg}]}>
+        <GlassCard style={styles.goalCard}>
             <TouchableOpacity style={styles.taskItem} onPress={onToggleExpand} onLongPress={onLongPress} activeOpacity={0.8}>
                 <View style={styles.headerRow}>
                     <TouchableOpacity onPress={onToggle}>
@@ -289,8 +289,8 @@ const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLon
 
                 {!goal.completed && (
                     <View style={styles.rpgProgressContainer}>
-                         <View style={[styles.rpgBarBg, {backgroundColor: '#333'}]}>
-                             <LinearGradient colors={['#4F46E5', '#9333EA']} start={{x: 0, y: 0}} end={{x: 1, y: 0}} style={[styles.rpgBarFill, { width: `${goal.progress || 0}%` }]} />
+                         <View style={[styles.rpgBarBg, {backgroundColor: 'rgba(255,255,255,0.1)'}]}>
+                             <LinearGradient colors={[Theme.colors.primary, Theme.colors.violet]} start={{x: 0, y: 0}} end={{x: 1, y: 0}} style={[styles.rpgBarFill, { width: `${goal.progress || 0}%` }]} />
                              <View style={[styles.milestone, {left: '25%'}]} />
                              <View style={[styles.milestone, {left: '50%'}]} />
                              <View style={[styles.milestone, {left: '75%'}]} />
@@ -325,7 +325,7 @@ const GoalItem = React.memo(({ goal, isExpanded, onToggle, onToggleExpand, onLon
                     </View>
                 </View>
             )}
-        </View>
+        </GlassCard>
     )
 }, (prev, next) => {
     return (
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   toggleCompletedBtn: { padding: 16, alignItems: 'center' },
   toggleText: { fontSize: 15, fontWeight: '500' },
   emptyText: { padding: 20, textAlign: 'center', fontStyle: 'italic' },
-  goalCard: { borderRadius: 16, overflow: 'hidden', paddingBottom: 4 },
+  goalCard: { overflow: 'hidden', paddingBottom: 4 },
   taskItem: { padding: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   taskContent: { flex: 1 },
