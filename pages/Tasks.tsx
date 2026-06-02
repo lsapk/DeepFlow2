@@ -154,7 +154,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, goals, toggleTask, addTask, delete
       });
   }, [tasks]);
 
-  const completedTasks = useMemo(() => tasks.filter(t => t.completed), [tasks]);
+  const completedTasks = useMemo(() => tasks.filter(t => t.completed).slice(0, 20), [tasks]);
 
   const getPriorityColor = (p: string) => {
       if (p === 'high') return colors.priorityHigh;

@@ -89,8 +89,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                await supabase.from('user_profiles').update({
-                    bio: JSON.stringify({ onboarding_quiz: finalAnswers })
+                const { data: settings } = await supabase.from('user_settings').select('unlocked_features').eq('id', user.id).single();
+                const unlockedFeatures = settings?.unlocked_features || {};
+
+                await supabase.from('user_settings').update({
+                    unlocked_features: { ...unlockedFeatures, onboarding_quiz: finalAnswers }
                 }).eq('id', user.id);
             }
         } catch (e) {
