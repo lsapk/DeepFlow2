@@ -278,11 +278,38 @@ const App: React.FC = () => {
           isAdmin(userId).then(setUserIsAdmin);
       }
 
-      const { data: settingsData } = await supabase.from('user_settings').select('theme').eq('id', userId).single();
-      if (settingsData && settingsData.theme) setIsDarkMode(settingsData.theme === 'dark');
+      const { data: settingsData } = await supabase.from('user_settings').select('theme, unlocked_features').eq('id', userId).single();
+      if (settingsData) {
+          if (settingsData.theme) setIsDarkMode(settingsData.theme === 'dark');
+
+          // MIGRATION: bio -> user_settings.unlocked_features
+          if (userData?.bio) {
+              try {
+                  const bioData = JSON.parse(userData.bio);
+                  if (bioData.onboarding_quiz) {
+                      const updatedFeatures = {
+                          ...(settingsData.unlocked_features || {}),
+                          onboarding_quiz: bioData.onboarding_quiz
+                      };
+                      await supabase.from('user_settings').update({ unlocked_features: updatedFeatures }).eq('id', userId);
+                      await supabase.from('user_profiles').update({ bio: null }).eq('id', userId);
+                  }
+              } catch (e) {
+                  // bio is likely plain text, no migration needed
+              }
+          }
+      }
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
 
       const [tasksRes, habitsRes, goalsRes, focusRes, journalRes, reflectionRes] = await Promise.all([
-          supabase.from('tasks').select('*, subtasks(*)').eq('user_id', userId).order('created_at', { ascending: false }),
+          supabase.from('tasks')
+            .select('*, subtasks(*)')
+            .eq('user_id', userId)
+            .or(`completed.eq.false,updated_at.gte.${thirtyDaysAgoIso}`)
+            .order('created_at', { ascending: false }),
           supabase.from('habits').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
           supabase.from('goals').select('*, subobjectives(*)').eq('user_id', userId),
           supabase.from('focus_sessions').select('*').eq('user_id', userId),

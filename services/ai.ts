@@ -144,10 +144,17 @@ export const generateActionableCoaching = async (
   logAiUsage('chat').catch(() => {});
   
   try {
+    const { data: settings } = await supabase.from('user_settings').select('unlocked_features').single();
+    const onboardingQuiz = settings?.unlocked_features?.onboarding_quiz;
+
     let systemInstruction = `
       Tu es DeepFlow, un coach de productivité expert.
       Réponds en Français, sois concis, direct et motivant. Utilise le format Markdown.
     `;
+
+    if (onboardingQuiz) {
+        systemInstruction += `\nPréférences utilisateur issues de l'onboarding : ${JSON.stringify(onboardingQuiz)}\n`;
+    }
 
     if (isCreationMode) {
         systemInstruction += `
@@ -217,8 +224,12 @@ export const generateLifeWheelAnalysis = async (fullContext: any): Promise<Analy
     logAiUsage('analysis').catch(() => {});
 
     try {
+        const { data: settings } = await supabase.from('user_settings').select('unlocked_features').single();
+        const onboardingQuiz = settings?.unlocked_features?.onboarding_quiz;
+
         const prompt = `
         Analyse ces données utilisateur (Tâches, Habitudes, Journal) pour évaluer l'équilibre de vie et fournir des insights de productivité.
+        ${onboardingQuiz ? `Préférences onboarding: ${JSON.stringify(onboardingQuiz)}` : ''}
         Données: ${JSON.stringify(fullContext).substring(0, 10000)} 
         
         Réponds UNIQUEMENT avec un JSON structuré comme suit :

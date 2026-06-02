@@ -262,6 +262,19 @@ const Focus: React.FC<FocusProps> = ({ onExit, tasks = [], isDarkMode = true, op
       await cancelNotifications();
       await scheduleNotifications(d * 60);
 
+      // Immediate notification for start
+      await Notifications.scheduleNotificationAsync({
+          content: {
+              title: "Session Focus",
+              body: "Session de focus démarrée ! Restez concentré. 🎯",
+              sound: true,
+          },
+          trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds: 1,
+          },
+      });
+
       setDurationMinutes(d);
       setEndTimeTimestamp(endTimestamp);
       setTimeLeft(d * 60);

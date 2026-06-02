@@ -25,16 +25,28 @@ export const computeProductivityScore = ({
   // 1. RECENT ACTIVITY (Last 7 days)
   const sevenDaysAgo = new Date(referenceDate);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const oneDayAgo = new Date(referenceDate);
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-  const recentCompletedTasks = tasks.filter(t => t.completed && t.updated_at && new Date(t.updated_at) >= sevenDaysAgo).length;
+  // Daily Momentum: Tasks in last 24h count 1.5x
+  const weightedTaskCount = tasks
+    .filter(t => t.completed && t.updated_at && new Date(t.updated_at) >= sevenDaysAgo)
+    .reduce((acc, t) => {
+        const isRecent = new Date(t.updated_at!) >= oneDayAgo;
+        return acc + (isRecent ? 1.5 : 1.0);
+    }, 0);
+
   const recentFocusMinutes = focusSessions
     .filter(s => new Date(s.completed_at!) >= sevenDaysAgo)
-    .reduce((acc, s) => acc + (s.duration || 0), 0);
+    .reduce((acc, s) => {
+        const isRecent = new Date(s.completed_at!) >= oneDayAgo;
+        return acc + (s.duration || 0) * (isRecent ? 1.2 : 1.0); // Focus also gets a slight boost
+    }, 0);
 
-  // 12 tasks in a week = 50 pts
-  const taskComponent = Math.min(50, (recentCompletedTasks / 12) * 50);
-  // 6 hours of focus in a week = 50 pts
-  const focusComponent = Math.min(50, (recentFocusMinutes / 360) * 50);
+  // 24 weighted tasks in a week = 50 pts (Increased from 12)
+  const taskComponent = Math.min(50, (weightedTaskCount / 24) * 50);
+  // 10 hours (600 min) of weighted focus in a week = 50 pts (Increased from 360)
+  const focusComponent = Math.min(50, (recentFocusMinutes / 600) * 50);
   const recentActivityScore = taskComponent + focusComponent; // Max 100
 
   // 2. HABITS & CONSISTENCY (Last 14 days)
