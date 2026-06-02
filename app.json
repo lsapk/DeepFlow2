@@ -1,5 +1,6 @@
 {
   "expo": {
+    "newArchEnabled": true,
     "name": "DeepFlow",
     "slug": "deepflow",
     "version": "1.0.0",

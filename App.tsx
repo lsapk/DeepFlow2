@@ -503,6 +503,7 @@ const App: React.FC = () => {
             const offset = await analyzeQualitativeProductivity(context);
             setAiProductivityOffset(offset);
             await AsyncStorage.setItem(`ai_productivity_offset_${userId}`, offset.toString());
+            // Only mark as run today if successful
             await AsyncStorage.setItem(`last_ai_productivity_run_${userId}`, today);
         }
     } catch (e) {
