@@ -20,7 +20,30 @@ const getGeminiFriendlyError = (error: unknown) => {
     return "🚫 **Erreur IA**\n\nVérifiez votre connexion internet ou la validité de votre clé API.";
 };
 
+const retryWithExponentialBackoff = async <T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 2,
+    initialDelay: number = 2000
+): Promise<T> => {
+    let retryCount = 0;
+    while (true) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            const errorMsg = error instanceof Error ? error.message : String(error || '');
+            const is503 = errorMsg.includes('status: 503') || errorMsg.includes('503');
 
+            if (is503 && retryCount < maxRetries) {
+                retryCount++;
+                const delay = initialDelay * Math.pow(2, retryCount - 1);
+                console.log(`Gemini API 503 error. Retrying in ${delay}ms (Attempt ${retryCount}/${maxRetries})...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+};
 
 const getAiLimitMessage = (type: AiFeatureType) => {
     if (type === 'chat') {
@@ -286,21 +309,25 @@ export const analyzeQualitativeProductivity = async (fullContext: any): Promise<
         }
         `;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: prompt,
-            config: { responseMimeType: 'application/json' }
+        const response = await retryWithExponentialBackoff(async () => {
+            return await ai.models.generateContent({
+                model: "gemini-3-flash-preview",
+                contents: prompt,
+                config: { responseMimeType: 'application/json' }
+            });
         });
 
         const text = response.text;
-        if (!text) return 0;
+        if (!text) throw new Error("Empty response from AI");
 
         const data = JSON.parse(text);
-        return data.offset || 0;
+        if (typeof data.offset !== 'number') throw new Error("Invalid AI response format");
+
+        return data.offset;
 
     } catch (e) {
         console.error("Error in analyzeQualitativeProductivity:", e);
-        return 0;
+        throw e; // Rethrow to allow caller to handle failure
     }
 };
 

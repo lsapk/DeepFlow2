@@ -203,7 +203,7 @@ const Journal: React.FC<JournalProps> = ({ userId, openMenu, isDarkMode = true, 
             })}
         </ScrollView>
 
-        <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)} transparent>
+        <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
             <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
                 <View style={[styles.modalContent, { backgroundColor: colors.bg, borderTopColor: colors.border, borderTopWidth: 1 }]}>
                     <View style={styles.modalHeader}>
